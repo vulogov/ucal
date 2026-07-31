@@ -1,6 +1,6 @@
 # ucal-core
 
-Ticks, tiers, text and binary forms, ucids, exact rationals and certified intervals.
+Ticks, tiers, text and binary forms, UCIDs, exact rationals and certified intervals.
 
 Part of [**ucal**](https://github.com/vulogov/ucal), an implementation of RFC
 UCAL-1: absolute time as an unsigned integer count of Planck-time units since a

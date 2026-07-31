@@ -1,6 +1,6 @@
 # ucal-cosmo
 
-Flat lambdacdm, t <-> z, by certified integer interval quadrature.
+Flat ΛCDM, t ↔ z, by certified integer interval quadrature.
 
 Part of [**ucal**](https://github.com/vulogov/ucal), an implementation of RFC
 UCAL-1: absolute time as an unsigned integer count of Planck-time units since a

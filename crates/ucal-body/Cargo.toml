@@ -15,7 +15,7 @@ keywords = ["calendar", "astronomy", "ephemeris", "planetary", "mars"]
 # the derived-calendar path from reaching declared civil tables (failure mode F9),
 # and `cargo run -p xtask -- lint` asserts the absence.
 [dependencies]
-ucal-core = { version = "0.1.0", path = "../ucal-core", default-features = false }
+ucal-core = { version = "0.1.1", path = "../ucal-core", default-features = false }
 
 [features]
 default = ["u512", "std"]

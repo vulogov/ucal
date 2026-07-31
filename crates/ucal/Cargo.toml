@@ -12,12 +12,12 @@ categories = ["command-line-utilities", "date-and-time", "science"]
 keywords = ["time", "calendar", "datetime", "planck", "cosmology"]
 
 [dependencies]
-ucal-core = { version = "0.1.0", path = "../ucal-core", default-features = false }
-ucal-civil = { version = "0.1.0", path = "../ucal-civil", default-features = false, optional = true }
+ucal-core = { version = "0.1.1", path = "../ucal-core", default-features = false }
+ucal-civil = { version = "0.1.1", path = "../ucal-civil", default-features = false, optional = true }
 # The facade may depend on both; §12 forbids only ucal-body -> ucal-civil.
-ucal-body = { version = "0.1.0", path = "../ucal-body", default-features = false, optional = true }
-ucal-events = { version = "0.1.0", path = "../ucal-events", default-features = false, optional = true }
-ucal-cosmo = { version = "0.1.0", path = "../ucal-cosmo", default-features = false, optional = true }
+ucal-body = { version = "0.1.1", path = "../ucal-body", default-features = false, optional = true }
+ucal-events = { version = "0.1.1", path = "../ucal-events", default-features = false, optional = true }
+ucal-cosmo = { version = "0.1.1", path = "../ucal-cosmo", default-features = false, optional = true }
 clap = { version = "4", features = ["derive", "wrap_help"] }
 
 [features]
@@ -31,7 +31,7 @@ events = ["dep:ucal-events"]
 cosmo = ["dep:ucal-cosmo"]
 
 [dev-dependencies]
-ucal-events = { version = "0.1.0", path = "../ucal-events", default-features = false }
+ucal-events = { version = "0.1.1", path = "../ucal-events", default-features = false }
 
 [[bin]]
 name = "ucal"

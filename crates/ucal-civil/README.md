@@ -1,6 +1,6 @@
 # ucal-civil
 
-The si bridge: tt pivot, tai, utc, leap seconds, gregorian and julian.
+The SI bridge: TT pivot, TAI, UTC, leap seconds, Gregorian and Julian.
 
 Part of [**ucal**](https://github.com/vulogov/ucal), an implementation of RFC
 UCAL-1: absolute time as an unsigned integer count of Planck-time units since a

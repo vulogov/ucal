@@ -19,7 +19,7 @@ num-rational = { version = "0.4", default-features = false, features = ["std", "
 sha2 = "0.10"
 # Documentation generation reads the tier and locale tables from the library, so
 # that §13.5's single source of truth is the library itself and not a copy.
-ucal-core = { version = "0.1.0", path = "../crates/ucal-core" }
+ucal-core = { version = "0.1.1", path = "../crates/ucal-core" }
 
 [[bin]]
 name = "xtask"
