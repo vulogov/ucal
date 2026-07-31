@@ -7,12 +7,15 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 description = "Universe Calendar bodies: cited, tick-native rotation and orbital parameters (Rule C)"
+readme = "README.md"
+categories = ["date-and-time", "science"]
+keywords = ["time", "calendar", "mars", "astronomy", "planetary"]
 
 # §12: ucal-body MUST NOT depend on ucal-civil. The graph itself is what prevents
 # the derived-calendar path from reaching declared civil tables (failure mode F9),
 # and `cargo run -p xtask -- lint` asserts the absence.
 [dependencies]
-ucal-core = { path = "../ucal-core", default-features = false }
+ucal-core = { version = "0.1.0", path = "../ucal-core", default-features = false }
 
 [features]
 default = ["u512", "std"]
