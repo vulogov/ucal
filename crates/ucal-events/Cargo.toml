@@ -9,7 +9,7 @@ repository.workspace = true
 description = "Universe Calendar event catalogue: cited, interval-valued cosmological and geological milestones"
 readme = "README.md"
 categories = ["date-and-time", "science"]
-keywords = ["time", "cosmology", "timeline", "geology", "chronology"]
+keywords = ["time", "cosmology", "timeline", "astronomy", "geology"]
 
 # D-7: versioned by citation set, independently of the library, so a revised
 # citation does not force a library release.

@@ -9,7 +9,7 @@ repository.workspace = true
 description = "Universe Calendar cosmology: flat LambdaCDM by certified integer interval quadrature"
 readme = "README.md"
 categories = ["science", "mathematics"]
-keywords = ["cosmology", "lambda-cdm", "redshift", "interval-arithmetic", "time"]
+keywords = ["cosmology", "redshift", "interval-arithmetic", "physics", "lambda-cdm"]
 
 [dependencies]
 ucal-core = { version = "0.1.0", path = "../ucal-core", default-features = false }

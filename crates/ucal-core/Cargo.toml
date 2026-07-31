@@ -9,7 +9,7 @@ repository.workspace = true
 description = "Universe Calendar core: absolute time in Planck ticks, base-5 tier grid, profile UC-1"
 readme = "README.md"
 categories = ["date-and-time", "no-std", "science"]
-keywords = ["time", "calendar", "planck", "cosmology", "no_std"]
+keywords = ["time", "calendar", "no-std", "exact-arithmetic", "planck"]
 
 [dependencies]
 bnum = { workspace = true, optional = true, features = ["alloc"] }

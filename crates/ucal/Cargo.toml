@@ -9,7 +9,7 @@ repository.workspace = true
 description = "Universe Calendar: absolute time in Planck ticks with a base-5 tier calendar"
 readme = "README.md"
 categories = ["command-line-utilities", "date-and-time", "science"]
-keywords = ["time", "calendar", "planck", "cosmology", "cli"]
+keywords = ["time", "calendar", "datetime", "planck", "cosmology"]
 
 [dependencies]
 ucal-core = { version = "0.1.0", path = "../ucal-core", default-features = false }

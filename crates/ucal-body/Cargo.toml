@@ -9,7 +9,7 @@ repository.workspace = true
 description = "Universe Calendar bodies: cited, tick-native rotation and orbital parameters (Rule C)"
 readme = "README.md"
 categories = ["date-and-time", "science"]
-keywords = ["time", "calendar", "mars", "astronomy", "planetary"]
+keywords = ["calendar", "astronomy", "ephemeris", "planetary", "mars"]
 
 # §12: ucal-body MUST NOT depend on ucal-civil. The graph itself is what prevents
 # the derived-calendar path from reaching declared civil tables (failure mode F9),
