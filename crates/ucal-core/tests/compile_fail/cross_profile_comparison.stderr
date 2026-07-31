@@ -1,0 +1,8 @@
+error[E0308]: mismatched types
+  --> tests/compile_fail/cross_profile_comparison.rs:11:18
+   |
+11 |     let _ = a == b;
+   |                  ^ expected `Instant<UC1>`, found `Instant<UC1Prime>`
+   |
+   = note: expected struct `ucal_core::Instant<UC1>`
+              found struct `ucal_core::Instant<UC1Prime>`

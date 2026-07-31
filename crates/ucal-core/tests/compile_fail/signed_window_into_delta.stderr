@@ -1,0 +1,7 @@
+error[E0277]: the trait bound `Delta: From<SignedWindow>` is not satisfied
+ --> tests/compile_fail/signed_window_into_delta.rs:7:27
+  |
+7 |     let _d: Delta = claim.into();
+  |                           ^^^^ the trait `From<SignedWindow>` is not implemented for `Delta`
+  |
+  = note: required for `SignedWindow` to implement `Into<Delta>`

@@ -1,0 +1,26 @@
+[package]
+name = "ucal-body"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Universe Calendar bodies: cited, tick-native rotation and orbital parameters (Rule C)"
+
+# §12: ucal-body MUST NOT depend on ucal-civil. The graph itself is what prevents
+# the derived-calendar path from reaching declared civil tables (failure mode F9),
+# and `cargo run -p xtask -- lint` asserts the absence.
+[dependencies]
+ucal-core = { path = "../ucal-core", default-features = false }
+
+[features]
+default = ["u512", "std"]
+u512 = ["ucal-core/u512"]
+bigint = ["ucal-core/bigint"]
+std = ["ucal-core/std", "alloc"]
+alloc = ["ucal-core/alloc"]
+
+[lints.rust]
+missing_docs = "warn"
+unsafe_code = "forbid"

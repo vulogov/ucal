@@ -1,0 +1,52 @@
+[package]
+name = "ucal-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Universe Calendar core: absolute time in Planck ticks, base-5 tier grid, profile UC-1"
+categories = ["date-and-time", "no-std", "science"]
+keywords = ["time", "calendar", "planck", "cosmology", "no_std"]
+
+[dependencies]
+bnum = { workspace = true, optional = true, features = ["alloc"] }
+num-bigint = { workspace = true, optional = true }
+num-integer = { workspace = true, optional = true }
+num-traits = { workspace = true, optional = true }
+
+[features]
+default = ["u512", "std"]
+
+# Default backend (RFC §3.1, D-4): stack-allocated, Copy, const-constructible.
+u512 = ["dep:bnum"]
+
+# Alternative backend. Removes `Copy` from Instant/Delta/Window (§3.2) and
+# enforces the same [0, 2^512) ceiling (Rule W). It implies `alloc`, because a
+# heap-backed integer cannot be built without one — GE-5's no-alloc build is
+# therefore a `u512` build by construction, which is the honest statement of
+# what that experiment tested.
+bigint = ["dep:num-bigint", "dep:num-integer", "dep:num-traits", "alloc"]
+
+std = ["alloc"]
+# Radix formatting and the text codecs need alloc. GE-5 tests the no-alloc build.
+alloc = []
+
+[dev-dependencies]
+# Compile-fail harness for §21.3 assertions 3 and 11.
+trybuild = "1"
+# Rule E: a float oracle is permitted in dev-dependencies ONLY as a test oracle.
+# None is needed at this phase; ucal-cosmo's arrives at UC-P16.
+
+[lints.rust]
+missing_docs = "warn"
+unsafe_code = "forbid"
+
+[lints.clippy]
+# Rule O is enforced structurally — no wrapping or saturating operation is
+# exposed on a time type, and `cargo run -p xtask -- lint` asserts that no
+# `wrapping_`/`saturating_`/`overflowing_` token appears in a shipped crate.
+# A blanket `arithmetic_side_effects` deny would only flag index and exponent
+# arithmetic on small integers, which is not what the rule is about.
+undocumented_unsafe_blocks = "deny"

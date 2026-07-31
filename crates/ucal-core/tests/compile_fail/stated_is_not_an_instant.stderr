@@ -1,0 +1,5 @@
+error[E0599]: no method named `checked_add` found for struct `Stated<P>` in the current scope
+ --> tests/compile_fail/stated_is_not_an_instant.rs:9:15
+  |
+9 |     let _ = s.checked_add(&Delta::one_tick());
+  |               ^^^^^^^^^^^ method not found in `Stated<UC1>`

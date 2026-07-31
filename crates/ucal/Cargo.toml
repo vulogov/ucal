@@ -1,0 +1,41 @@
+[package]
+name = "ucal"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Universe Calendar: absolute time in Planck ticks with a base-5 tier calendar"
+categories = ["command-line-utilities", "date-and-time", "science"]
+keywords = ["time", "calendar", "planck", "cosmology", "cli"]
+
+[dependencies]
+ucal-core = { path = "../ucal-core", default-features = false }
+ucal-civil = { path = "../ucal-civil", default-features = false, optional = true }
+# The facade may depend on both; §12 forbids only ucal-body -> ucal-civil.
+ucal-body = { path = "../ucal-body", default-features = false, optional = true }
+ucal-events = { path = "../ucal-events", default-features = false, optional = true }
+ucal-cosmo = { path = "../ucal-cosmo", default-features = false, optional = true }
+clap = { version = "4", features = ["derive", "wrap_help"] }
+
+[features]
+default = ["u512", "std", "civil", "body", "events", "cosmo"]
+u512 = ["ucal-core/u512", "ucal-civil?/u512", "ucal-body?/u512", "ucal-events/u512", "ucal-cosmo?/u512"]
+bigint = ["ucal-core/bigint", "ucal-civil?/bigint", "ucal-body?/bigint", "ucal-events/bigint", "ucal-cosmo?/bigint"]
+std = ["ucal-core/std", "ucal-civil?/std", "ucal-body?/std", "ucal-events/std", "ucal-cosmo?/std"]
+civil = ["dep:ucal-civil", "ucal-civil/hifitime"]
+body = ["dep:ucal-body"]
+events = ["dep:ucal-events"]
+cosmo = ["dep:ucal-cosmo"]
+
+[dev-dependencies]
+ucal-events = { path = "../ucal-events", default-features = false }
+
+[[bin]]
+name = "ucal"
+path = "src/main.rs"
+
+[lints.rust]
+missing_docs = "warn"
+unsafe_code = "forbid"

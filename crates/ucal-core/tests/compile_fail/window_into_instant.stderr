@@ -1,0 +1,7 @@
+error[E0277]: the trait bound `ucal_core::Instant<UC1>: From<Window<UC1>>` is not satisfied
+  --> tests/compile_fail/window_into_instant.rs:12:38
+   |
+12 |     let _collapsed: Instant<UC1> = w.into();
+   |                                      ^^^^ the trait `From<Window<UC1>>` is not implemented for `ucal_core::Instant<UC1>`
+   |
+   = note: required for `Window<UC1>` to implement `Into<ucal_core::Instant<UC1>>`

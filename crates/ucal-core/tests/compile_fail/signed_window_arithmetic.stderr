@@ -1,0 +1,13 @@
+error[E0369]: cannot add `SignedWindow` to `SignedWindow`
+ --> tests/compile_fail/signed_window_arithmetic.rs:8:15
+  |
+8 |     let _ = a + b;
+  |             - ^ - SignedWindow
+  |             |
+  |             SignedWindow
+  |
+note: `SignedWindow` does not implement `Add`
+ --> src/value.rs
+  |
+  | pub struct SignedWindow {
+  | ^^^^^^^^^^^^^^^^^^^^^^^ `SignedWindow` is defined in another crate

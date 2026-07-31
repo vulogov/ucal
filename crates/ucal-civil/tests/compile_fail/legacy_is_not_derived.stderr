@@ -1,0 +1,18 @@
+error[E0277]: the trait bound `ucal_civil::Gregorian: DerivedCalendarMarker` is not satisfied
+  --> tests/compile_fail/legacy_is_not_derived.rs:21:24
+   |
+21 |     needs_a_derivation(Gregorian);
+   |     ------------------ ^^^^^^^^^ the trait `DerivedCalendarMarker` is not implemented for `ucal_civil::Gregorian`
+   |     |
+   |     required by a bound introduced by this call
+   |
+help: this trait has no implementations, consider adding one
+  --> tests/compile_fail/legacy_is_not_derived.rs:14:1
+   |
+14 | trait DerivedCalendarMarker {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: required by a bound in `needs_a_derivation`
+  --> tests/compile_fail/legacy_is_not_derived.rs:18:26
+   |
+18 | fn needs_a_derivation<C: DerivedCalendarMarker>(_c: C) {}
+   |                          ^^^^^^^^^^^^^^^^^^^^^ required by this bound in `needs_a_derivation`

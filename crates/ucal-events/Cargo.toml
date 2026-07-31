@@ -1,0 +1,25 @@
+[package]
+name = "ucal-events"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Universe Calendar event catalogue: cited, interval-valued cosmological and geological milestones"
+
+# D-7: versioned by citation set, independently of the library, so a revised
+# citation does not force a library release.
+[dependencies]
+ucal-core = { path = "../ucal-core", default-features = false }
+
+[features]
+default = ["u512", "std"]
+u512 = ["ucal-core/u512"]
+bigint = ["ucal-core/bigint"]
+std = ["ucal-core/std", "alloc"]
+alloc = ["ucal-core/alloc"]
+
+[lints.rust]
+missing_docs = "warn"
+unsafe_code = "forbid"

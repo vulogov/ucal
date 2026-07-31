@@ -1,0 +1,14 @@
+error[E0599]: `LegacyFields` doesn't implement `std::fmt::Display`
+  --> tests/compile_fail/legacy_fields_cannot_render.rs:22:39
+   |
+22 |     let _unqualified: String = fields.to_string();
+   |                                       ^^^^^^^^^ method cannot be called on `LegacyFields` due to unsatisfied trait bounds
+   |
+  ::: src/legacy.rs
+   |
+   | pub struct LegacyFields {
+   | ----------------------- doesn't satisfy `LegacyFields: ToString` or `LegacyFields: std::fmt::Display`
+   |
+   = note: the following trait bounds were not satisfied:
+           `LegacyFields: std::fmt::Display`
+           which is required by `LegacyFields: ToString`

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="24" height="24" role="img" aria-labelledby="ucalTitle ucalDesc">
+  <title id="ucalTitle">Universe Calendar mark, micro</title>
+  <desc id="ucalDesc">Favicon-scale mark: elapsed sector and zero notch only.</desc>
+  <circle cx="256" cy="256" r="222" fill="none" stroke="var(--text-primary, #14110f)" stroke-width="30"/>
+  <path d="M 256.00 74.00 A 182.00 182.00 0 0 1 383.88 385.50 L 256.00 256.00 A 0.00 0.00 0 0 0 256.00 256.00 Z" fill="var(--text-primary, #14110f)"/>
+  <path d="M 226.00 -65.00 L 286.00 -65.00 L 256.00 -20.00 Z" fill="var(--text-primary, #14110f)"/>
+</svg>

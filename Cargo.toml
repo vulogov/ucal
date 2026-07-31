@@ -1,0 +1,33 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/ucal-core",
+    "crates/ucal-civil",
+    "crates/ucal",
+    "crates/ucal-body",
+    "crates/ucal-events",
+    "crates/ucal-cosmo",
+    "xtask",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "MPL-2.0"
+authors = ["Vladimir Ulogov"]
+repository = "https://github.com/vulogov/ucal"
+description = "Universe Calendar: absolute time in Planck ticks with a base-5 tier calendar"
+
+[workspace.dependencies]
+# Default backend (RFC §3.1, D-4). NOTE: bnum 0.14 restructured its type surface
+# and renamed `parse_str_radix` -> `from_str_radix`; `ZERO`/`ONE` became private.
+# The RFC §3.3 signatures are pre-0.14. All churn is absorbed by the `TickInt`
+# layer in ucal-core, per GE-4.
+bnum = { version = "0.14", default-features = false }
+num-bigint = { version = "0.4", default-features = false }
+num-integer = { version = "0.1", default-features = false }
+num-traits = { version = "0.2", default-features = false }
+
+[profile.release]
+overflow-checks = true   # Rule O: never wrap, even in release

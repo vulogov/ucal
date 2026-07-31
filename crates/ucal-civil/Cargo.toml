@@ -1,0 +1,34 @@
+[package]
+name = "ucal-civil"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Universe Calendar SI bridge: exact TT pivot, leap seconds, and legacy civil calendars"
+
+[dependencies]
+ucal-core = { path = "../ucal-core", default-features = false }
+# §8.1 names hifitime for civil time. Only its integer-exact surface is used —
+# `to_gregorian`, `from_duration`, `total_nanoseconds() -> i128` and
+# `leap_seconds_iers() -> i32`. Its `f64` accessors (`to_seconds`, `to_tai_days`,
+# `leap_seconds(..) -> Option<f64>`) are never called, because Rule E forbids a
+# float token anywhere in a shipped crate.
+hifitime = { version = "4.3", default-features = false, optional = true }
+
+[dev-dependencies]
+# Compile-fail harness for §6.6 and Rule K.6.
+trybuild = "1"
+
+[features]
+default = ["u512", "std", "hifitime"]
+u512 = ["ucal-core/u512"]
+bigint = ["ucal-core/bigint"]
+std = ["ucal-core/std", "alloc"]
+alloc = ["ucal-core/alloc"]
+hifitime = ["dep:hifitime", "std"]
+
+[lints.rust]
+missing_docs = "warn"
+unsafe_code = "forbid"

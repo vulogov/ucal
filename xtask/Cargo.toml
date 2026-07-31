@@ -1,0 +1,26 @@
+[package]
+name = "xtask"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "UC-P0 constants harness: two independent exact-integer derivations"
+
+# Rule E note: xtask is not a shipped crate. It nonetheless contains no float
+# token, because its whole purpose is to be the exact oracle. The float lint
+# covers shipped crates; `cargo xtask lint` additionally asserts xtask is clean.
+
+[dependencies]
+bnum = { workspace = true, features = ["alloc", "numtraits"] }
+num-bigint = { workspace = true, features = ["std"] }
+num-integer = { workspace = true, features = ["std"] }
+num-traits = { workspace = true, features = ["std"] }
+num-rational = { version = "0.4", default-features = false, features = ["std", "num-bigint"] }
+sha2 = "0.10"
+# Documentation generation reads the tier and locale tables from the library, so
+# that §13.5's single source of truth is the library itself and not a copy.
+ucal-core = { path = "../crates/ucal-core" }
+
+[[bin]]
+name = "xtask"
+path = "src/main.rs"
