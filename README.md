@@ -57,8 +57,11 @@ cargo run -p xtask -- lint      # workspace lints
 
 ## Status
 
-Early. The library and CLI are complete against RFC UCAL-1 and the suite is
-green, but nothing has been published and the API is not yet stable.
+Released: **0.1.1** on [crates.io](https://crates.io/crates/ucal), all six
+crates. `main` carries the released line; `0.2.0` is where development happens.
+
+The library and CLI are complete against RFC UCAL-1 and the suite is green. The
+API is **not yet stable** — a `0.x` bump may break it.
 
 Verification notes and RFC errata are in
 [`spec/SPEC-DELTAS.md`](spec/SPEC-DELTAS.md). Fuller documentation is still to
