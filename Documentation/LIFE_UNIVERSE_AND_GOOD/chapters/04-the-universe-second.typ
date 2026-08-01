@@ -41,6 +41,7 @@ numbers came from, and this one came from a digit-packing convenience.
 Each rung is $5^5 = 3125$ of the rung below, which is to say each rung is exactly five
 base-5 digits wide. Rung $k$ is $5^(60 + 5k)$ ticks, indexed from the beat at $k = 0$.
 
+#block(breakable: false, width: 100%)[
 #v(3mm)
 #align(center, cetz.canvas({
   import cetz.draw: *
@@ -73,6 +74,7 @@ base-5 digits wide. Rung $k$ is $5^(60 + 5k)$ ticks, indexed from the beat at $k
 #figcap[2][
   The named rungs of the tier ladder. Each is 3125 of the one below. The ladder continues
   in both directions; only the named tiers are shown.
+]
 ]
 
 #section("What the ladder buys")
@@ -154,6 +156,7 @@ planetary content, you do not get to keep the hour. The hour *is* planetary cont
 
 The project's own mark is a diagram of this chapter, and it is worth reading as one.
 
+#block(breakable: false, width: 100%)[
 #v(3mm)
 #align(center, cetz.canvas({
   import cetz.draw: *
@@ -196,6 +199,7 @@ The project's own mark is a diagram of this chapter, and it is worth reading as 
 #figcap[4][
   The mark, read as a diagram. Five heavy divisions on the tick band, not twelve — the
   base is visible at a glance. The centre is negative space.
+]
 ]
 
 The centre dot has its core knocked out. That is deliberate: the datum is stipulated rather

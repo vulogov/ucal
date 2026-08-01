@@ -44,6 +44,7 @@ Converting *out* is division, which is where rounding lives — and so the rende
 path is the only place a rounding mode is chosen, and it is always chosen explicitly
 by the caller.
 
+#block(breakable: false, width: 100%)[
 #v(3mm)
 #align(center, cetz.canvas({
   import cetz.draw: *
@@ -79,6 +80,7 @@ by the caller.
 #figcap[9][
   The bridge. Earth enters and leaves at one declared constant; the arithmetic in
   between is integer operations on tick counts.
+]
 ]
 
 #section("Refusing rather than rounding")

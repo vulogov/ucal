@@ -33,23 +33,8 @@
 
   part(number: "III", title: "What implementation refused",
     blurb: [Design as something that loses arguments.]),
-  unwritten(number: 9, title: "Divergence", spec: "§16.2",
-    contains: (
-      [Which UCAL-1 rules survived contact with the compiler, which were
-       altered, which were dropped, and what each change cost.],
-      [Figure F10 — the divergence map, rules coloured by fate.],
-    )),
-  unwritten(number: 10, title: "The 97/400 correction", spec: "§16.2 — the centrepiece",
-    contains: (
-      [Two RFC revisions asserted the machinery reproduces the Julian *and*
-       Gregorian rules as convergents. The Julian rule is convergent 1.],
-      [97/400 is not a convergent at any depth. 8/33 is more accurate with a
-       denominator twelve times smaller; 31/128 is 124× more accurate.],
-      [The machinery contradicted its author, and the author published the
-       contradiction — dated, including the revisions that were wrong.],
-      [The direct answer to Maimonides' charge in *Guide* I.73 that such systems
-       are built to make their conclusions provable.],
-    )),
+  include "chapters/09-divergence.typ",
+  include "chapters/10-the-97-400-correction.typ",
 
   part(number: "IV", title: "The datum",
     blurb: [Why it cannot be measured, and what was done instead.]),

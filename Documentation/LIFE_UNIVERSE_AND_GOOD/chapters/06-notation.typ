@@ -120,6 +120,7 @@ At five bits per character, covering the full 512-bit domain would take *103
 characters*. At 256 bits it takes 52, which is 260 bits of capacity — so the leading
 character encodes a single significant bit and is always `0` or `1`.
 
+#block(breakable: false, width: 100%)[
 #v(2mm)
 #align(center, cetz.canvas({
   import cetz.draw: *
@@ -140,6 +141,7 @@ character encodes a single significant bit and is always `0` or `1`.
 #figcap[3][
   UCID length against range. Five bits per character, so width is linear in bits —
   and the domain is twice the bits.
+]
 ]
 
 The ceiling that buys is $2^256$ ticks, about $1.98 times 10^26$ years. That is past

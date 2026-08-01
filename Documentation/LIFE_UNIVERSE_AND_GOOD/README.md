@@ -48,7 +48,7 @@ argument became less persuasive.
 
 ## State
 
-Front matter and Parts I–II are drafted. The remaining chapters are carried as
+Front matter and Parts I–III are drafted. The remaining chapters are carried as
 stubs that state their specification, so the book's shape is visible in the
 contents and its length is not quietly understated — the same discipline as
 `UCAL-E0062` in the software it describes.
@@ -58,7 +58,7 @@ contents and its length is not quietly understated — the same discipline as
 | — | preface | drafted |
 | I — Foundations | 1–4 | drafted |
 | II — What was built | 5–8 | drafted |
-| III — What implementation refused | 9–10 | specified |
+| III — What implementation refused | 9–10 | drafted |
 | IV — The datum | 11–13 | specified |
 | V — Any celestial body | 14–17 | specified |
 | VI — Nine readings | 18–26 | specified |
