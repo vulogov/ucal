@@ -43,6 +43,31 @@ That is a genuine piece of mathematical reading. It takes a structural feature o
 poem seriously enough to ask what geometry the poem presupposes, and the answer is
 neither trivial nor forced. Whatever one thinks of the rest, this part is good work.
 
+#block(breakable: false, width: 100%)[
+#v(3mm)
+#align(center, image("../assets/images/florensky-cosmos.png", width: 74%))
+#v(1mm)
+#figcap[11][
+  The cosmos Florensky's reading requires. The spheres carry their zodiacal and
+  planetary signs; the infernal cone descends at the centre; the Mount of
+  Purgatory rises beneath it; the Empyrean is at the upper right. The single
+  traced line is the *Comedy*'s trajectory, and it closes — because the outermost
+  sphere has rejoined the innermost without the traveller ever turning round.
+]
+]
+
+#callout(label: "What this plate is")[
+  An illustration made for this book, in the manner of a sixteenth-century
+  cosmological engraving. It is *not* a reproduction of any diagram Florensky
+  drew, and *Мнимости в геометрии* contains no plate like it.
+
+  It is here because the geometry is the chapter's whole argument and prose is
+  poor at conveying a shape. Saying what it is and is not costs one paragraph,
+  and a book that spends four chapters on the difference between a structure and
+  a claim about the world should not slip a modern picture in as a historical
+  document.
+]
+
 #section("What Florensky did next")
 
 In §9 of the same book, he turns to relativity.

@@ -12,7 +12,7 @@
 #import "design.typ": *
 #import "chapters/zz-unwritten.typ": unwritten
 
-#book((
+#book(frontispiece: "assets/images/dial-plate.png", (
   include "chapters/00-preface.typ",
   include "chapters/00b-the-rules.typ",
 

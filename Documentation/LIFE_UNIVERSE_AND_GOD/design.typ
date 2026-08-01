@@ -276,7 +276,7 @@
   fill: ink_gray, style: "italic", [Figure #n — #body]))
 
 // ── Master document wrapper ─────────────────────────────────────────
-#let book(pages) = {
+#let book(pages, frontispiece: none) = {
   assert-slots()
 
   set document(title: book_title, author: book_author)
@@ -327,6 +327,16 @@
   pagebreak()
 
   set page(margin: book_page.margin, fill: white)
+
+  // Frontispiece — a plate facing the contents, no caption, no folio.
+  if frontispiece != none {
+    set page(numbering: none, header: none)
+    v(1fr)
+    align(center, image(frontispiece, width: 74%))
+    v(1fr)
+    pagebreak()
+  }
+
   text(font: body_family, size: 22pt, weight: "bold", fill: ink_black, "Contents")
   v(7mm)
   outline(title: none, indent: auto, depth: 2)

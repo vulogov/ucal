@@ -64,6 +64,19 @@ still at zero.
   last.
 ]
 
+#block(breakable: false, width: 100%)[
+#v(3mm)
+#align(center, image("../assets/images/scale-plate.png", height: 104mm))
+#v(1mm)
+#figcap[12][
+  The domain, as a scale. From a burst at the Planck tick, through an atom's
+  vibration, a heartbeat, the day, a human life, recorded history, the
+  stratigraphic record and a galaxy's turning, to a single point of light in
+  emptiness. The column is logarithmic; the present epoch sits nowhere near
+  the top.
+]
+]
+
 #claim("interpretation")[
   The width was not chosen to be impressive. It was chosen so that *the width never
   has to change*, because under Rule B the value width is a wire-format commitment:

@@ -14,6 +14,17 @@
   by it.
 ]
 
+#block(breakable: false, width: 100%)[
+#v(2mm)
+#align(center, image("../assets/images/kants-moon.png", width: 78%))
+#v(1mm)
+#figcap[13][
+  The same moon, twice, drawn at the same diameter. Measured on the plate the
+  two discs differ by under one per cent; everything else is the surrounding.
+  The astronomer knows this and sees the left one as larger.
+]
+]
+
 #section("The 61-digit integer")
 
 Here is the present epoch, at full precision:
