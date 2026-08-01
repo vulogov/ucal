@@ -35,12 +35,20 @@ is evidence about the past.
 **Rule M** — every interpretive claim is marked typographically. `#claim("code")`
 and `#claim("history")` pass through unmarked because they are checkable;
 `interpretation` and `resonance` are ruled off in their own blocks. Deleting
-every marked block must leave every technical claim standing. That is a
-scheduled production step, not a hope.
+every marked block must leave every technical claim standing:
+
+```
+python3 Documentation/LIFE_UNIVERSE_AND_GOOD/deletion-test.py
+```
+
+That is A-P8, and it is a script rather than a promise. It strips every marked
+block, compiles what remains, and fails if any surviving prose refers into a
+deleted one. It checks structural dependence; it cannot check whether an
+argument became less persuasive.
 
 ## State
 
-Front matter and Part I are drafted. The remaining chapters are carried as
+Front matter and Parts I–II are drafted. The remaining chapters are carried as
 stubs that state their specification, so the book's shape is visible in the
 contents and its length is not quietly understated — the same discipline as
 `UCAL-E0062` in the software it describes.
@@ -49,7 +57,7 @@ contents and its length is not quietly understated — the same discipline as
 |---|---|---|
 | — | preface | drafted |
 | I — Foundations | 1–4 | drafted |
-| II — What was built | 5–8 | specified |
+| II — What was built | 5–8 | drafted |
 | III — What implementation refused | 9–10 | specified |
 | IV — The datum | 11–13 | specified |
 | V — Any celestial body | 14–17 | specified |

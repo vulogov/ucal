@@ -26,44 +26,10 @@
   part(number: "II", title: "What was built",
     blurb: [An engineer may stop at the end of this part and have received a
             complete technical article.]),
-  unwritten(number: 5, title: "The domain", spec: "§16.2",
-    contains: (
-      [Unsigned, closed, checked. Why 512 bits: $2.29 times 10^103$ years, past
-       proton decay and heat death, with the present epoch using
-       $7 times 10^(-17)$ of the range.],
-      [Exact integer arithmetic and the refusal of floating point anywhere —
-       what it costs (certified interval quadrature instead of a library call)
-       and what it buys (a rigorous enclosure instead of a tolerance guess).],
-      [Overflow as a typed error; no wrapping arithmetic exposed on time types.],
-    )),
-  unwritten(number: 6, title: "Notation", spec: "§16.2",
-    contains: (
-      [Two text forms — decimal tier groups for humans, base-5 digit groups as
-       canonical — and why one value with two tagged forms is not redundancy.],
-      [Canonical binary as fixed 64 bytes big-endian, so byte order is
-       chronological order and the encoding is a usable database key.],
-      [UCID as 52-character Crockford base-32 over 256 bits, with both caveats
-       stated: undefined above $2^256$, and carrying no randomness.],
-    )),
-  unwritten(number: 7, title: "The bridge", spec: "§16.2",
-    contains: (
-      [`SECOND` as the single declared bridge constant, an exact integer of
-       ticks, so conversion into absolute time never rounds.],
-      [TT as the only pivot; leap seconds confined to the parse/format boundary.],
-      [Why an input finer than $10^(-30)$ s is rejected rather than rounded.],
-      [The alignment invariants that fall out free: whole seconds land with
-       thirty trailing base-5 zeros, whole nanoseconds with twenty-one.],
-    )),
-  unwritten(number: 8, title: "Derived calendars", spec: "§16.2",
-    contains: (
-      [Units derived from a body's rotation, solar day, and orbital period as
-       exact rationals of ticks.],
-      [Intercalation derived by continued-fraction expansion, never declared.],
-      [The one empirical component — the anchor — flagged here, developed in
-       chapter 16.],
-      [The legacy/derived distinction, applied evenhandedly to the Gregorian and
-       to scriptural chronologies alike.],
-    )),
+  include "chapters/05-the-domain.typ",
+  include "chapters/06-notation.typ",
+  include "chapters/07-the-bridge.typ",
+  include "chapters/08-derived-calendars.typ",
 
   part(number: "III", title: "What implementation refused",
     blurb: [Design as something that loses arguments.]),
