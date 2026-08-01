@@ -1,5 +1,16 @@
 // Life, the Universe, and God — design tokens and page chrome.
 //
+// PAGE-BREAK POLICY. Every framed block is `breakable: false`: term, callout,
+// claim, conflict, terminal, recap, and raw code blocks. A framed block that
+// splits leaves its label at the foot of one page and its content on the next,
+// which reads as two things rather than one — and for `claim` and `conflict`
+// the label is the whole point, since it marks where the book stops asserting
+// fact. The cost is slack at the foot of a page when a block will not fit; that
+// is the right trade for a book whose apparatus carries meaning.
+//
+// Figures are wrapped in `block(breakable: false)` at each call site, so a
+// caption cannot orphan from its figure.
+//
 // SLOT-VOICE is filled from the companion volumes (blackInkhaven/Book/POETRY):
 // the same measure-and-report discipline, the same warm paper and cool ink,
 // pointed now at an instrument rather than at verse. Where this book departs
@@ -168,7 +179,10 @@
     v(2mm)
     block(fill: bg, stroke: (left: 2pt + fg),
       inset: (left: 9pt, right: 9pt, top: 7pt, bottom: 7pt),
-      width: 100%, radius: 1pt, breakable: true, {
+      // Not breakable. A marked block split across a page leaves its tag
+      // stranded at the foot of one page and its argument on the next, which
+      // is exactly the boundary Rule M exists to make visible.
+      width: 100%, radius: 1pt, breakable: false, {
         text(font: body_family, size: 8pt, weight: "bold", fill: fg,
           tracking: 1.5pt, tag)
         v(2mm)
@@ -191,7 +205,7 @@
   v(3mm)
   block(fill: ink_conflict_bg, stroke: (left: 3pt + ink_conflict),
     inset: (left: 10pt, right: 10pt, top: 8pt, bottom: 8pt),
-    width: 100%, radius: 1pt, breakable: true, {
+    width: 100%, radius: 1pt, breakable: false, {
       text(font: body_family, size: 8.5pt, weight: "bold", fill: ink_conflict,
         tracking: 1.5pt, "THE CONFLICT")
       v(2.5mm)
