@@ -190,8 +190,12 @@ criteria, and chapter 9 said so. The book's own experiments deserve the same tre
   six that cannot be run by the person writing, and it is therefore the only one that
   has been deferred at every stage.
 
-  Recording it as *not run* rather than quietly dropping it is the minimum. The dual
-  audience claim in the preface is, as of this chapter, untested.
+  Recording it as *not run* rather than quietly dropping it is the minimum. The next
+  thing after the minimum is to make running it cheap, so the protocol is written out
+  in `GE-A4-reader-test.md` — who reads what, the five questions in order, the scoring,
+  and the consequence if it fails. Designing the test was the part the author could do.
+
+  The dual-audience claim in the preface is, as of this chapter, untested.
 ]
 
 #section("What the null results have in common")

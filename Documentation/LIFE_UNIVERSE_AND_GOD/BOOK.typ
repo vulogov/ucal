@@ -73,5 +73,9 @@
   include "chapters/30-uselessness-restated.typ",
   include "chapters/31-what-is-not-claimed.typ",
   include "chapters/32-kants-moon.typ",
+  include "chapters/a-sources.typ",
+  include "chapters/b-glossary.typ",
+  include "chapters/c-diagnostics.typ",
+
   include "chapters/99-about-the-author.typ",
 ))

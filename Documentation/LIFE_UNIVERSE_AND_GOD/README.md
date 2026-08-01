@@ -80,6 +80,20 @@ python3 Documentation/LIFE_UNIVERSE_AND_GOD/samples/run-samples.py
 S4 and S5 read a pinned instant rather than the clock, because a sample whose
 output changes between runs is a demonstration and not evidence.
 
+## Checks
+
+| what | how |
+|---|---|
+| Rule M — no technical claim rests on an interpretive one | `python3 deletion-test.py` |
+| Rule B — no uncited bibliography entry | `python3 samples/check-refs.py` |
+| the six samples regenerate | `python3 samples/run-samples.py` |
+| the diagnostic appendix matches the source | `python3 samples/gen-diagnostics.py` |
+
+`GE-A4-reader-test.md` is the two-reader protocol. **It has not been run** — it
+needs two people who are not the author, and it is the one experiment he cannot
+run. Chapter 28 records it as not run, and the preface's dual-audience claim is
+untested until it is.
+
 ## Note on the assets
 
 The SVGs in `assets/logo/` are the identity files with their CSS `var()`
