@@ -46,5 +46,5 @@ Pinned at the import site, so the build fails rather than drifting.
 git checkout f84f157
 cargo test --workspace --release
 cargo run -p xtask
-typst compile Documentation/LIFE_UNIVERSE_AND_GOOD/BOOK.typ
+typst compile Documentation/LIFE_UNIVERSE_AND_GOD/BOOK.typ
 ```

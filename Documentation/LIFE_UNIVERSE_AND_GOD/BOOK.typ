@@ -1,7 +1,7 @@
 // Life, the Universe, and God — master file.
 //
 // Compile with:
-//   typst compile Documentation/LIFE_UNIVERSE_AND_GOOD/BOOK.typ
+//   typst compile Documentation/LIFE_UNIVERSE_AND_GOD/BOOK.typ
 //
 // Structure follows RFC UCAL-A1 §14 (the eight parts), §16.2 (chapter
 // specifications), and §17.2 (the nine readings). Chapters not yet drafted are
@@ -38,40 +38,9 @@
 
   part(number: "IV", title: "The datum",
     blurb: [Why it cannot be measured, and what was done instead.]),
-  unwritten(number: 11, title: "Why it cannot be measured", spec: "§16.2",
-    contains: (
-      [Rule Q's three reasons: exactness cannot come from measurement; the FLRW
-       $t arrow.r 0$ limit is not an observable event; the extrapolation is
-       model-dependent.],
-      [Kant's fourth, which the specification does not state: the question
-       presupposes a completed totality that is not a possible object of
-       knowledge.],
-      [The datum in ordinary company — TAI 1958, the Julian Day epoch, Unix —
-       and the exact parallel to the SI second.],
-    )),
-  unwritten(number: 12, title: "What was done instead", spec: "§16.2",
-    contains: (
-      [`BIG_BANG_CLAIM` as a `SignedWindow` with no arithmetic implementations,
-       `UCAL-E0025`, and the compile-fail test proving the type cannot reach an
-       operand position — *the book's central exhibit*.],
-      [`datum_provenance` as machine-readable, re-executable data, with its
-       $-0.017 space 190 space 364$ s rounding residual.],
-      [Kant's constitutive/regulative distinction: Kant policed the boundary
-       with philosophical discipline; the crate polices it with a type.],
-      [UC-Θ as unbuilt — the profile in which the datum is the beginning of time
-       at organization, and what it would cost.],
-    )),
-  unwritten(number: 13, title: "Florensky's radius", spec: "§16.2",
-    contains: (
-      [*Мнимости в геометрии* (1922) as the closest precedent and the clearest
-       cautionary tale in one text.],
-      [The Dante geometry as genuine achievement; then §9, where a formal
-       artifact is read as a physical place.],
-      [The distance between the two is exactly one move — and Florensky had no
-       rule against the second.],
-      [Basil, *Hexaemeron* I.6, and the historical cost: persecution from 1922
-       to execution in 1937.],
-    )),
+  include "chapters/11-why-it-cannot-be-measured.typ",
+  include "chapters/12-what-was-done-instead.typ",
+  include "chapters/13-florenskys-radius.typ",
 
   part(number: "V", title: "Any celestial body",
     blurb: [How far the approach generalises, and precisely where it fails.]),

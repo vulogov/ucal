@@ -8,7 +8,7 @@ is `BOOK.pdf`.
 ## Build
 
 ```
-typst compile Documentation/LIFE_UNIVERSE_AND_GOOD/BOOK.typ
+typst compile Documentation/LIFE_UNIVERSE_AND_GOD/BOOK.typ
 ```
 
 Requires Typst 0.14 or newer and network access on first build, to fetch
@@ -38,7 +38,7 @@ and `#claim("history")` pass through unmarked because they are checkable;
 every marked block must leave every technical claim standing:
 
 ```
-python3 Documentation/LIFE_UNIVERSE_AND_GOOD/deletion-test.py
+python3 Documentation/LIFE_UNIVERSE_AND_GOD/deletion-test.py
 ```
 
 That is A-P8, and it is a script rather than a promise. It strips every marked
@@ -48,7 +48,7 @@ argument became less persuasive.
 
 ## State
 
-Front matter and Parts I–III are drafted. The remaining chapters are carried as
+Front matter and Parts I–IV are drafted. The remaining chapters are carried as
 stubs that state their specification, so the book's shape is visible in the
 contents and its length is not quietly understated — the same discipline as
 `UCAL-E0062` in the software it describes.
@@ -59,7 +59,7 @@ contents and its length is not quietly understated — the same discipline as
 | I — Foundations | 1–4 | drafted |
 | II — What was built | 5–8 | drafted |
 | III — What implementation refused | 9–10 | drafted |
-| IV — The datum | 11–13 | specified |
+| IV — The datum | 11–13 | drafted |
 | V — Any celestial body | 14–17 | specified |
 | VI — Nine readings | 18–26 | specified |
 | VII — The instrument as research tool | 27–28 | specified |

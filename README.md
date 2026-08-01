@@ -107,7 +107,7 @@ Every `§`, `Rule` and `D-A` citation in the source resolves against `spec/`, an
 </p>
 
 **[Life, the Universe, and God — *A Software Engineer's Instrument for the
-Immeasurable*](Documentation/LIFE_UNIVERSE_AND_GOOD)**
+Immeasurable*](Documentation/LIFE_UNIVERSE_AND_GOD)**
 
 Three things are true about this project, and the third only follows if you
 accept the first two. The artifact is real. Its practical utility is
@@ -122,8 +122,8 @@ assert that a distinction ought to be respected; a type system can make violatin
 it fail to build.
 
 Typst source and a build note are in
-[`Documentation/LIFE_UNIVERSE_AND_GOOD`](Documentation/LIFE_UNIVERSE_AND_GOOD).
-Front matter and Parts I–III are drafted; the remaining chapters carry their
+[`Documentation/LIFE_UNIVERSE_AND_GOD`](Documentation/LIFE_UNIVERSE_AND_GOD).
+Front matter and Parts I–IV are drafted; the remaining chapters carry their
 specification so the shape is visible and the length is not understated.
 
 ## Licence
