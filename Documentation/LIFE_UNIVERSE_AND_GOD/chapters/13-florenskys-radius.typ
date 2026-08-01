@@ -49,10 +49,12 @@ neither trivial nor forced. Whatever one thinks of the rest, this part is good w
 #v(1mm)
 #figcap[11][
   The cosmos Florensky's reading requires. The spheres carry their zodiacal and
-  planetary signs; the infernal cone descends at the centre; the Mount of
-  Purgatory rises beneath it; the Empyrean is at the upper right. The single
-  traced line is the *Comedy*'s trajectory, and it closes — because the outermost
-  sphere has rejoined the innermost without the traveller ever turning round.
+  planetary signs, and they twist so that the outermost rejoins the innermost.
+  The traced line is Dante's route: in from the Empyrean at the upper right, down
+  through the infernal circles to the centre, and out at the Mount of Purgatory.
+  What closes here is the *surface*, not the drawn line — and that is the whole
+  of Florensky's point, since on a surface of this kind the journey can return to
+  its start without the traveller ever turning round.
 ]
 ]
 
