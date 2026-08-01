@@ -330,17 +330,17 @@
 
   // Frontispiece — a plate facing the contents, no caption, no folio.
   //
-  // Currently unused. The dial plate went to chapter 29 instead: its centre is
-  // torn open to show clockwork, and the identity knocks that centre out as
-  // negative space precisely because the datum is stipulated rather than
-  // observed (ch. 4). A frontispiece asserting the opposite on page one would
-  // undercut the book before it starts. The slot stays for a plate whose torn
-  // centre reveals nothing.
+  // Filled with a dial whose centre is a clean circular void — the identity's
+  // knocked-out core at plate scale. The earlier dial, whose centre is torn
+  // open to show clockwork, went to chapter 29 instead: it asserts the opposite
+  // of what ch. 4 says the mark means, which is the wrong thing to put on the
+  // first page a reader sees.
   if frontispiece != none {
     set page(numbering: none, header: none)
-    v(1fr)
-    align(center, image(frontispiece, width: 74%))
-    v(1fr)
+    // A leading v(1fr) collapses at the top of a page, so centre with a
+    // full-height block instead.
+    block(width: 100%, height: 100%,
+      align(center + horizon, image(frontispiece, width: 82%)))
     pagebreak()
   }
 
