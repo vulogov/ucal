@@ -123,7 +123,7 @@ it fail to build.
 
 Typst source and a build note are in
 [`Documentation/LIFE_UNIVERSE_AND_GOD`](Documentation/LIFE_UNIVERSE_AND_GOD).
-Front matter and Parts I–IV are drafted; the remaining chapters carry their
+Front matter and Parts I–V are drafted; the remaining chapters carry their
 specification so the shape is visible and the length is not understated.
 
 ## Licence

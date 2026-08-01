@@ -44,41 +44,10 @@
 
   part(number: "V", title: "Any celestial body",
     blurb: [How far the approach generalises, and precisely where it fails.]),
-  unwritten(number: 14, title: "Universal baselines", spec: "§16.2",
-    contains: (
-      [Nothing in the arithmetic references a rotation, an orbit, or a civil
-       calendar.],
-      [One derivation mechanism — every calendar is (Body, Anchor, Cycles,
-       LeapRule) — with Earth as an ordinary instance and no crate named after a
-       body.],
-    )),
-  unwritten(number: 15, title: "Deriving a calendar", spec: "§16.2",
-    contains: (
-      [Earth: convergents 1/4, 7/29, 8/33, 31/128 — the Julian rule as convergent
-       1, the Gregorian absent.],
-      [Mars: 668.59 sols per year, convergent 16/27.],
-      [Titan: tidally locked, handled with no special case — which is the point.],
-      [The Metonic cycle 235/19 derived from Earth's periods unaided.],
-    )),
-  unwritten(number: 16, title: "Where it breaks", spec: "§16.2 — no shorter than ch. 15",
-    contains: (
-      [The anchor is empirical and cannot be derived.],
-      [A body with no qualifying satellite has no month — Mars is the worked
-       case, and the absence is the correct output.],
-      [A rogue planet has no year.],
-      [A tidally locked body's day equals its orbit.],
-      [Relativistic environments are out of scope.],
-      [Body parameters carry secular rates and validity windows and are wrong
-       outside them — which matters most at exactly the deep-time scale this
-       project targets.],
-    )),
-  unwritten(number: 17, title: "The one qualification", spec: "§16.2 — one page",
-    contains: (
-      [For a single planet this is a curiosity. For timekeeping across two or
-       more bodies, a universal ladder with local overlays may be the only
-       coherent arrangement.],
-      [A claim about coherence, not a recommendation for adoption.],
-    )),
+  include "chapters/14-universal-baselines.typ",
+  include "chapters/15-deriving-a-calendar.typ",
+  include "chapters/16-where-it-breaks.typ",
+  include "chapters/17-the-one-qualification.typ",
 
   part(number: "VI", title: "Nine readings",
     blurb: [The traditions as readers of the artifact — neither validating it nor
