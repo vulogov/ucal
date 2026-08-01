@@ -61,13 +61,42 @@
   numbering: "1",
 )
 
+
+// ── The mark, drawn at a given elapsed fraction ─────────────────────
+//
+// The identity's sector is elapsed time (see Documentation/logo/README.md). A
+// part divider that draws it at the fraction of the book already read is the
+// mark measuring the reading — which is what the mark is for. Redrawn here
+// rather than imported because the asset's sector is fixed and this one is not.
+#let dial(elapsed: 0.0, size: 16mm) = {
+  let n = 40
+  cetz.canvas(length: size / 2, {
+    import cetz.draw: *
+    circle((0, 0), radius: 1.0, stroke: 0.9pt + ink_black)
+    for i in range(0, 5) {
+      let a = 90deg - i * 72deg
+      line((calc.cos(a) * 0.84, calc.sin(a) * 0.84),
+           (calc.cos(a) * 1.0,  calc.sin(a) * 1.0), stroke: 0.9pt + ink_black)
+    }
+    if elapsed > 0.001 {
+      arc((0, 0), start: 90deg, stop: 90deg - elapsed * 360deg, radius: 0.78,
+        anchor: "origin", mode: "PIE", fill: ink_black, stroke: none)
+    }
+    circle((0, 0), radius: 0.13, fill: white, stroke: 0.8pt + ink_black)
+    line((-0.07, 1.06), (0.07, 1.06), (0, 1.2), close: true, fill: ink_black,
+      stroke: none)
+  })
+}
+
 // ── Part divider ────────────────────────────────────────────────────
-#let part(number: "I", title: "", blurb: none) = {
+#let part(number: "I", title: "", blurb: none, elapsed: 0.0) = {
   pagebreak(weak: true)
   hide(heading(level: 1, numbering: none, outlined: true, bookmarked: true,
     [Part #number — #title]))
-  v(7cm)
+  v(5.4cm)
   align(center)[
+    #dial(elapsed: elapsed, size: 17mm)
+    #v(9mm)
     #text(font: body_family, size: 11pt, tracking: 3pt, fill: ink_gray,
       upper("Part " + number))
     #v(6mm)
