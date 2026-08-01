@@ -195,6 +195,11 @@ is recorded as not made.
 a build note are in
 [`Documentation/LIFE_UNIVERSE_AND_GOD`](Documentation/LIFE_UNIVERSE_AND_GOD).
 
+**Shorter:** [`Documentation/UCAL_INTRO.typ`](Documentation/UCAL_INTRO.typ) —
+*A Software Engineer's Attempt to Measure Time in the Universe*, 29 pages. The
+rationale, the engineering, the philosophical and theological background, what
+came out of it, and where it stops.
+
 ---
 
 ## Verification
