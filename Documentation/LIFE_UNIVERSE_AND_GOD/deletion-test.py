@@ -66,7 +66,15 @@ def main() -> int:
 
     with tempfile.TemporaryDirectory() as td:
         work = pathlib.Path(td) / "book"
-        shutil.copytree(ROOT, work, ignore=shutil.ignore_patterns("*.pdf", "*.png"))
+        # Skip the built PDF and any stray page renders, but never anything
+        # under assets/ — the about-the-author page needs the portrait, and a
+        # test that cannot build the book is not testing the book.
+        def ignore(dirname, names):
+            if pathlib.Path(dirname).name == "assets" or "assets" in pathlib.Path(dirname).parts:
+                return []
+            return [n for n in names if n.endswith((".pdf", ".png"))]
+
+        shutil.copytree(ROOT, work, ignore=ignore)
 
         total, per_file = 0, []
         for ch in drafted:
