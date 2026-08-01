@@ -66,50 +66,12 @@
     blurb: [What a program can do that an argument cannot: it can be run against
             material its author did not choose, and return an answer he did not
             want.]),
-  unwritten(number: 27, title: "Six samples", spec: "§18",
-    contains: (
-      [S1 — comparative chronology on one axis: Seder Olam, Byzantine, Ussher,
-       D&C 77, each a declared profile.],
-      [S2 — calendar audit by convergent. Julian *is* convergent 1; Gregorian is
-       not a convergent at any depth; Jalali 8/33 *is* convergent 3.],
-      [S3 — uncertainty audit: cited versus stipulated.],
-      [S4 — cross-body simultaneity: the demonstration that "now" is not a shared
-       object.],
-      [S5 — measuring διάστημα with no Earth content in the units.],
-      [S6 — a revealed ratio evaluated as a bridge constant, refused as an anchor.],
-    )),
-  unwritten(number: 28, title: "Null results", spec: "§16.2",
-    contains: (
-      [Each sample's negative finding, stated as plainly as its positive one.],
-      [Where a sample produced nothing, say so; where a result was weaker than
-       hoped, say how much.],
-      [This chapter is what distinguishes the book from a demonstration.],
-    )),
-
+  include "chapters/27-six-samples.typ",
+  include "chapters/28-null-results.typ",
   part(number: "VIII", title: "The claim"),
-  unwritten(number: 29, title: "Why a program", spec: "§16.2",
-    contains: (
-      [An essay can assert that a distinction ought to be respected; a type system
-       can make violating it fail to build.],
-      [Why prose cannot be *run* by someone who disagrees.],
-    )),
-  unwritten(number: 30, title: "Uselessness restated", spec: "§16.2",
-    contains: (
-      [The thesis, not an apology. Part V's qualification restated as a limit
-       rather than a rescue.],
-    )),
-  unwritten(number: 31, title: "What is not claimed", spec: "§16.2",
-    contains: ([The negative inventory, assembled from Appendix C.],)),
-  unwritten(number: 32, title: "Kant's moon", spec: "§16.2",
-    contains: (
-      [Transcendental illusion is not error but a natural appearance that
-       persists after diagnosis — the astronomer knows the moon is not larger at
-       the horizon and still sees it that way.],
-      [Every reader who sees a 61-digit integer will read it as a fact about
-       being, and no rule prevents that.],
-      [`UCAL-E0025` does not cure the illusion; it refuses to compute with it,
-       which is the only thing a specification can do.],
-    )),
-
+  include "chapters/29-why-a-program.typ",
+  include "chapters/30-uselessness-restated.typ",
+  include "chapters/31-what-is-not-claimed.typ",
+  include "chapters/32-kants-moon.typ",
   include "chapters/99-about-the-author.typ",
 ))

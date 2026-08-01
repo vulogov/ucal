@@ -1,0 +1,26 @@
+S1 — comparative chronology on one axis
+==========================================================================
+
+Four declared epochs, each converted to absolute ticks. Rule P forbids
+comparing them as though they were the same profile; putting them on one
+axis is exactly what a profile tag exists to make safe.
+
+epoch                         civil (Julian)    ticks since datum
+--------------------------------------------------------------------------
+Seder Olam (Masoretic AM 1)   3761 BC-10-07     8070201802429604139840348480835637180530466139316558837890625
+Byzantine AM 1                5509 BC-09-01     8070200779182195887193514013635637180530466139316558837890625
+Ussher                        4004 BC-10-23     8070201660215084938627680384835637180530466139316558837890625
+Julian Day epoch              4713 BC-01-01     8070201244728812467723985261635637180530466139316558837890625
+
+Spread between the widest pair, in ticks and in years:
+  1023247408252646834467200000000000000000000000000000000
+  1748.1 years
+
+Provenance:
+  Seder Olam (Masoretic AM 1)   rabbinic; Seder Olam Rabbah
+  Byzantine AM 1                Septuagint genealogies
+  Ussher                        Annales Veteris Testamenti, 1650
+  Julian Day epoch              Scaliger, 1583 — computational
+
+NOTE. These are four different profiles. The table is legitimate only
+because each row carries its own; arithmetic across rows is not.

@@ -48,10 +48,11 @@ argument became less persuasive.
 
 ## State
 
-Front matter and Parts I–VI are drafted. The remaining chapters are carried as
-stubs that state their specification, so the book's shape is visible in the
-contents and its length is not quietly understated — the same discipline as
-`UCAL-E0062` in the software it describes.
+**Complete draft.** All eight parts, 32 chapters, 217 pages.
+
+RFC UCAL-A1 set a 200-page hard ceiling; it was raised on the author's
+instruction and the book runs through it. Part VI at the book band — nine full
+chapters rather than one with nine sections — is where the pages went.
 
 | part | chapters | state |
 |---|---|---|
@@ -62,9 +63,22 @@ contents and its length is not quietly understated — the same discipline as
 | IV — The datum | 11–13 | drafted |
 | V — Any celestial body | 14–17 | drafted |
 | VI — Nine readings | 18–26 | drafted |
-| VII — The instrument as research tool | 27–28 | specified |
-| VIII — The claim | 29–32 | specified |
+| VII — The instrument as research tool | 27–28 | drafted |
+| VIII — The claim | 29–32 | drafted |
 | — | about the author | drafted |
+
+## The samples
+
+`samples/run-samples.py` regenerates every artifact under `assets/output/`.
+Chapter 27 quotes those files and nothing else; chapter 28 reports what they
+failed to establish.
+
+```
+python3 Documentation/LIFE_UNIVERSE_AND_GOD/samples/run-samples.py
+```
+
+S4 and S5 read a pinned instant rather than the clock, because a sample whose
+output changes between runs is a demonstration and not evidence.
 
 ## Note on the assets
 
