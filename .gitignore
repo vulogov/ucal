@@ -19,3 +19,9 @@ target
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
+
+# Illustration sources. Plates arrive as flattened exports and are cleaned by
+# Documentation/LIFE_UNIVERSE_AND_GOD/samples/clean-plate.py; only the cleaned
+# result belongs in the tree. Numbered drops and superseded assets do not.
+Documentation/LIFE_UNIVERSE_AND_GOD/assets/images/[0-9].png
+Documentation/LIFE_UNIVERSE_AND_GOD/assets/images/*-photo.png
