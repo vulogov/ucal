@@ -52,83 +52,15 @@
   part(number: "VI", title: "Nine readings",
     blurb: [The traditions as readers of the artifact — neither validating it nor
             validated by it. Every chapter names its conflict.]),
-  unwritten(number: 18, title: "Greek", spec: "§17.2 — A1",
-    contains: (
-      [Archimedes' *Sand Reckoner* builds a positional hierarchy to make a cosmic
-       magnitude expressible, arriving at $tilde 10^63$.],
-      [Euclid X.2's anthyphairesis *is* the intercalation algorithm.],
-      [*Conflict:* Aristotle holds time a continuum and the instant a limit; the
-       instrument is discrete. And *Physics* IV.14 makes the datum's objectivity
-       depend on there being a counter.],
-    )),
-  unwritten(number: 19, title: "Jewish", spec: "§17.2 — A2",
-    contains: (
-      [*Molad tohu* — "the new moon of chaos" — a stipulated epoch placed before
-       the event it anchors, nineteen centuries early.],
-      [The *ḥelek* chosen for divisibility, exactly as `SECOND` was.],
-      [*Conflict:* the compressed Persian period is provenance overruled by
-       doctrine, and the crate's re-executable chain would expose it — so the
-       instrument judges a tradition, which the book's own rules forbid the
-       author from doing.],
-    )),
-  unwritten(number: 20, title: "Islamic", spec: "§17.2 — A3",
-    contains: (
-      [Ghazālī's *ʿāda* — divine custom yielding practical certainty without
-       necessity — is what a validity window encodes.],
-      [*Conflict:* under Premise 6 an orbital period is a habit, so a guaranteed
-       drift bound over 400,000 years is meaningless. The crate's ontology is
-       Rushdian and it took a side without arguing for it.],
-    )),
-  unwritten(number: 21, title: "Patristic and Latin", spec: "§17.2 — A4",
-    contains: (
-      [Basil's road-and-house image is Rule Q's content exactly.],
-      [Augustine's answer is `UCAL-E0020`: an error, not a negative number.],
-      [*Conflict:* *ex nihilo* is held firmly, so UC-Θ is heterodox by this
-       standard — and the book must say so rather than soften it.],
-    )),
-  unwritten(number: 22, title: "Orthodox", spec: "§17.2 — A5",
-    contains: (
-      [Gregory of Nyssa's διάστημα makes a calendar an instrument of the created
-       order by definition — the limitation is the doctrine, not a defect.],
-      [Palamas' essence/energies distinction as the strongest licence the
-       thesis receives from any tradition.],
-      [*Conflict:* Rule N sides with the 1913 Synodal position against Florensky
-       and Losev — the two thinkers this book most depends on.],
-    )),
-  unwritten(number: 23, title: "Latter-day Saint", spec: "§17.2 — A6",
-    contains: (
-      [D&C 130:4–5 states Rule K's thesis in 1843: reckoning is body-relative.],
-      [Abraham 3:4 is a declared bridge constant with a profile tag on each side.],
-      [*Conflict:* Kolob is a governing *body*, where Rule K.5 permits only an
-       abstract ladder — the privilege is located differently.],
-    )),
-  unwritten(number: 24, title: "Modern philosophy", spec: "§17.2 — A7",
-    contains: (
-      [The First Antinomy supplies a fourth reason for Rule Q the specification
-       does not state.],
-      [Constitutive versus regulative, enforced by a type with no arithmetic:
-       Kant policed the boundary by discipline, the crate by the compiler.],
-      [*Conflict:* Kant's number is the schema of magnitude — monadic — which
-       contradicts the eidetic number of A1 and A8, and Rule G asserts both
-       readings of one integer.],
-    )),
-  unwritten(number: 25, title: "Russian", spec: "§17.2 — A8",
-    contains: (
-      [Fyodorov makes total addressability of the past an obligation.],
-      [Vernadsky's process-relative times and Chizhevsky's solar-period dating
-       as Rule K's unacknowledged ancestry, a century early.],
-      [*Conflict:* Bugaev proposes discreteness *as worldview*, which the book
-       declines — from the closest kin. And Losev's имя makes the name
-       constitutive where Rule N makes it a locale-table entry.],
-    )),
-  unwritten(number: 26, title: "Method", spec: "§17.2 — A9",
-    contains: (
-      [Klein on *arithmos*; Sorabji on time, creation, and the continuum.],
-      [*Conflict:* the method makes the code the invariant and the traditions the
-       variables. That is itself a metaphysical choice, made without argument —
-       and disclosing it is the last and most self-referential application of
-       Rule M.],
-    )),
+  include "chapters/18-greek.typ",
+  include "chapters/19-jewish.typ",
+  include "chapters/20-islamic.typ",
+  include "chapters/21-patristic-and-latin.typ",
+  include "chapters/22-orthodox.typ",
+  include "chapters/23-latter-day-saint.typ",
+  include "chapters/24-modern-philosophy.typ",
+  include "chapters/25-russian.typ",
+  include "chapters/26-method.typ",
 
   part(number: "VII", title: "The instrument as research tool",
     blurb: [What a program can do that an argument cannot: it can be run against

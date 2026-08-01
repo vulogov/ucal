@@ -48,7 +48,7 @@ argument became less persuasive.
 
 ## State
 
-Front matter and Parts I–V are drafted. The remaining chapters are carried as
+Front matter and Parts I–VI are drafted. The remaining chapters are carried as
 stubs that state their specification, so the book's shape is visible in the
 contents and its length is not quietly understated — the same discipline as
 `UCAL-E0062` in the software it describes.
@@ -61,7 +61,7 @@ contents and its length is not quietly understated — the same discipline as
 | III — What implementation refused | 9–10 | drafted |
 | IV — The datum | 11–13 | drafted |
 | V — Any celestial body | 14–17 | drafted |
-| VI — Nine readings | 18–26 | specified |
+| VI — Nine readings | 18–26 | drafted |
 | VII — The instrument as research tool | 27–28 | specified |
 | VIII — The claim | 29–32 | specified |
 | — | about the author | drafted |
