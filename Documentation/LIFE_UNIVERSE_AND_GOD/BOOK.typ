@@ -14,6 +14,7 @@
 
 #book((
   include "chapters/00-preface.typ",
+  include "chapters/00b-the-rules.typ",
 
   part(number: "I", title: "Foundations",
     blurb: [Definitional. Nothing later in the book may redefine these, and a
@@ -76,6 +77,7 @@
   include "chapters/a-sources.typ",
   include "chapters/b-glossary.typ",
   include "chapters/c-diagnostics.typ",
+  include "chapters/d-rules.typ",
 
   include "chapters/99-about-the-author.typ",
 ))

@@ -3,9 +3,127 @@
 #v(1cm)
 #align(center)[
   #text(font: body_family, size: 20pt, weight: "bold", fill: ink_black,
-    "Before we begin")
+    "Why this might be worth your time")
 ]
 #v(6mm)
+
+There is a distinction that people have been trying to hold steady for about
+two and a half thousand years, and losing.
+
+It is the line between what a measurement *establishes* and what it merely
+*points at*. Everyone agrees it exists. Aristotle has a version of it, Basil of
+Caesarea has a version of it, Kant spent a large part of the *Critique* on it,
+and every one of them observed that it does not stay where you put it. Kant was
+the bluntest: the illusion that erodes the line is natural, unavoidable, and
+*survives being diagnosed*. You can see exactly why the moon is not larger at
+the horizon and go on seeing it larger.
+
+The usual remedy is vigilance — argue carefully, mark the boundary, and hope the
+next reader is paying attention. It works for as long as attention lasts, which
+is not long. In 1922 a first-rate mathematician who had the distinction fully
+available to him, in his own tradition, going back fifteen centuries, crossed it
+in a single paragraph and did not notice.
+
+This book is about trying something else: holding the line with a *compiler*.
+
+#v(2mm)
+
+The project is a working piece of software — a calendar that counts time in
+Planck units from an origin it declares it cannot measure. Inside it, the
+uncertain claim about where that origin actually falls is recorded in full,
+cited, with its exact magnitude — and given a type that has no arithmetic
+operations at all. You can read it. You can print it. You cannot compute with
+it, and three tests exist whose job is to fail to build if you ever could.
+
+That is a small technical fact with a large consequence. A philosophical
+argument reaches people who are willing to follow it. A type refuses people who
+are not. Someone who thinks the distinction is pedantic sits down, writes the
+line of code that ignores it, and is stopped in under a second by something with
+no interest in whether they agree.
+
+#v(2mm)
+
+The other reason to keep reading is that the machinery answered back.
+
+The specification behind this software claimed, twice, in two published
+revisions, that its calendar-derivation mechanism reproduces both the Julian and
+the Gregorian leap rules from first principles. It reproduces the Julian one
+exactly. The Gregorian rule is not there — not at that depth, not at any depth,
+and a rule twelve times simpler is more accurate than it.
+
+The author found that out from his own program, about his own published claim,
+and printed it. Chapter 10 is that story, and there is a check in the build now
+whose only purpose is to stop anyone quietly reversing the correction.
+
+If a book about a calendar that admits it cannot measure its own zero sounds
+like it might be an elaborate way of saying nothing, chapter 10 is the answer,
+and it is the shortest one available.
+
+#v(2mm)
+
+#section("Some of what is in here")
+
+A calendar with no Earth in its arithmetic turns out to be a good instrument for
+looking at calendars that do have Earth in theirs. Some of what came out:
+
+/ The Julian leap rule is derivable and the Gregorian is not: #sym.dash.em Feed the mechanism
+  nothing but Earth's rotation and orbit and it produces `1/4` as its first
+  answer — the Julian calendar, with no knowledge of Rome. It never produces
+  `97/400`. Two simpler fractions beat the Gregorian rule, one of them by a
+  factor of 124.
+
+/ The Persian calendar of 1079 *is* derivable: #sym.dash.em The rule worked out by a
+  commission including Omar Khayyam is the third convergent — exactly where the
+  arithmetic says the good approximation lives. So "derived" and "accurate" are
+  independent properties, and the older calendar is the one the mathematics
+  agrees with.
+
+/ The Metonic cycle falls out unaided: #sym.dash.em Nineteen years, 235 lunar months — known
+  to Babylon, named for an Athenian, still fixing the date of Easter and the
+  Hebrew calendar's leap years. It appears as the sixth convergent of two
+  numbers, with nothing supplied but Earth's periods.
+
+/ Mars has no month, and that is the correct output: #sym.dash.em Neither of its moons is
+  anything a person would call one. The mechanism returns nothing rather than
+  inventing a Martian month, because "month-like" turns out to be an Earth
+  predicate and there is no way to compute it for somewhere else.
+
+/ The Hebrew calendar's epoch is the same idea, eleven centuries early: #sym.dash.em *Molad
+  tohu* — "the new moon of chaos" — is a computational origin, placed before the
+  event it anchors, and named for its own emptiness. Whoever fixed it understood
+  precisely what this project spent four chapters working out, and named it
+  better.
+
+#section("And what kind of book it is")
+
+Nine philosophical and religious traditions are read here — Greek, Jewish,
+Islamic, Patristic, Orthodox, Latter-day Saint, modern European, Russian — and
+none of them is argued to be true. They are treated as *readers of the artifact*:
+each chapter says where the tradition and the software agree, and then, at
+greater length, where they collide.
+
+Every one of those chapters has a section headed *the conflict*, and four of
+them cut at the project rather than at the tradition. A Baghdad argument from
+1095 shows that the software took a metaphysical side without noticing it had
+one. A Russian philosopher shows that its central prohibition is a contested
+position rather than a safeguard. Those are in here because a tradition that
+only agrees has not been read.
+
+The book also marks itself. Where a passage is the author's interpretation
+rather than a checkable fact, it sits in a ruled block that says so — and there
+is a script that deletes every one of those blocks, rebuilds the book, and fails
+if any technical claim stopped standing. The software marks where it stops
+computing; the book marks where it stops asserting. That symmetry is the whole
+design.
+
+And there is a chapter reserved for what did not work. Six experiments were run
+against real material; chapter 28 reports what each of them failed to establish,
+including one that essentially failed outright and one measurement the author
+cannot make and has recorded as not made.
+
+#v(4mm)
+#align(center, line(length: 26%, stroke: 0.5pt + ink_rule))
+#v(4mm)
 
 Three things are true about this project, and the third only follows if you accept
 the first two. So they go here, on the first page, before anything has a chance to

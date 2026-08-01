@@ -16,17 +16,34 @@
 #line(length: 100%, stroke: 0.5pt + ink_rule)
 #v(12mm)
 
-Vladimir Ulogov has spent decades building infrastructure for distributed systems — the
-kind of software that watches other software. Early in his career he worked on monitoring
-and telemetry platforms; later years took him into federated observability, telemetry
-buses, and the architecture of systems that have to make sense of millions of data points
-without losing the thread.
+#grid(
+  columns: (56mm, 1fr),
+  gutter: 7mm,
+  [
+    #image("../assets/images/author-portrait.png", width: 100%)
+    #v(2mm)
+    #align(center, text(font: body_family, style: "italic", size: 9pt, fill: ink_gray,
+      "Vladimir Ulogov."))
+  ],
+  [
+    Vladimir Ulogov has spent decades building infrastructure for distributed
+    systems — the kind of software that watches other software. Early in his
+    career he worked on monitoring and telemetry platforms; later years took him
+    into federated observability, telemetry buses, and the architecture of
+    systems that have to make sense of millions of data points without losing the
+    thread.
 
-Observability, in the end, is a discipline of *coherence* — of never reporting a state the
-system cannot account for, of insisting that every signal follow from something real. It
-is not an accident that a calendar built to point at an origin it cannot measure carries
-the same instinct: it declares what it knows, declares what it has merely stipulated, and
-refuses to let the second quietly become the first.
+    Observability, in the end, is a discipline of *coherence* — of never
+    reporting a state the system cannot account for, of insisting that every
+    signal follow from something real. It is not an accident that a calendar
+    built to point at an origin it cannot measure carries the same instinct.
+  ],
+)
+
+#v(4mm)
+
+It declares what it knows, declares what it has merely stipulated, and refuses to let the
+second quietly become the first.
 
 What makes him slightly unusual in his corner of the industry is a tendency to write his
 own tools — not small utilities, but programming languages. The Bund language (its

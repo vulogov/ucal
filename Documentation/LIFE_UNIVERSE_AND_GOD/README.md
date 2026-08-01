@@ -48,7 +48,7 @@ argument became less persuasive.
 
 ## State
 
-**Complete draft.** All eight parts, 32 chapters, 217 pages.
+**Complete draft.** All eight parts, 32 chapters, four appendices, 245 pages.
 
 RFC UCAL-A1 set a 200-page hard ceiling; it was raised on the author's
 instruction and the book runs through it. Part VI at the book band — nine full
@@ -88,6 +88,7 @@ output changes between runs is a demonstration and not evidence.
 | Rule B — no uncited bibliography entry | `python3 samples/check-refs.py` |
 | the six samples regenerate | `python3 samples/run-samples.py` |
 | the diagnostic appendix matches the source | `python3 samples/gen-diagnostics.py` |
+| the rule reference covers every rule cited | `python3 samples/gen-rules.py` |
 
 `GE-A4-reader-test.md` is the two-reader protocol. **It has not been run** — it
 needs two people who are not the author, and it is the one experiment he cannot

@@ -123,7 +123,7 @@ it fail to build.
 
 Typst source and a build note are in
 [`Documentation/LIFE_UNIVERSE_AND_GOD`](Documentation/LIFE_UNIVERSE_AND_GOD).
-**Complete draft** — all eight parts, 32 chapters, 217 pages.
+**Complete draft** — all eight parts, 32 chapters, four appendices, 245 pages.
 
 ## Licence
 
