@@ -329,6 +329,13 @@
   set page(margin: book_page.margin, fill: white)
 
   // Frontispiece — a plate facing the contents, no caption, no folio.
+  //
+  // Currently unused. The dial plate went to chapter 29 instead: its centre is
+  // torn open to show clockwork, and the identity knocks that centre out as
+  // negative space precisely because the datum is stipulated rather than
+  // observed (ch. 4). A frontispiece asserting the opposite on page one would
+  // undercut the book before it starts. The slot stays for a plate whose torn
+  // centre reveals nothing.
   if frontispiece != none {
     set page(numbering: none, header: none)
     v(1fr)

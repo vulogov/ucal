@@ -51,6 +51,18 @@ Chapter 12's `SignedWindow` does something an essay cannot. It refuses.
   guard, and a type is a *precondition of the code existing*.
 ]
 
+#block(breakable: false, width: 100%)[
+#v(3mm)
+#align(center, image("../assets/images/dial-plate.png", width: 58%))
+#v(1mm)
+#figcap[14][
+  The instrument with its centre torn open. The book's own mark leaves that
+  centre empty — the datum is stipulated, so the identity declines to draw
+  anything there (ch. 4). Here the opening shows mechanism, because this chapter
+  is about mechanism: what the compiler does that the argument cannot.
+]
+]
+
 #section("Why this is philosophical and not merely technical")
 
 The obvious objection: enforcing an invariant with a type is good engineering, and good
