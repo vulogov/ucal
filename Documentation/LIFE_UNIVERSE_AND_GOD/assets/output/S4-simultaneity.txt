@@ -1,0 +1,31 @@
+S4 — cross-body simultaneity
+==========================================================================
+
+One instant, three calendars. Each rendering carries its kind and its
+anchor revision, so values from different determinations are never
+silently compared. "Now" is not a shared object.
+
+ucal show
+─────────
+ticks  8070205189128471254993117657693008777530466139316558837890625
+human  UC1 0031·0687·2481·3000·1638·3018:0779·2671·2006·1837·2640·1833·1790·1250·0000·0000·0000·0000
+calendars:
+  earth-d:
+    rendered          earth-d/1: 0027-213.7987 c328
+    kind              derived (Rule K)
+    anchor_revision   1
+    window_ticks      37097168799722000000000000000000000000000
+    day_is_ambiguous  false
+  mars-d:
+    rendered          mars-d/1: 0082-086.1665
+    kind              derived (Rule K)
+    anchor_revision   1
+    window_ticks      37097168799722000000000000000000000000000000
+    day_is_ambiguous  false
+  earth-civil:
+    rendered  earth-civil: 2026-07-31T19:11:12 TT
+    kind      legacy (§8.6)
+    warning   UCAL-W0005: value produced by a legacy (non-derived) calendar
+    note      declared tables; not a Rule K derivation
+
+One instant, several local calendars. Each derived rendering carries its anchor revision (Rule J.5) and the width of the window that revision implies (Rule J.2); each legacy one is labelled as declared table data (§8.6).

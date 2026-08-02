@@ -1,0 +1,43 @@
+S6 — a revealed ratio, evaluated
+==========================================================================
+
+Abraham 3:4 states a conversion with a profile tag on each side:
+
+  "one revolution was a day unto the Lord, after his manner of
+   reckoning, it being one thousand years according to the time
+   appointed unto that whereon thou standest."
+
+Read as a bridge constant (Rule Y), the source unit is one Kolob
+revolution and the target is one thousand Earth years.
+
+WHAT IT IMPLIES
+  1 Kolob revolution = 585348807057053493600000000000000000000000000000000000 ticks
+                     = 674861227352 beats
+                     = 0.007076 drifts
+
+  It is NOT a whole number of beats. The remainder is
+    35632189513851911760866641998291015625000 ticks
+  which is 5^60-relative, not a rounding artifact: a thousand Julian
+  years is a whole number of seconds and seconds carry only 5^30, so
+  the ratio lands off the tier grid by construction. Chapter 7's
+  incommensurability, arriving where nobody was looking for it.
+
+WHAT IT LEAVES UNDETERMINED
+  the phase — when a revolution begins. Rule J requires an anchor, and
+  the text supplies a period without one.
+  the uncertainty — Rule C requires an epoch, a rate and a validity
+  window. The text supplies a ratio with none of the three.
+  the determination method — 'revealed' is not a value the schema's
+  Determination field admits.
+
+VERDICT
+  ACCEPTED as a declared bridge constant. Rule Y requires a bridge to
+  be declared and tagged on both sides, and this one is — more
+  explicitly than most technical writing manages.
+  REFUSED as a Rule J anchor. An anchor must carry a determination
+  with a stated uncertainty window, and no reading of the text supplies
+  one without inventing it.
+
+This is a template, not a special case. Any tradition's stated ratio
+gets the same treatment: the period is usable, the phase is not, and
+the refusal is about the schema rather than about the source.

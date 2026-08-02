@@ -1,0 +1,33 @@
+S3 — uncertainty audit
+==========================================================================
+
+For any chronology, separate what is cited from what is stipulated.
+The worked case is UC-1's own datum, because it is the one this project
+is answerable for.
+
+
+  input     13.787 Gyr ± 0.020 Gyr (age_of_universe)
+  citation  Planck 2018 results VI: Cosmological parameters, A&A 641, A6 (2020)
+  unit_defs:
+    Gyr = 10^9 x 31 557 600 s (Julian years, exact by definition)
+  chain:
+    AGE_s = 13 787 000 000 x 31 557 600 = 435 084 631 200 000 000 s (exact)
+    AGE_ticks = AGE_s x SECOND = 8070204002895596516263200000000000000000000000000000000000000 (exact)
+    beats = round_half_even(AGE_ticks / BEAT) = 9 304 311 741 502 590 385
+    ORIGIN_OFFSET = beats x BEAT = 8070204002895596515944343085635637180530466139316558837890625
+rounding:
+  to                 BEAT
+  mode               half_even
+
+CITED      13.787 Gyr +/- 0.020 Gyr, Planck 2018 VI
+           31 557 600 s per Julian year (definitional)
+           SECOND, as the declared bridge constant
+STIPULATED that tick 0 is the origin of the count
+           that the datum is rounded to a whole beat
+DISCARDED  0.017190364 s, reported rather than absorbed
+
+The same audit applied to Seder Olam would separate the scriptural
+genealogies (cited, in the sense that they are quoted) from the
+compression of the Persian period (stipulated, and not presented as
+such). That audit is computable. Chapter 19 explains why this book
+computes it and does not conclude from it.

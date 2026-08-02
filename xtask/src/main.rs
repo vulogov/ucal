@@ -16,6 +16,7 @@
 //!
 //! Usage: `cargo run -p xtask -- [check | emit | report]`
 
+mod citations;
 mod declared;
 mod derivation;
 mod gendocs;
@@ -102,6 +103,9 @@ fn main() {
     }
     if mode == "gen-docs" || mode == "check-docs" {
         std::process::exit(run_docs(&mode));
+    }
+    if mode == "verify-vectors" {
+        std::process::exit(run_verify_vectors());
     }
 
     println!("UC-P0 constants harness — RFC UCAL-1, profile UC-1\n");
@@ -526,9 +530,10 @@ fn main() {
         println!("  wrote fixtures/SHA256SUMS");
         println!("  sha256 {hex}");
         println!(
-            "  NOTE: §20 calls for a *signed* vector file. The manifest above is \
-             the artefact to sign; detached signing needs a key and is a \
-             release-process step, not a harness step."
+            "  NOTE: §20 calls for a *signed* vector file. SHA256SUMS is the \
+             artefact to sign; signing needs a key and is a release step, not a \
+             harness step. Procedure: spec/CONFORMANCE.md. Verify a checkout \
+             with `cargo run -p xtask -- verify-vectors`."
         );
         println!();
     }
@@ -837,6 +842,57 @@ fn print_suppressions(root: &std::path::Path, allowed: &[lint::Suppression]) {
     }
 }
 
+/// `verify-vectors` — re-derive the conformance vectors and check them against
+/// the committed digest.
+///
+/// This answers "does this checkout produce the vectors it claims to", which is
+/// the half of §20's requirement that needs no key. The other half — "did the
+/// maintainer vouch for this digest" — needs a signature, and
+/// `spec/CONFORMANCE.md` documents how to make and check one.
+///
+/// Separating the two matters. A digest proves the file was not corrupted; only
+/// a signature proves who stood behind it, and reporting the first as if it were
+/// the second is the kind of overclaim Rule Q exists to prevent.
+fn run_verify_vectors() -> i32 {
+    let root = workspace_root();
+    let a = route_bnum::derive();
+    let b = route_bigint::derive();
+    let json = emit_vectors(&a, &b);
+
+    let mut h = Sha256::new();
+    h.update(json.as_bytes());
+    let hex: String = h.finalize().iter().map(|b| format!("{b:02x}")).collect();
+
+    let manifest = root.join("fixtures/SHA256SUMS");
+    let committed = match std::fs::read_to_string(&manifest) {
+        Ok(t) => t.split_whitespace().next().unwrap_or("").to_string(),
+        Err(e) => {
+            eprintln!("  FAIL  cannot read fixtures/SHA256SUMS: {e}");
+            return 6;
+        }
+    };
+
+    if hex != committed {
+        eprintln!("  FAIL  vectors do not match the committed digest");
+        eprintln!("          re-derived {hex}");
+        eprintln!("          committed  {committed}");
+        eprintln!("        Either this checkout changed a constant, or the manifest is stale.");
+        return 6;
+    }
+    println!("  ok    vectors re-derive to the committed digest");
+    println!("        sha256 {hex}");
+
+    let sig = root.join("fixtures/SHA256SUMS.minisig");
+    if sig.exists() {
+        println!("  ok    a detached signature is present: fixtures/SHA256SUMS.minisig");
+        println!("        verify it: minisign -Vm fixtures/SHA256SUMS -P <public key>");
+    } else {
+        println!("  --    UNSIGNED. The digest is self-consistent and nobody has vouched");
+        println!("        for it. See spec/CONFORMANCE.md to sign a release.");
+    }
+    0
+}
+
 /// Workspace root, from this crate's manifest.
 fn workspace_root() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -860,7 +916,7 @@ fn run_docs(mode: &str) -> i32 {
             }
         }
     } else {
-        match gendocs::check(&root) {
+        let mut code = match gendocs::check(&root) {
             Ok(()) => {
                 println!("  ok    §13.5: generated docs are current");
                 0
@@ -869,6 +925,22 @@ fn run_docs(mode: &str) -> i32 {
                 eprintln!("  FAIL  §13.5: {e}");
                 6
             }
+        };
+        // Citation integrity. A dangling `§` or `Rule` is a lost explanation,
+        // and the only thing that keeps a thousand of them honest is a check.
+        match citations::check(&root) {
+            Ok(n) => println!("  ok    citations resolve against spec/ ({n} distinct)"),
+            Err(bad) => {
+                eprintln!("  FAIL  {} citation(s) resolve to nothing:", bad.len());
+                for d in bad.iter().take(20) {
+                    eprintln!("          {} `{}`  ({} site(s))", d.kind, d.citation, d.sites);
+                }
+                if bad.len() > 20 {
+                    eprintln!("          ... and {} more", bad.len() - 20);
+                }
+                code = 6;
+            }
         }
+        code
     }
 }

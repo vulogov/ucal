@@ -1,0 +1,36 @@
+S2 — calendar audit by convergent
+==========================================================================
+
+Earth's fractional day-per-year: 24219/100000 = 0.242190
+
+The convergents are the best rational approximations: no fraction with a
+smaller denominator comes closer. A historical rule either is one or is not.
+
+rule                       value   convergent?    1 day slips in
+--------------------------------------------------------------------------
+Julian                       1/4      yes — #1            128 yr
+Gregorian                 97/400            NO          3,226 yr
+Revised Julian           218/900            NO         31,034 yr
+Persian (Jalali)            8/33      yes — #3          4,269 yr
+Medler                    31/128      yes — #4        400,000 yr
+Coptic / Ethiopian           1/4      yes — #1            128 yr
+
+Earth's convergent ladder, for reference:
+   1: 1/4             128 yr
+   2: 7/29            1,234 yr
+   3: 8/33            4,269 yr
+   4: 31/128          400,000 yr
+   5: 752/3105        62,100,000 yr
+   6: 4543/18758      937,900,000 yr
+   7: 9838/40621      4,062,100,000 yr
+   8: 24219/100000    exact
+
+FINDING
+  derived (a convergent): Coptic / Ethiopian, Julian, Medler, Persian (Jalali)
+  declared (not one):     Gregorian, Revised Julian
+
+GE-A2 asked whether this audit produces a non-trivial result — the kill
+criterion being that every historical calendar turns out to be a
+convergent, which would make the finding empty. It does not: the split
+is real, and it does not follow accuracy. The Persian rule of 1079 is
+derived and the Gregorian reform of 1582 is not.

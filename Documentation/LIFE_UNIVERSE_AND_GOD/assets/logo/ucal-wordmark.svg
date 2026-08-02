@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 224" width="560" height="224" role="img" aria-labelledby="ucalTitle ucalDesc">
+  <title id="ucalTitle">ucal wordmark</title>
+  <desc id="ucalDesc">Lowercase wordmark above a timeline rule that begins at the datum dot.</desc>
+  <text x="96" y="150" font-family="&apos;Iosevka&apos;, &apos;IBM Plex Mono&apos;, ui-monospace, SFMono-Regular, Menlo, monospace" font-size="150" font-weight="600" letter-spacing="10" fill="#14110f">ucal</text>
+  <circle cx="52" cy="190" r="17" fill="#14110f"/>
+  <line x1="76" y1="190" x2="508" y2="190" stroke="#14110f" stroke-width="5"/>
+</svg>
