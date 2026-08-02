@@ -12,6 +12,7 @@ knows only what it did.
 
 | version | date | state |
 |---|---|---|
+| [0.3.0](0.3.0.md) | — | **unreleased** — goal not yet chosen |
 | [0.2.0](0.2.0.md) | 2026-08-01 | released — supersede RFC UCAL-1 |
 | [0.1.1](0.1.1.md) | 2026-07-31 | released |
 | [0.1.0](0.1.0.md) | 2026-07-31 | released |
@@ -62,10 +63,18 @@ one-line version and links to it.
    what shipped.
 2. Add the row to the table above.
 3. Bump the workspace version and the internal dependency requirements
-   together — they move in lockstep, so a `0.2.0` facade never resolves against
-   a `0.1.x` core.
+   together — they move in lockstep, so a `0.3.0` facade never resolves against
+   a `0.2.x` core.
 4. `cargo test --workspace --release`, both backends, plus
-   `cargo run -p xtask -- lint` and `check-docs`.
-5. `cargo publish --workspace --dry-run`, then for real.
-6. Tag `vX.Y.Z`, annotated, and push the tag.
+   `cargo run -p xtask -- lint`, `check-docs` and `verify-vectors`.
+5. `cargo publish --workspace --dry-run --no-verify` to confirm every crate
+   packages, then publish **one crate at a time in dependency order**:
+   `ucal-core`, `ucal-body`, `ucal-civil`, `ucal-events`, `ucal-cosmo`, `ucal`.
+
+   Not `cargo publish --workspace`. It fails on this workspace with a cargo
+   internal error — `no hash listed for ucal-core` — because it tries to verify
+   a dependent against a dependency that is not on the index yet. Publishing
+   sequentially is not a workaround that skips verification: each crate is
+   verified normally, against the real index, once the one below it is live.
+6. Tag `vX.Y.Z`, annotated and signed, and push the tag.
 7. Open the next file.

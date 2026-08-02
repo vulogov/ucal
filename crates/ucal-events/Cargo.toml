@@ -14,7 +14,7 @@ keywords = ["time", "cosmology", "timeline", "astronomy", "geology"]
 # D-7: versioned by citation set, independently of the library, so a revised
 # citation does not force a library release.
 [dependencies]
-ucal-core = { version = "0.2.0", path = "../ucal-core", default-features = false }
+ucal-core = { version = "0.3.0", path = "../ucal-core", default-features = false }
 
 [features]
 default = ["u512", "std"]
