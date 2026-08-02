@@ -495,13 +495,9 @@ That rule exists to prevent a specific failure: Earth quietly becoming the
 template, one convenience at a time, until the mechanism is an Earth calendar
 with parameters.
 
-#scripture("Doctrine and Covenants 130:4–5")[
-  In answer to the question — Is not the reckoning of God's time, angel's time,
-  prophet's time, and man's time, according to the planet on which they reside?
-  I answer, Yes.
-]
-
-That is the rule's premise, stated in 1843, without the software.
+That rule's premise is D&C 130:4–5, quoted earlier for a different purpose:
+*reckoning is according to the planet on which they reside.* Stated in 1843,
+without the software.
 
 Not that Earth's reckoning is primary and others approximate it. Not that there
 is a true reckoning somewhere that local ones are shadows of. *Reckoning is
