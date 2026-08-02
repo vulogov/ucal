@@ -4,6 +4,7 @@
 //! golden tests can call the commands as functions.
 
 use clap::{Parser, Subcommand};
+use ucal::style::{resolve_for_output, ColorChoice, Role, Style};
 use ucal::{cmd_datum, cmd_doctor, cmd_explain, cmd_ladder, exit_code, parse_rounding, parse_tier};
 use ucal_core::LocaleId;
 use ucal_core::codec::Form;
@@ -41,6 +42,15 @@ struct Cli {
     /// Emit stable, versioned JSON instead of text (§19.1).
     #[arg(long, global = true)]
     json: bool,
+
+    /// When to colour the output. `auto` colours only into a terminal.
+    #[arg(long, global = true, default_value = "auto",
+          value_parser = ["auto", "always", "never"])]
+    color: String,
+
+    /// Never colour. An alias for `--color never`, and it wins over `--color`.
+    #[arg(long, global = true)]
+    no_color: bool,
 
     #[command(subcommand)]
     command: Command,
@@ -333,13 +343,60 @@ fn main() {
             .and_then(|(s, r, c)| cmd_to_civil(instant, s, *digits, r, c)),
     };
 
+    // --no-color beats --color, because it is the flag a script sets when it
+    // cannot know what the caller's environment has already put in `--color`.
+    let choice = if cli.no_color {
+        ColorChoice::Never
+    } else {
+        match ColorChoice::parse(&cli.color) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("{e}");
+                std::process::exit(exit_code(&e));
+            }
+        }
+    };
+    let style = resolve_for_output(choice, cli.json);
+
     match result {
         Ok(doc) => {
-            print!("{}", if cli.json { doc.to_json() } else { doc.to_text() });
+            print!(
+                "{}",
+                if cli.json {
+                    doc.to_json()
+                } else {
+                    doc.to_ansi(&style)
+                }
+            );
         }
         Err(e) => {
-            eprintln!("{e}");
+            // stderr is a different stream with its own answer to "is this a
+            // terminal", so it gets its own resolution rather than reusing the
+            // one computed for stdout.
+            let err_style = error_style(choice);
+            eprintln!("{}", err_style.paint(Role::Error, &e.to_string()));
             std::process::exit(exit_code(&e));
+        }
+    }
+}
+
+/// The style for diagnostics on stderr.
+///
+/// `--json` does not suppress it: the JSON contract in §19.1 is about stdout,
+/// and a diagnostic is not part of the document a consumer parses.
+fn error_style(choice: ColorChoice) -> Style {
+    use std::io::IsTerminal as _;
+    match choice {
+        ColorChoice::Never => Style::PLAIN,
+        ColorChoice::Always => Style::colored(),
+        ColorChoice::Auto => {
+            if std::env::var_os("NO_COLOR").is_some_and(|v| !v.is_empty())
+                || !std::io::stderr().is_terminal()
+            {
+                Style::PLAIN
+            } else {
+                Style::colored()
+            }
         }
     }
 }

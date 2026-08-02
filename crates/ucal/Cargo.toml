@@ -19,6 +19,10 @@ ucal-body = { workspace = true, optional = true }
 ucal-events = { workspace = true, optional = true }
 ucal-cosmo = { workspace = true, optional = true }
 clap = { version = "4", features = ["derive", "wrap_help"] }
+# Already in the tree through clap: making it direct adds a line to this
+# manifest and nothing to the dependency graph. Only the SGR value types are
+# used -- the tty test is std's `IsTerminal` and the choice logic is ours.
+anstyle = "1"
 
 [features]
 default = ["u512", "std", "civil", "body", "events", "cosmo"]

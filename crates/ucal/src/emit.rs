@@ -11,6 +11,8 @@
 
 use std::fmt::Write as _;
 
+use crate::style::{Role, Style};
+
 /// The `--json` schema version (§19.1).
 pub const JSON_FORMAT: &str = "ucal-json/1";
 
@@ -89,12 +91,28 @@ impl Doc {
         self.fields.iter().find(|(k, _)| k == key).map(|(_, v)| v)
     }
 
-    /// Render for a person.
+    /// Render for a person, without colour.
+    ///
+    /// Defined as [`to_ansi`](Doc::to_ansi) against [`Style::PLAIN`] rather than
+    /// as a renderer of its own. One code path means the coloured and plain
+    /// layouts cannot drift, and it is what makes the strip invariant a statement
+    /// about styles rather than about two functions agreeing.
     pub fn to_text(&self) -> String {
+        self.to_ansi(&Style::PLAIN)
+    }
+
+    /// Render for a person, with colour.
+    ///
+    /// The layout is computed from the *unpainted* text and the sequences are
+    /// added last, so a coloured column lines up with a plain one. Getting this
+    /// backwards is the classic defect here: `{k:<width$}` on an already-painted
+    /// string pads to the width of the escape sequences.
+    pub fn to_ansi(&self, style: &Style) -> String {
         let mut s = String::new();
         if let Some(t) = &self.title {
-            let _ = writeln!(s, "{t}");
-            let _ = writeln!(s, "{}", "─".repeat(t.chars().count()));
+            let _ = writeln!(s, "{}", style.paint(Role::Title, t));
+            let rule = "─".repeat(t.chars().count());
+            let _ = writeln!(s, "{}", style.paint(Role::Title, &rule));
         }
         let width = self
             .fields
@@ -104,10 +122,10 @@ impl Doc {
             .max()
             .unwrap_or(0);
         for (k, v) in &self.fields {
-            render_field_text(&mut s, k, v, width, 0);
+            render_field_text(&mut s, k, v, width, 0, style);
         }
         for n in &self.notes {
-            let _ = writeln!(s, "\n{n}");
+            let _ = writeln!(s, "\n{}", style.paint(role_of_prose(n), n));
         }
         s
     }
@@ -137,11 +155,40 @@ impl Doc {
     }
 }
 
-fn render_field_text(s: &mut String, k: &str, v: &Value, width: usize, depth: usize) {
+/// Which role a run of prose takes.
+///
+/// A diagnostic code is the one thing in this output that a reader scans for
+/// rather than reads, so it earns a colour. The test is the emitted code itself —
+/// `UCAL-W` for a warning, `UCAL-E` for an error — and not a guess at tone, so a
+/// note that happens to read gravely stays a note.
+fn role_of_prose(t: &str) -> Role {
+    if t.contains("UCAL-W") {
+        Role::Warning
+    } else if t.contains("UCAL-E") {
+        Role::Error
+    } else {
+        Role::Note
+    }
+}
+
+/// Pad `text` to `width` *display* columns, then paint it.
+///
+/// The order is the point: padding is measured on the characters a reader sees,
+/// and the sequences go on afterwards.
+fn padded(style: &Style, role: Role, text: &str, width: usize) -> String {
+    let n = text.chars().count();
+    let mut out = style.paint(role, text);
+    for _ in n..width {
+        out.push(' ');
+    }
+    out
+}
+
+fn render_field_text(s: &mut String, k: &str, v: &Value, width: usize, depth: usize, style: &Style) {
     let pad = "  ".repeat(depth);
     match v {
         Value::Section(fields) => {
-            let _ = writeln!(s, "{pad}{k}:");
+            let _ = writeln!(s, "{pad}{}:", style.paint(Role::Key, k));
             let inner = fields
                 .iter()
                 .filter(|(_, v)| !matches!(v, Value::Section(_) | Value::List(_)))
@@ -149,23 +196,37 @@ fn render_field_text(s: &mut String, k: &str, v: &Value, width: usize, depth: us
                 .max()
                 .unwrap_or(0);
             for (ik, iv) in fields {
-                render_field_text(s, ik, iv, inner, depth + 1);
+                render_field_text(s, ik, iv, inner, depth + 1, style);
             }
         }
         Value::List(items) => {
-            let _ = writeln!(s, "{pad}{k}:");
+            let _ = writeln!(s, "{pad}{}:", style.paint(Role::Key, k));
             for i in items {
-                let _ = writeln!(s, "{pad}  {i}");
+                let _ = writeln!(s, "{pad}  {}", style.paint(role_of_prose(i), i));
             }
         }
         Value::Text(t) => {
-            let _ = writeln!(s, "{pad}{k:<width$}  {t}");
+            let _ = writeln!(
+                s,
+                "{pad}{}  {}",
+                padded(style, Role::Key, k, width),
+                style.paint(role_of_prose(t), t)
+            );
         }
         Value::Number(n) => {
-            let _ = writeln!(s, "{pad}{k:<width$}  {n}");
+            let _ = writeln!(
+                s,
+                "{pad}{}  {}",
+                padded(style, Role::Key, k, width),
+                style.paint(Role::Digits, n)
+            );
         }
         Value::Bool(b) => {
-            let _ = writeln!(s, "{pad}{k:<width$}  {b}");
+            let _ = writeln!(
+                s,
+                "{pad}{}  {b}",
+                padded(style, Role::Key, k, width)
+            );
         }
     }
 }

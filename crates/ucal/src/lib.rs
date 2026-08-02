@@ -14,6 +14,7 @@
 #![warn(missing_docs)]
 
 pub mod emit;
+pub mod style;
 
 use emit::{Doc, Value};
 use ucal_core::backend::TickInt;
