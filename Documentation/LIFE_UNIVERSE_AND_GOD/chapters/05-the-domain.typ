@@ -11,9 +11,9 @@ operation on it is *checked*.
 
 #section("Unsigned, and why that is not a saving")
 
-There is no tick $-1$. Chapter 3 said why in one line — nothing precedes the datum,
-because the datum is where the count begins — and the type system is where that
-line is enforced.
+There is no tick $-1$. Chapter 3 said why in one line — the domain begins at the datum,
+because that is where the count begins — and the type system is where that line is
+enforced. It bounds what is representable, not what exists.
 
 `Instant` has no `Sub` implementation returning a signed value. Subtracting a later
 instant from an earlier one does not produce a negative `Delta`; it produces

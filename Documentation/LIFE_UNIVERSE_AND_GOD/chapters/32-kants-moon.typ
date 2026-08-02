@@ -142,7 +142,7 @@ So the book ends on a boundary rather than a conclusion.
 #align(center, line(length: 30%, stroke: 0.5pt + ink_rule))
 #v(6mm)
 
-#align(center, block(width: 76%)[
+#align(center, block(width: 76%, breakable: false)[
   #set par(justify: false)
   #align(center, text(size: 10.5pt, style: "italic", fill: ink_gray)[
     Tick zero is a stipulated reference point, conventionally identified with the

@@ -45,7 +45,7 @@
     v(3mm)
     align(center, image(path, width: width))
     v(1.5mm)
-    align(center, block(width: 84%, {
+    align(center, block(width: 84%, breakable: false, {
       set par(justify: false)
       text(font: body_family, size: 8.5pt, style: "italic", fill: ink_gray, cap)
     }))
@@ -115,7 +115,7 @@
 Read almost any account of the early universe and you will find a sentence like
 this one:
 
-#align(center, block(width: 82%)[
+#align(center, block(width: 82%, breakable: false)[
   #set par(justify: false)
   #v(2mm)
   #text(size: 11.5pt, style: "italic")[
@@ -837,7 +837,7 @@ produced would be wrong by an unknown amount with nothing anywhere to indicate i
 // ── 8 ───────────────────────────────────────────────────────────────
 #part("The claim, and what is not claimed")
 
-#align(center, block(width: 86%)[
+#align(center, block(width: 86%, breakable: false)[
   #set par(justify: false)
   #v(2mm)
   #text(size: 11.5pt, style: "italic")[
@@ -951,7 +951,7 @@ reader. The instrument contains the illusion; it does not cure it.
 #v(10mm)
 #align(center, line(length: 28%, stroke: 0.5pt + ink_rule))
 #v(6mm)
-#align(center, block(width: 76%)[
+#align(center, block(width: 76%, breakable: false)[
   #set par(justify: false)
   #align(center, text(size: 10.5pt, style: "italic", fill: ink_gray)[
     Tick zero is a stipulated reference point, conventionally identified with the

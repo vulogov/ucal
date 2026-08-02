@@ -18,9 +18,15 @@ is made here and made plainly.
 
 Absolute time in this system is an unsigned integer. There is no tick $-1$.
 
-This is not a storage optimisation. It is a statement about what the system is willing to
-represent: nothing precedes the datum, because the datum is where the count begins, and a
-count does not go backwards past its own start.
+This is not a storage optimisation, and it is not a claim that nothing existed earlier. It
+is a statement about what the system is willing to *represent*: the domain begins at the
+datum, because that is where the count begins, and a count does not go backwards past its
+own start.
+
+The specification is explicit that the two differ. `BIG_BANG_CLAIM` is a *signed* window
+precisely because the FLRW limit may lie before the datum — and a system asserting that
+nothing precedes tick zero would have no use for a type able to express something that
+does.
 
 Ask for an instant before tick zero and you do not get a negative number. You get an error
 — `UCAL-E0020` — and the operation fails.

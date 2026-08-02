@@ -33,8 +33,8 @@ GLOSS = {
     #    letter: (name, card line (<= 58 ch), appendix gloss, chapter)
     "Q": ("the datum is stipulated", "declared, not measured — and not computable with",
           "Tick 0 is declared, not measured or observed. The physical claim about it is recorded separately and cannot be computed with.", "3"),
-    "Z": ("time is unsigned", "nothing precedes the datum; earlier is an error",
-          "Nothing precedes the datum. A result that would be earlier is an error, not a negative number.", "3"),
+    "Z": ("time is unsigned", "the domain begins at the datum; earlier is not representable",
+          "The domain begins at tick 0 and no earlier instant is representable. A statement about range, not about what exists.", "3"),
     "A": ("the tick is primitive", "everything is counted in ticks; no other unit is basic",
           "Everything is counted in ticks. No other unit is fundamental — not the second, not the beat.", "2"),
     "Y": ("metrology", "foreign units cross one boundary you can point at",

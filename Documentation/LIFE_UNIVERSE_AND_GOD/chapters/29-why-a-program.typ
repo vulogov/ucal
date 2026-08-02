@@ -5,7 +5,7 @@
 The thesis, restated with everything the book has gathered behind it:
 
 #v(3mm)
-#align(center, block(width: 84%)[
+#align(center, block(width: 84%, breakable: false)[
   #set par(justify: false)
   #text(size: 12pt, style: "italic", fill: ink_black)[
     A measuring instrument may legitimately point at what it cannot describe, provided

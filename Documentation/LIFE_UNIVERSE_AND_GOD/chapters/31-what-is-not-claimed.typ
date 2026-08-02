@@ -99,7 +99,7 @@ being confessed; it is what an interval-measure is.
 Stated once, with the qualifications attached rather than deferred.
 
 #v(3mm)
-#align(center, block(width: 84%)[
+#align(center, block(width: 84%, breakable: false)[
   #set par(justify: false)
   #text(size: 11.5pt, style: "italic")[
     A measuring instrument may legitimately point at what it cannot describe, provided

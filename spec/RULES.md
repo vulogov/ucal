@@ -115,7 +115,15 @@ in ticks.
 
 ### Rule Z — zero and the unsigned domain  §1.2
 
-Absolute time is an **unsigned** integer count. Nothing precedes tick 0.
+Absolute time is an **unsigned** integer count. The domain begins at tick 0, and
+**no earlier instant is representable**.
+
+That is a statement about the representable range, not about what exists. The
+RFC is explicit on the point: `BIG_BANG_CLAIM` is a *signed* window precisely
+because "the limit may lie before the datum, which is not representable as a
+tick (N12)". The datum is the best available starting point for time as this
+system can date it, and everything it dates is dated from there. What may lie
+earlier is a question it declines rather than answers.
 
 *Enforced by* **type system** — `Instant::since` returns
 `Result<Delta>` and errors rather than going negative; there is no `Sub` impl

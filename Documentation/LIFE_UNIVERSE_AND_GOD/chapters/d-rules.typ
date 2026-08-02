@@ -42,7 +42,7 @@ complete rather than curated.
     [W], [one domain across backends], [The fixed-width and arbitrary-precision integers enforce one identical domain.], [—],
     [*X*], [certified enclosures], [An interval that provably contains the answer, with quadrature error and parameter uncertainty reported separately.], [5],
     [*Y*], [metrology], [Earth units cross one declared boundary, and never appear in the arithmetic.], [7],
-    [*Z*], [zero and the unsigned domain], [Nothing precedes the datum. A result that would be earlier is an error, not a negative number.], [3],
+    [*Z*], [zero and the unsigned domain], [The domain begins at tick 0 and no earlier instant is representable. A statement about range, not about what exists.], [3],
   )
 ]
 

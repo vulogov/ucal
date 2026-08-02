@@ -51,9 +51,10 @@ declared boundary where Earth enters and leaves.
 
 ## Three properties
 
-**Time is unsigned.** Tick 0 is the datum and nothing precedes it. Subtraction
-that would go negative is `UCAL-E0020`, an error — not a wrap, and not a negative
-number. The refusal is the answer.
+**Time is unsigned.** The domain begins at the datum, and no earlier instant is
+representable. Subtraction that would go negative is `UCAL-E0020`, an error — not
+a wrap, and not a negative number. It is a limit on what the system can *date*,
+not a claim about what exists.
 
 **No floating point, anywhere.** Every derived quantity is an exact rational or a
 certified interval. Rounding happens once, at display, under a mode the caller

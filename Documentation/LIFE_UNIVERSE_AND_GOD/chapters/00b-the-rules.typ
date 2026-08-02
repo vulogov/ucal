@@ -27,7 +27,7 @@ when a chapter leans on one — that is what this page is for.
     align: (center, left, left, center),
     [*rule*], [*name*], [*what it requires*], [*ch.*],
     [*Q*], [the datum is stipulated], [declared, not measured — and not computable with], [3],
-    [*Z*], [time is unsigned], [nothing precedes the datum; earlier is an error], [3],
+    [*Z*], [time is unsigned], [the domain begins at the datum; earlier is not representable], [3],
     [*G*], [the tier grid], [units are powers of five; a timestamp is base 5], [4],
     [*N*], [names are display only], [a tier's identity is its exponent, not its name], [4],
     [*P*], [profiles are tagged and type-bound], [two profiles' values cannot be compared], [6],

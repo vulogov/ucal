@@ -139,8 +139,11 @@ So it is declared: `ORIGIN_OFFSET` = 9 304 311 741 502 590 385 beats, a whole
 number of them. The published age rounded to a whole beat — and the system prints
 what the rounding discarded, −0.017190364 s, rather than absorbing it.
 
-Two things follow. The domain is *unsigned*: nothing precedes the datum, and an
-earlier result is `UCAL-E0020`, an error rather than a negative number. And the
+Two things follow. The domain is *unsigned*: it begins at the datum, and an
+earlier instant is not representable — `UCAL-E0020`, an error rather than a
+negative number. A limit on what can be *dated*, not a claim about what exists;
+the specification keeps the origin claim in a *signed* window precisely because
+the limit may lie earlier. And the
 physical claim about where the origin falls is kept separately — cited, with its
 exact magnitude, in a type with *no arithmetic operations at all*. Three tests
 exist whose job is to *fail to build* if anyone computes with it.

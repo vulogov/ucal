@@ -43,7 +43,7 @@
 #let scripture(ref, body) = {
   v(2.5mm)
   block(width: 100%, inset: (left: 10pt, right: 8pt),
-    stroke: (left: 2pt + ink_term), {
+    stroke: (left: 2pt + ink_term), breakable: false, {
       text(font: body_family, size: 8pt, weight: "bold", fill: ink_term,
         tracking: 1pt, upper(ref))
       v(1.8mm)
@@ -71,7 +71,7 @@
   v(3mm)
   align(center, image(path, width: width))
   v(1.5mm)
-  align(center, block(width: 84%, {
+  align(center, block(width: 84%, breakable: false, {
     set par(justify: false)
     text(font: body_family, size: 8.5pt, style: "italic", fill: ink_gray, cap)
   }))
@@ -160,13 +160,10 @@ second, even by accident.
 
 #section("What this is and is not")
 
-This is a technical document with scripture in it, written for readers who know
-the scripture better than the author does.
-
-It reports where a piece of software and Latter-day Saint doctrine converge, and
-where they collide. Both halves are here at comparable length. The convergences
-are the easy half and would make a more comfortable document; the collisions are
-why it exists.
+A technical document with scripture in it, written for readers who know the
+scripture better than its author does. It reports where a piece of software and
+Latter-day Saint doctrine converge and where they collide, at comparable length.
+The convergences are the easy half; the collisions are why it exists.
 
 #callout(label: "The rule this document works under")[
   No doctrine is argued true here, and none is argued false. The software is
@@ -202,30 +199,27 @@ refuse the passenger.
   Every quantity in the system is an unsigned integer count of these.
 ]
 
-A tick is too small to think in, so ticks group into *tiers*: the powers
-$5^(5k)$, each exactly five base-5 digits. The reference rung is the *beat*,
-$5^60$ ticks, about 46.762 milliseconds.
-
-Base five because $5^5 = 3125$ is a number of five base-5 digits. That is the
-whole reason, and it is worth saying before anyone reaches Part III and starts
-looking for significance in the five. There is none, and the specification
-forbids finding any.
+Ticks group into *tiers*: the powers $5^(5k)$, each exactly five base-5 digits.
+The reference rung is the *beat*, $5^60$ ticks, about 46.762 milliseconds — base
+five because $5^5 = 3125$ is a number of five base-5 digits, and exponent 60
+because it puts the reference rung where a human can notice a duration. Those are
+the only two reasons, and the specification forbids finding any others.
 
 The cost of leaving Earth units behind is that nothing on the ladder is near
-anything familiar. One second is 21.385061835 beats — not a whole number, and
-not close to one.
+anything familiar. One second is 21.385061835 beats.
 
-#plate("LIFE_UNIVERSE_AND_GOD/assets/images/scale-plate.png", width: 27%)[
-  The domain, logarithmic: from the Planck tick through an atom's vibration, a
-  heartbeat, the day, a human life, recorded history, the stratigraphic record
-  and a galaxy's turning. The ceiling is about $2.29 times 10^103$ years; the
-  present epoch sits at $6 times 10^(-94)$ of it.
+#plate("LIFE_UNIVERSE_AND_GOD/assets/images/scale-plate.png", width: 25%)[
+  The domain, logarithmic: Planck tick to a single point of light in emptiness.
+  The ceiling is about $2.29 times 10^103$ years; the present epoch sits at
+  $6 times 10^(-94)$ of it.
 ]
 
 #section("Three commitments")
 
-*Time is unsigned.* Nothing precedes the datum. A result that would be earlier is
-an error — `UCAL-E0020` — not a negative number. The refusal is the answer.
+*Time is unsigned.* The domain begins at the datum, and no earlier instant is
+representable — a result that would be earlier is `UCAL-E0020`, an error rather
+than a negative number. That is a limit on what the system can *date*, not a
+claim about what exists.
 
 *No floating point, anywhere.* Not in a signature, a field, an intermediate, or
 the printed output. A lint fails the build on any float token. Cosmology is
@@ -428,18 +422,35 @@ than left to the author remembering.
 // ── 5 ───────────────────────────────────────────────────────────────
 #part("Where they collide")
 
-Five, and the first is the largest. In every case the collision is the project's
-problem rather than the doctrine's, and in every case the project has chosen
-without arguing for the choice.
+Four, and one that looks like a collision and is not. In every case the problem
+is the project's rather than the doctrine's, and in every case the project has
+chosen without arguing for the choice.
 
-#section("1. The datum assumes a beginning this doctrine does not")
+#section("The one that is not a collision: the datum")
 
-`ucal`'s built profile, UC-1, stipulates tick 0 and conventionally identifies it
-with the FLRW $t arrow.r 0$ limit — the point a standard cosmological model
-extrapolates back to. The unsigned domain follows: nothing precedes the datum,
-and asking for an earlier instant is an error rather than a negative number.
+This is where a reader would most expect the two to come apart, and the title of
+this document is why they do not.
 
-That arrangement sits comfortably with a cosmology in which time itself began.
+`ucal`'s profile UC-1 stipulates tick 0 and conventionally identifies it with the
+FLRW $t arrow.r 0$ limit. The domain is unsigned: no earlier instant is
+representable, and asking for one is an error rather than a negative number.
+
+It is easy to read that as *nothing existed before* — and I wrote an earlier
+draft of this document that read it exactly so, and built a collision on top of
+it. That was wrong, and the specification says so plainly. `BIG_BANG_CLAIM` is a
+*signed* window precisely because the limit "may lie before the datum, which is
+not representable as a tick." A system asserting that nothing precedes the datum
+would have no use for a type that can express something preceding it.
+
+#callout(label: "What the unsigned domain actually says")[
+  The datum is the best available starting point for time *as this system can
+  date it*, and everything it dates is dated from there. What may lie earlier is
+  a question the instrument declines rather than answers.
+
+  It is a limit on *range*, not a claim about *existence*. Alma's verse is the
+  whole of it: time is measured unto men, and a measuring instrument reaches as
+  far as measuring reaches.
+]
 
 #scripture("Doctrine and Covenants 93:29")[
   Man was also in the beginning with God. Intelligence, or the light of truth, was
@@ -448,40 +459,43 @@ That arrangement sits comfortably with a cosmology in which time itself began.
 
 Taken with the King Follett discourse of 1844 — in which the word rendered
 *created* is argued to mean *organise*, and matter is held co-eternal with God —
-the picture is not one in which time began. It is one in which a particular
+the picture is not one in which time began, but one in which a particular
 organisation began, out of materials that did not.
 
-#tension[
-  If matter and intelligence are co-eternal, then tick 0 is not the beginning of
-  time. At most it is the beginning of *this* organisation, and there is a
-  "before" that is not nothing.
+The instrument does not contradict that. It is *silent* about it, and silence is
+not contradiction. Where the doctrine speaks of what precedes organisation, the
+instrument has nothing to say, because there is nothing there it can date.
 
-  UC-1's unsigned domain then stops being a principled refusal and becomes a
-  *misdescription*: the system says no time exists before the datum, and this
-  doctrine says otherwise.
+#subsection("What remains, which is a limitation and not a disagreement")
+
+If the doctrine holds there is a dateable "before" — an eternity of organised
+matter preceding this arrangement — then the instrument's *reach* falls short of
+the doctrine's *scope*. That is a real limitation and worth naming as one.
+
+The specification anticipates it. A second profile, UC-Θ, would place the datum
+at organisation rather than at a physical origin and make the interval before it
+representable. Under UC-Θ the unsigned domain becomes *room* rather than an edge.
+It has never been built.
+
+So the honest statement is narrow: UC-1 cannot date what precedes its datum, and
+UC-Θ would extend the range rather than correct a false claim. Whether extending
+it is desirable is a separate question, and one this document does not settle.
+
+#callout(label: "An inversion worth stating anyway")[
+  The book this document summarises reads nine traditions. Judged by the Patristic
+  and Latin material — Augustine, Basil, Aquinas, all holding creation *ex nihilo*
+  including time — UC-Θ is the *heterodox* profile: it posits pre-existing
+  material shaped rather than made.
+
+  Read from Latter-day Saint scripture, that is reversed. UC-Θ is the natural
+  profile and UC-1 the foreign one.
+
+  Two profiles here are not two configurations of one system. They are two
+  cosmologies — and the project ships the one that reaches less far for this
+  reader, without having argued that it should.
 ]
 
-The specification anticipates this. There is a second profile, called UC-Θ, in
-which the datum is placed at organisation rather than at a physical origin, and
-in which the interval between the two is representable rather than refused. Under
-it the unsigned domain becomes *room* instead of a limit.
-
-UC-Θ has never been built.
-
-#callout(label: "An inversion worth stating plainly")[
-  The book that this document summarises reads nine traditions. Judged by the
-  Patristic and Latin material — Augustine, Basil, Aquinas, all holding creation
-  *ex nihilo* including time — UC-Θ is the heterodox profile and UC-1 is the
-  orthodox one.
-
-  Read from Latter-day Saint scripture, that is exactly reversed. UC-Θ is the
-  natural profile and UC-1 is the foreign one.
-
-  So the two profiles are not two configurations of one system. They are two
-  cosmologies, and the project ships the one that does not fit this reader.
-]
-
-#section("2. Kolob is a body; the ladder is a grid")
+#section("1. Kolob is a body; the ladder is a grid")
 
 The mechanism permits no privileged body. The universal ladder is the powers
 $5^(5k)$ — an abstract grid — and the specification is explicit that no body's
@@ -517,7 +531,7 @@ replaced without changing the cosmology. But that is an argument the project
 should make rather than assume, and until it was written down here it had assumed
 it.
 
-#section("3. Revelation has no place in the schema")
+#section("2. Revelation has no place in the schema")
 
 Every body parameter in the system records *how it was determined*: measured to a
 stated precision, derived from other parameters, or cited to a published source
@@ -543,7 +557,7 @@ them.
   omission.
 ]
 
-#section("4. A revealed ratio does not land on the grid")
+#section("3. A revealed ratio does not land on the grid")
 
 A smaller finding, reported because an attentive reader would otherwise wonder,
 and because it says nothing at all about the text.
@@ -566,7 +580,7 @@ by construction, from any source whatever.
   than a round number, showing up somewhere nobody was looking for it.
 ]
 
-#section("5. Scripture chronology is classified as declared, not derived")
+#section("4. Scripture chronology is classified as declared, not derived")
 
 The system distinguishes calendars whose rules it *derives* from a body's motion
 from calendars whose rules are *declared tables*. That distinction is factual
@@ -637,7 +651,7 @@ the quoting will not always be careful.
 
 #section("What is claimed")
 
-#align(center, block(width: 86%)[
+#align(center, block(width: 86%, breakable: false)[
   #set par(justify: false)
   #v(2mm)
   #text(size: 11.5pt, style: "italic")[
@@ -698,7 +712,7 @@ does not reach is not reached by measuring more carefully.
 #v(10mm)
 #align(center, line(length: 28%, stroke: 0.5pt + ink_rule))
 #v(6mm)
-#align(center, block(width: 76%)[
+#align(center, block(width: 76%, breakable: false)[
   #set par(justify: false)
   #align(center, text(size: 10.5pt, style: "italic", fill: ink_gray)[
     Tick zero is a stipulated reference point, conventionally identified with the
