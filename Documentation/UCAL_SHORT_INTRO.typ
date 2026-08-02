@@ -34,7 +34,7 @@
     }
   })
 #set text(font: body_family, size: 9pt, fill: ink_black, lang: "en")
-#set par(leading: 0.62em, justify: true)
+#set par(leading: 0.62em, spacing: 1.15em, justify: true)
 
 #show raw.where(block: true): it => block(
   fill: rgb("#f3eee4"), stroke: 0.4pt + ink_rule, inset: 5pt, radius: 2pt,
@@ -43,7 +43,9 @@
   fill: rgb("#f3eee4"), inset: (x: 2pt), outset: (y: 1.4pt), radius: 1pt,
   text(font: mono_family, size: 8pt, it))
 
-#let head(t) = block(sticky: true, above: 4mm, below: 1.6mm,
+// A heading at 11pt over 9pt text needs real air beneath it, or the descenders
+// of the heading sit on the ascenders of the first line.
+#let head(t) = block(sticky: true, above: 5mm, below: 2.8mm,
   text(size: 11pt, weight: "bold", fill: ink_black, t))
 #let note(t) = block(width: 100%, inset: (left: 7pt),
   stroke: (left: 1.6pt + ink_accent),

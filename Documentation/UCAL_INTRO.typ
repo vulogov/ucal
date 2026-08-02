@@ -897,12 +897,27 @@ artifact.
   solution to needing an exact origin.
 / Not that base 5 is meaningful: #sym.dash.em $5^5 = 3125$ is five base-5 digits,
   and that is the whole reason.
-/ Not that the system is useful: #sym.dash.em no task you have today needs a
-  Planck-tick count. That is not an apology; it is the second of three facts, and
-  the third depends on it.
 / Not that anyone should adopt it: #sym.dash.em there is one qualification about
   timekeeping across two or more bodies, it is a claim about coherence rather than
   a recommendation, and it is one page long in the book.
+
+#section("Usefulness is not on that list")
+
+It was, in an earlier draft, sitting sixth among the negatives — and that
+misfiled it. Every other item above is a claim *about the world* that the
+instrument declines to make. Usefulness is not that. It is a property of the
+artifact, and the project's position on it is structural rather than defensive.
+
+Three things are true, in this order. The artifact is real: six crates, 381
+tests, constants reproducible by two independent derivations. Its practical
+utility is questionable: no task you have today needs a Planck-tick count, and
+nothing on its ladder is near an hour. *Therefore* it is research of another kind
+— conducted in the medium of a working program.
+
+The third does not rescue the second. It *depends* on it. A useful instrument
+would have been answerable to its users; this one is answerable only to whether
+it is right, and that is the whole reason the corrections in Part VI could be
+published rather than quietly absorbed.
 
 #section("What the artifact actually is")
 

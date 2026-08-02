@@ -179,59 +179,306 @@ The convergences are the easy half; the collisions are why it exists.
 ]
 
 // ── 2 ───────────────────────────────────────────────────────────────
-#part("The irritation, and what was built")
+#part("The irritation")
 
 Read almost any account of the early universe and you find a sentence like
 *recombination occurred about 380,000 years after the Big Bang.*
 
 A year is the time Earth takes to circle the Sun — definitionally, not
-approximately. So an event 13.8 billion years old is described in units defined
-by the motion of a planet that would not exist for another nine billion years.
+approximately. The Julian year of astronomy is exactly 365.25 days of exactly
+86,400 seconds, and those numbers are what they are because of how fast one
+particular rock spins and how long it takes to circle one particular star.
 
-The number is correct. It carries a passenger. `ucal` is what you get if you
-refuse the passenger.
+So an event 13.8 billion years old is described in units defined by the motion of
+a planet that would not exist for another nine billion years. The number is
+correct. It carries a passenger.
 
-#section("The tick and the ladder")
+The complaint is not that the units are arbitrary — all units are — but that
+*provenance leaks into arithmetic*. Compute in Earth years and Earth's orbital
+period sits inside every intermediate value.
+
+#section("Three things are declared; everything else is computed")
+
+What follows is the whole foundation. The notation, the domain, the calendars,
+the cosmology — none of them is a further decision. Each falls out of three
+declared things, and this part is those three.
+
+They are worth the space in a document written for this reader in particular,
+because the first of them is what makes D&C 130:4–5 *expressible*.
+
+// ── 1 ──────────────────────────────────────────────────────────────
+#part("The first declared thing: the tick")
 
 #term("Tick")[
-  The Planck time, about $5.391 times 10^(-44)$ seconds — built from the
-  gravitational constant, the reduced Planck constant and the speed of light.
-  Every quantity in the system is an unsigned integer count of these.
+  The Planck time, $t_P = sqrt(planck G \/ c^5) approx 5.391247 times 10^(-44)$
+  seconds. Every quantity in the system is an unsigned integer count of these,
+  and nothing else is primitive.
 ]
 
-Ticks group into *tiers*: the powers $5^(5k)$, each exactly five base-5 digits.
-The reference rung is the *beat*, $5^60$ ticks, about 46.762 milliseconds — base
-five because $5^5 = 3125$ is a number of five base-5 digits, and exponent 60
-because it puts the reference rung where a human can notice a duration. Those are
-the only two reasons, and the specification forbids finding any others.
+#section("Why this unit and not another")
 
-The cost of leaving Earth units behind is that nothing on the ladder is near
-anything familiar. One second is 21.385061835 beats.
+The Planck time is composed from three constants: the gravitational constant $G$,
+the reduced Planck constant $planck$, and the speed of light $c$. Those bound
+gravitation, quantum action and the propagation of causality respectively, and
+there is exactly one combination of them with the dimension of time.
 
-#plate("LIFE_UNIVERSE_AND_GOD/assets/images/scale-plate.png", width: 25%)[
-  The domain, logarithmic: Planck tick to a single point of light in emptiness.
-  The ceiling is about $2.29 times 10^103$ years; the present epoch sits at
-  $6 times 10^(-94)$ of it.
+What matters here is what is *absent* from that list. No rotation. No orbit. No
+body. The tick does not know about Earth, or the Solar System, or matter being
+organised into planets at all. It is the interval you get when you ask the three
+limiting constants of physics what a duration would be.
+
+#section("What the tick makes possible for this reader")
+
+Here is the point specific to this document, and it took writing the document to
+see it.
+
+#scripture("Doctrine and Covenants 130:4–5")[
+  In answer to the question — Is not the reckoning of God's time, angel's time,
+  prophet's time, and man's time, according to the planet on which they reside?
+  I answer, Yes.
 ]
 
-#section("Three commitments")
+That proposition needs something to be true before it can even be *stated
+precisely*. If every available unit were derived from some body's motion, then
+"reckoning is according to the planet" could be asserted but not *compared*: you
+would have Earth's reckoning and Kolob's reckoning and no common measure in which
+to say how they differ, except by picking one of them as the standard — which is
+the thing the verse denies.
 
-*Time is unsigned.* The domain begins at the datum, and no earlier instant is
-representable — a result that would be earlier is `UCAL-E0020`, an error rather
-than a negative number. That is a limit on what the system can *date*, not a
-claim about what exists.
+A body-independent substrate is what makes body-relative reckoning expressible
+rather than merely assertable. The tick is that substrate. Every body's periods
+enter the system as exact rational multiples of it, and two bodies' calendars can
+then be set side by side without either being privileged.
 
-*No floating point, anywhere.* Not in a signature, a field, an intermediate, or
-the printed output. A lint fails the build on any float token. Cosmology is
-therefore done by certified interval arithmetic: it returns two numbers and a
-proof the answer lies between them, rather than one number and a guess.
+#callout(label: "What this convergence is not")[
+  It is not a claim that the verse anticipated Planck units, or that it needs
+  them. The proposition stands on its own and predates the physics by seventy
+  years.
 
-*Earth enters at one declared boundary.* A single exact constant, `SECOND`,
-converts between ticks and seconds. Conversion in is multiplication and never
-rounds. The dependency is not eliminated — that is not available to anyone — it
-is *localised* somewhere you can point at.
+  What can be said is narrower and still worth saying: a system that wanted to
+  *implement* the proposition rather than assert it would need a unit of this
+  kind, and would have to go looking for one.
+]
 
-// ── 3 ───────────────────────────────────────────────────────────────
+#section("What the tick is not")
+
+*The tick is not a quantum of time.* It is the resolution floor of an instrument,
+not a structure discovered in the world. Nothing in this project asserts that
+time comes in indivisible parts, or that asking about a shorter duration is
+meaningless. The system cannot *represent* a shorter duration; that is a fact
+about the system.
+
+The distinction matters more than it looks. Temporal atomism is a serious
+position with a long history — Epicurus held it, and so did a whole medieval
+school — and so is its denial. Asserting either as a side effect of having chosen
+an integer type is not a respectable way to hold a metaphysical position, so the
+specification declines to hold one.
+
+#section("The one concession")
+
+There is a place where the tick is not free of Earth, and it should be admitted
+here rather than discovered later.
+
+The Planck time's *numerical value* requires a unit of time to state it in, and
+that unit is the SI second — defined by a caesium transition counted by
+instruments on this planet. So the tick's length is fixed by convention against
+the second, recorded, and used as declared.
+
+What that concedes is *metrology* and nothing else. The arithmetic contains no
+Earth content: ticks are counted, never converted. What is Earth-flavoured is the
+sentence saying how long a tick is in seconds — a statement about translating
+between two systems, not a fact used inside either.
+
+// ── 2 ──────────────────────────────────────────────────────────────
+#part("The second declared thing: the universe second")
+
+A tick is far too small to think in. The present epoch is about
+$8 times 10^60$ of them, and nobody reads a sixty-one-digit number.
+
+#term("Beat")[
+  $5^60$ ticks — 867 361 737 988 403 547 205 962 240 695 953 369 140 625 of
+  them, about 46.762 milliseconds. The specification calls it the *universe
+  second*.
+]
+
+#section("Two choices, each with exactly one reason")
+
+*Base five*, because $5^5 = 3125$ is a number of exactly five base-5 digits. A
+tier is therefore a clean five-digit group, and a timestamp is the tick count
+written in base 5 and cut into fives. That is the entire reason for the five, and
+the specification contains a rule forbidding any constant from acquiring
+significance by resembling a number in a tradition. The rule was written before
+any of this reading began.
+
+*Exponent sixty*, because it places the reference rung at the scale where a human
+being can notice a duration. Forty-seven milliseconds is about the resolution of
+the perceptual present — the interval below which events stop being separable.
+
+That second choice is the one concession to the reader in the whole design, and
+it changes no arithmetic: the ladder could be re-anchored at any exponent without
+altering a single computed value.
+
+#section("What the ladder is")
+
+Every rung is $5^(5k)$ ticks — 3125 of the rung below, five base-5 digits wide.
+
+#v(2mm)
+#block(width: 100%)[
+  #set text(size: 9.5pt)
+  #table(
+    columns: (auto, auto, auto, auto),
+    stroke: (x, y) => if y == 0 { (bottom: 0.6pt) } else { (bottom: 0.2pt + luma(210)) },
+    inset: (x: 5pt, y: 4.5pt),
+    align: (center, left, left, right),
+    [*tier*], [*name*], [*exponent*], [*≈*],
+    [T5], [deep], [$5^85$], [441.6 Myr],
+    [T4], [drift], [$5^80$], [141.3 kyr],
+    [T3], [span], [$5^75$], [45.2 yr],
+    [T2], [sweep], [$5^70$], [5.285 d],
+    [T1], [arc], [$5^65$], [146.1 s],
+    [T0], [*beat*], [$5^60$], [46.762 ms],
+    [T−1], [flicker], [$5^55$], [14.96 µs],
+  )
+]
+#v(2mm)
+
+Because a timestamp is that count in base 5, three things follow at once and none
+of them is a separate feature. Truncation *is* rounding — drop groups and you
+have said the same thing less precisely, with the dropped digits being exactly
+the precision surrendered. Prefix comparison *is* chronological comparison.
+And writing every digit pinpoints one tick, with no accumulated error between the
+coarse view and the fine one, because they are the same integer read at different
+widths.
+
+#section("The beat is not a second in disguise")
+
+This is worth stating flatly, because it is the ladder's real cost.
+
+One SI second is 21.385061835 beats. Not a whole number, not close to one, and no
+rescaling would make it whole. `SECOND` carries thirty factors of five and `BEAT`
+carries sixty, so the two share a common measure *only at the tick*.
+
+#callout(label: "Which is why the tick is primitive")[
+  Not the second, and not the beat. Two units that agree only at the tick cannot
+  both be fundamental, and the one they agree at is the one that is.
+
+  An hour is 24.6 arcs. A day is 0.189 sweeps. A year is 0.699 spans. If you want
+  units with no planetary content, you do not get to keep the hour — the hour
+  *is* planetary content.
+]
+
+#section("What this means for a stated ratio")
+
+Take Abraham 3:4's ratio — one Kolob revolution to one thousand Earth years — and
+put it into the system. Two things happen, and the difference between them is the
+whole point of this section.
+
+*The ratio converts exactly.* One thousand Julian years is a whole number of
+seconds; a second is a whole number of ticks; so the revolution is a whole,
+exact, unrounded number of ticks. Nothing is lost and nothing is approximated.
+
+*It does not land on a round number of beats.* Expressed in the human-facing unit
+it comes out as 674 861 227 352 beats and a remainder of
+35 632 189 513 851 911 760 866 641 998 291 015 625 000 ticks.
+
+#callout(label: "Why that is worth a paragraph")[
+  Because it is easy to read the second fact as though it said something about
+  the verse, and it does not.
+
+  A reader might reasonably expect that a stated ratio ought to come out *clean*
+  in a well-built system, and that its failing to do so is a mark against one or
+  the other. It is neither. "Clean in Earth years" and "clean in powers of five
+  above the tick" are two different tidinesses, and no unit system is tidy in
+  another's terms.
+
+  The same arithmetic makes one SI second 21.385061835 beats rather than a round
+  number, for exactly the same reason: seconds carry thirty factors of five, the
+  beat carries sixty, and the two meet only at the tick.
+
+  So *any* quantity stated in years misses the beat grid, from any source
+  whatever — a papal bull, an IAU resolution, or this verse. What survives is
+  what matters: the ratio is exactly representable, in the unit the system treats
+  as primitive.
+]
+
+That is the practical form of the earlier claim that the tick is primitive and
+the beat is a convenience. Exactness lives at the tick. Tidiness lives at the
+beat, and tidiness was never promised.
+
+// ── 3 ──────────────────────────────────────────────────────────────
+#part("The third declared thing: the datum")
+
+A count needs somewhere to start counting from, and the obvious place is not
+available.
+
+#section("Why the origin cannot be measured")
+
+The published age of the universe is 13.787 billion years, plus or minus 0.020
+billion. That is an excellent measurement and, like every measurement, an
+interval rather than a point.
+
+Convert the uncertainty to ticks and it is a number with fifty-eight digits —
+about 0.145% of the entire span from the datum to now. Define the datum *as* the
+measured age and every timestamp in the system inherits that wobble, and the
+exact integer arithmetic becomes decoration over a guess.
+
+You cannot get an exact origin from an inexact measurement. So the origin is not
+taken from the measurement.
+
+#section("What was declared instead")
+
+#terminal(caption: "ucal datum — the provenance chain")[
+```
+datum_provenance:
+  input     13.787 Gyr +/- 0.020 Gyr (age_of_universe)
+  citation  Planck 2018 results VI, A&A 641, A6 (2020)
+  chain:
+    AGE_s     = 13 787 000 000 x 31 557 600
+              = 435 084 631 200 000 000 s        (exact)
+    AGE_ticks = AGE_s x SECOND                   (exact)
+    beats     = round_half_even(AGE_ticks / BEAT)
+              = 9 304 311 741 502 590 385
+    ORIGIN_OFFSET
+              = beats x BEAT
+  residual_rendered  -0.017190364 s
+```
+]
+
+Tick zero is *stipulated*: declared, not discovered, and the specification says in
+as many words that it is not a measurement and not an observed event.
+
+`ORIGIN_OFFSET` — the distance from the datum to the SI epoch — is 9 304 311 741
+502 590 385 beats. A whole number of them, deliberately, so that the sub-beat
+digits of the bridge epoch are all zero.
+
+And the rounding to a whole beat is *reported* rather than absorbed: −0.017190364
+seconds, printed on every run. A citation says where a number came from; this
+chain says where it came from and what happened to it on the way in.
+
+#section("What follows, and what does not")
+
+Two things follow from the datum. The domain is *unsigned*: it begins there, and
+no earlier instant is representable — a result that would be earlier is
+`UCAL-E0020`, an error rather than a negative number.
+
+And the physical claim about where the origin falls is held *separately*: cited,
+with its exact magnitude, in a type with no arithmetic operations at all.
+
+What does *not* follow is any claim that nothing preceded it. That distinction is
+the subject of Part VI, and it is the reason this document is called what it is.
+
+#callout(label: "The three, and what they generate")[
+  / The tick: #sym.dash.em fixes what is counted, and makes body-relative
+    reckoning comparable rather than merely assertable.
+  / The beat: #sym.dash.em fixes the notation, and with it the tier ladder, the
+    meaning of truncation, and the 64-byte binary form.
+  / The datum: #sym.dash.em fixes where counting starts, and with it the unsigned
+    domain and the separation of the origin claim from the arithmetic.
+
+  Calendars, the SI bridge, the cosmology and the 512-bit domain are consequences
+  of these three. Nothing below them is a further decision.
+]
+
 #part("Where the doctrine got there first")
 
 Four places, and the first is not a resemblance.
@@ -422,7 +669,7 @@ than left to the author remembering.
 // ── 5 ───────────────────────────────────────────────────────────────
 #part("Where they collide")
 
-Four, and one that looks like a collision and is not. In every case the problem
+Three, and one that looks like a collision and is not. In every case the problem
 is the project's rather than the doctrine's, and in every case the project has
 chosen without arguing for the choice.
 
@@ -557,30 +804,7 @@ them.
   omission.
 ]
 
-#section("3. A revealed ratio does not land on the grid")
-
-A smaller finding, reported because an attentive reader would otherwise wonder,
-and because it says nothing at all about the text.
-
-Take Abraham 3:4 as a bridge constant and convert it. One Kolob revolution is
-1,000 Julian years, which is 585,348,807,057,053,493,600 followed by
-thirty-three zeros of ticks — and that is *not* a whole number of beats. The
-remainder is 35,632,189,513,851,911,760,866,641,998,291,015,625,000 ticks.
-
-The reason is arithmetic and it has nothing to do with Kolob. A thousand Julian
-years is a whole number of *seconds*; the second carries thirty factors of five,
-while the beat carries sixty. Any quantity stated in years misses the tier grid
-by construction, from any source whatever.
-
-#callout(label: "Why this is in the document at all")[
-  Because it *looks* like a finding about scripture and is not, and a reader
-  skimming could take it for one.
-
-  It is the same incommensurability that makes one second 21.385 beats rather
-  than a round number, showing up somewhere nobody was looking for it.
-]
-
-#section("4. Scripture chronology is classified as declared, not derived")
+#section("3. Scripture chronology is classified as declared, not derived")
 
 The system distinguishes calendars whose rules it *derives* from a body's motion
 from calendars whose rules are *declared tables*. That distinction is factual
