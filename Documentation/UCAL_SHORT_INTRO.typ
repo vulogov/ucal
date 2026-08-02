@@ -74,60 +74,104 @@
 and its units are a problem. A year is the time Earth takes to circle the Sun —
 definitionally, not approximately. So an event 13.8 billion years old is
 described in units defined by a planet that would not exist for another nine
-billion.
+billion. The number is correct; it carries a passenger.
 
-The number is correct. It carries a passenger.
+Not a complaint about cosmology. The complaint is that *provenance leaks into
+arithmetic*: compute in Earth years and Earth's orbital period sits inside every
+intermediate value.
 
-Not a complaint about cosmology: Julian years are stable, agreed and
-unambiguous, which is what a unit should be. The complaint is that *provenance
-leaks into arithmetic*. Compute in Earth years and Earth's orbital period sits
-inside every intermediate value.
+#v(1.5mm)
+#note[
+  Three things are declared. Everything else in the system is *computed* from
+  them — the notation, the ladder, the domain, the calendars, the cosmology.
+  They are worth the space.
+]
 
-#head("What was built")
-`ucal` is six Rust crates. Time is an unsigned integer count of Planck-time
-units — *ticks*, $5.391 times 10^(-44)$ s — since a stipulated datum.
+#head("1 — The tick")
+The Planck time, $t_P = sqrt(planck G \/ c^5) approx 5.391247 times 10^(-44)$ s.
+It is the one combination of the gravitational constant, the reduced Planck
+constant and the speed of light with the dimension of time — so it is built from
+the bounds on gravitation, quantum action and causality, and from nothing else.
+It does not know about Earth, or planets, or matter being organised at all.
 
-Ticks group into tiers, the powers $5^(5k)$, each exactly five base-5 digits.
-The reference rung is the *beat*, $5^60$ ticks ≈ 46.762 ms, which the
-specification calls the universe second: human-noticeable, with no Earth content.
-Base five because $5^5 = 3125$ is five base-5 digits — that is the whole reason.
+Every quantity in the system is an unsigned integer count of ticks. Nothing else
+is primitive — not the second, not the beat, not the day.
 
-A timestamp is the tick count written in base 5 and grouped in fives, so
-truncation *is* rounding, prefix comparison *is* chronological comparison, and
-writing every digit pinpoints one tick.
+*It is not a quantum of time.* It is the resolution floor of an instrument, not a
+structure found in the world. The system cannot represent a shorter duration;
+that is a fact about the system. Asserting otherwise would take a side in a
+twenty-four-century argument as a side effect of choosing an integer type.
 
-The cost is that nothing on the ladder is near anything you know. One second is
-21.385061835 beats, and the two share a common measure only at the tick.
+*The one concession.* The tick's length *in seconds* is fixed by convention
+against SI, because stating it at all needs a unit to state it in. That concedes
+metrology and nothing else: ticks are counted, never converted.
 
-#head("Three engineering commitments")
-*Unsigned.* Nothing precedes the datum. A result that would be earlier is
-`UCAL-E0020` — an error, not a negative number. The refusal is the answer.
+#head("2 — The beat")
+$5^60$ ticks — 867 361 737 988 403 547 205 962 240 695 953 369 140 625 of them,
+about 46.762 ms. The specification calls it the *universe second*.
 
-*No floating point, anywhere.* Not in a signature, a field, an intermediate, or
-the rendering path; a lint fails the build on any float token. Cosmology is
-therefore certified interval quadrature over exact rationals — orders of
-magnitude slower, and it returns an *enclosure* with a proof rather than an
-estimate with a guess.
+Two choices, each with one reason. *Base five*, because $5^5 = 3125$ is a number
+of exactly five base-5 digits, so a tier is a clean five-digit group. *Exponent
+60*, because it puts the reference rung at the scale a human can notice a
+duration — the one concession to the reader in the whole design, and it changes
+no arithmetic.
 
-*One declared boundary.* Earth enters through a single exact constant,
-`SECOND` = 18 548 584 399 861 × $10^30$ ticks. Conversion in is multiplication
-and never rounds; conversion out is division and is the only place a rounding
-mode is chosen. The dependency is not eliminated — that is not available to
-anyone — it is *localised* to somewhere you can point at and argue about.
+Everything above and below is $5^(5k)$: deep, drift, span, sweep, arc, beat,
+flicker. A uniform ladder, no ragged fields at either end.
 
-#head("The problem with zero")
-A count needs a zero, and the obvious one is not available.
+#note[
+  The beat is not a second in disguise. One second is 21.385061835 beats, and no
+  rescaling would make it whole: `SECOND` carries thirty factors of five and
+  `BEAT` carries sixty, so the two share a common measure only *at the tick*.
 
-The published age is 13.787 ± 0.020 Gyr. That uncertainty is 58 digits of ticks,
-0.145% of the whole span. Define the datum *as* the measured age and every
-timestamp inherits the wobble, making the exact arithmetic theatre.
+  That is the whole reason the tick is primitive rather than either of them.
+]
 
-So the datum is *stipulated*: declared, not discovered. And the physical claim
-about it is kept — cited, with its exact magnitude — in a type that has *no
-arithmetic operations at all*. Three tests exist whose job is to *fail to build*
-if anyone ever computes with it.
+#head("3 — The datum")
+Tick 0. *Stipulated* — declared, not measured, and not an observed event.
+
+It cannot be measured, and the reason is arithmetic before it is philosophy. The
+published age is 13.787 ± 0.020 Gyr; that uncertainty is a fifty-eight-digit
+number of ticks, 0.145% of the whole span. Define the datum *as* the measured age
+and every timestamp inherits the wobble, making the exact arithmetic theatre.
+
+So it is declared: `ORIGIN_OFFSET` = 9 304 311 741 502 590 385 beats, a whole
+number of them. The published age rounded to a whole beat — and the system prints
+what the rounding discarded, −0.017190364 s, rather than absorbing it.
+
+Two things follow. The domain is *unsigned*: nothing precedes the datum, and an
+earlier result is `UCAL-E0020`, an error rather than a negative number. And the
+physical claim about where the origin falls is kept separately — cited, with its
+exact magnitude, in a type with *no arithmetic operations at all*. Three tests
+exist whose job is to *fail to build* if anyone computes with it.
 
 #colbreak()
+
+#head("What is computed from them")
+Nothing below is a further decision. Each follows from the three above.
+
+*The notation.* A timestamp is the tick count written in base 5 and grouped in
+fives. So truncation *is* rounding, prefix comparison *is* chronological
+comparison, and writing every digit pinpoints one tick — no separate rounding
+step, no scaling, no drift between the coarse view and the fine one.
+
+*The domain.* 512 bits, reaching $2.29 times 10^103$ years — past proton decay
+and black-hole evaporation. The present epoch is $6 times 10^(-94)$ of it. The
+width is fixed so that it never has to change: the canonical binary form is 64
+bytes because the domain is 512 bits.
+
+*The bridge.* Earth enters through one exact constant,
+`SECOND` = 18 548 584 399 861 × $10^30$ ticks. In is multiplication and never
+rounds; out is division and is the only place a rounding mode is chosen. The
+dependency is not eliminated — that is not available to anyone — it is
+*localised* to somewhere you can point at.
+
+*Calendars.* A body's periods enter as exact rationals of ticks; intercalation is
+*derived* by continued fraction, never declared.
+
+*Cosmology.* No floating point anywhere, so ages are certified interval
+quadrature over exact rationals: two numbers and a proof the answer lies between
+them, rather than one number and a guess.
 
 #head("The philosophical background")
 The line between what a measurement *establishes* and what it merely *points at*
