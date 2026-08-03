@@ -7,7 +7,9 @@ use std::io::IsTerminal as _;
 
 use clap::{Parser, Subcommand};
 use ucal::style::{parse_group_sep, resolve_for_output, ColorChoice, Render, Role, Style};
-use ucal::{cmd_datum, cmd_doctor, cmd_explain, cmd_ladder, exit_code, parse_rounding, parse_tier};
+use ucal::{
+    cmd_datum, cmd_doctor, cmd_explain, cmd_ladder, exit_code, parse_rounding, parse_tier_in,
+};
 use ucal_core::LocaleId;
 use ucal_core::codec::Form;
 
@@ -314,9 +316,13 @@ fn main() {
             EventCommand::Show { id } => ucal::cmd_events_show(id),
         },
         #[cfg(feature = "events")]
-        Command::Timeline { tier } => parse_tier(tier).and_then(ucal::cmd_timeline),
+        Command::Timeline { tier } => LocaleId::parse(&cli.locale)
+            .and_then(|l| parse_tier_in(l, tier))
+            .and_then(ucal::cmd_timeline),
         Command::Ruler { from, to, step } => {
-            parse_tier(step).and_then(|s| ucal::cmd_ruler(from, to, s))
+            LocaleId::parse(&cli.locale)
+                .and_then(|l| parse_tier_in(l, step))
+                .and_then(|s| ucal::cmd_ruler(from, to, s))
         }
         #[cfg(all(feature = "body", feature = "civil"))]
         Command::Cal { what } => match what {
@@ -336,7 +342,7 @@ fn main() {
             LocaleId::parse(&cli.locale).and_then(|l| cmd_ladder(l, *named_only))
         }
         Command::Explain { instant, claim } => cmd_explain(instant, *claim),
-        Command::Now { precision, form } => run_now(precision, form),
+        Command::Now { precision, form } => run_now(&cli.locale, precision, form),
         #[cfg(feature = "civil")]
         Command::FromCivil {
             date,
@@ -435,14 +441,14 @@ fn error_style(choice: ColorChoice) -> Style {
 }
 
 #[cfg(all(feature = "civil", feature = "std"))]
-fn run_now(precision: &str, form: &str) -> ucal::CmdResult {
-    let tier = parse_tier(precision)?;
+fn run_now(locale: &str, precision: &str, form: &str) -> ucal::CmdResult {
+    let tier = parse_tier_in(LocaleId::parse(locale)?, precision)?;
     let f = parse_form(form)?;
     ucal::cmd_now(tier, f)
 }
 
 #[cfg(not(all(feature = "civil", feature = "std")))]
-fn run_now(_precision: &str, _form: &str) -> ucal::CmdResult {
+fn run_now(_locale: &str, _precision: &str, _form: &str) -> ucal::CmdResult {
     Err(ucal_core::TimeError::with_context(
         ucal_core::Code::E0001,
         "`ucal now` requires the `civil` and `std` features",

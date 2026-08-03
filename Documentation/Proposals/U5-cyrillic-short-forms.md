@@ -1,7 +1,6 @@
 # U5 — Cyrillic short forms for the `ru` locale
 
-**Status: nine of ten decided, one blocked on a vocabulary choice that belongs
-to the author.**
+**Status: decided and implemented.** T3 is `пролёт`, short form `пр`.
 
 Cyrillic short forms for the named tiers, scoped to the `ru` locale. Not a
 universal symbol layer — that question is settled in `docs/TIERS.md`, and the
@@ -95,9 +94,11 @@ mistake waiting to be made.
 `мерцание` takes `мц` rather than `ме`. `ме` is entirely homoglyphic — м and е
 both have Latin twins — and would render identically to the Latin word "me".
 
-## The one that is blocked
+## The one that was blocked, and how it was resolved
 
-**`срок` has no safe short form.** Its four letters are с→c, р→p, о→o, к→k:
+**Decided: T3 is `пролёт`, short form `пр`.**
+
+**`срок` had no safe short form.** Its four letters are с→c, р→p, о→o, к→k:
 every one has a Latin twin, so `ср`, `сро` and `срк` all render exactly as
 Latin text. No abbreviation of this word can satisfy the requirement above.
 
@@ -120,27 +121,33 @@ motion words":
 | пласт | a layer, a stratum | `пл` | geological rather than temporal |
 | заход | an approach, a setting | `за` | shades toward обход's sense |
 
-If asked, I would take **пролёт → `пр`**. It is the one that actually means
-*span* in the structural sense the English name has, it is a concrete noun with
-no mythological or national content, and `пр` carries п.
+**`пролёт`** was chosen. It is the one that actually means *span* in the
+structural sense the English name carries — *пролёт моста*, the span of a
+bridge — it is a concrete noun with no mythological or national content, and
+`пр` is detectable because of the `п`.
 
-That is a recommendation, not a decision. Changing a shipped locale name is
-visible to anyone using `--locale ru`, and §13.5 makes it a regeneration of
-`docs/TIERS.md` as well — both cheap, neither mine to choose.
+## Built
 
-## What is not yet built
-
-All of it. This cycle scoped U5 as a decision and a written scheme, not code.
-Implementing it means:
-
-- a short-form column in `ucal_core::locale`, `ru` only, resolving alongside the
-  existing names in `resolve_tier_name` so that Rule N's "accepted wherever a
-  name is" continues to hold;
-- a test that every shipped short form contains a non-confusable letter, so the
-  rule above is enforced rather than remembered;
-- a test that no two short forms collide, and that none is a reversal of
-  another;
-- regeneration of `docs/TIERS.md`, since §13.5 makes the locale table and the
+- `Names` carries a `short` field. `ru` ships ten; `en` ships none, because
+  `T[k]` is already short, locale-invariant, and accepted everywhere.
+- Short forms resolve wherever a name does. Rule N requires index notation to be
+  accepted wherever a name is; a short form *is* a name, and an abbreviation a
+  reader can see but not type would be a worse alias than none.
+- Four tests, verified strict by injection: reverting T3 to `срок`/`ср` fails
+  `every_short_form_is_detectably_not_latin`, and giving `обход` the form `об`
+  fails `no_two_short_forms_collide_or_reverse_each_other` against `бо`.
+- `docs/TIERS.md` regenerated, since §13.5 makes the locale table and the
   documentation table one source.
 
-The first cannot be written until T3 has a word.
+## What this exposed
+
+`--locale` was reaching only the *display* of tier names. `ucal ruler --step
+пролёт --locale ru` failed while `--step span` worked in every locale, because
+the CLI resolved tiers against the default locale regardless of the flag. Rule N
+makes names display aliases — a statement about what decides *behaviour*, not
+licence for one locale's aliases to be the only ones a parser accepts.
+
+`parse_tier_in` threads the locale through `now`, `ruler` and `timeline`. The
+stable keys, `T[k]` and `5^e` still resolve in every locale, so nothing that
+worked before stopped working, and `пр` does not resolve under `en` — which is
+the scoping doing its job.

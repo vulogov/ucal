@@ -78,6 +78,20 @@ pub fn parse_tier(s: &str) -> Result<Tier, TimeError> {
     codec::resolve_tier_name(s)
 }
 
+/// Parse a tier in a stated locale (Rule N).
+///
+/// `--locale` was reaching only the *display* of tier names, so `--step пролёт`
+/// failed under `--locale ru` while `--step span` worked in every locale. Rule N
+/// makes names display aliases, which is a statement about what decides
+/// behaviour — not licence for one locale's aliases to be the only ones a parser
+/// accepts.
+///
+/// The stable keys and `T[k]`/`5^e` continue to resolve in every locale, so
+/// nothing that worked before stops working.
+pub fn parse_tier_in(locale: LocaleId, s: &str) -> Result<Tier, TimeError> {
+    codec::resolve_tier_name_in(locale, s)
+}
+
 /// Parse a rounding mode.
 pub fn parse_rounding(s: &str) -> Result<Rounding, TimeError> {
     match s {
