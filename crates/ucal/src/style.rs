@@ -120,30 +120,52 @@ impl Style {
 
     /// The shipped colour scheme.
     ///
-    /// Deliberately restrained, and built from the eight ANSI colours plus
-    /// dimming rather than from 256-colour or truecolor codes: this output is
-    /// read in terminals whose palettes are set by their owners, and a scheme
-    /// that assumes a background is a scheme that is unreadable on half of them.
+    /// Built from the eight ANSI colours and the two intensity effects, never
+    /// from 256-colour or truecolor codes: this output is read in terminals
+    /// whose palettes are set by their owners, and a scheme that assumes a
+    /// background is unreadable in half of them.
+    ///
+    /// # What a colour is allowed to be used for
+    ///
+    /// A palette is the reader's, and a theme can map any ANSI slot to anything
+    /// — cyan has been observed rendering as salmon. Two consequences shape the
+    /// table below.
+    ///
+    /// **Anything that must be *legible* uses the terminal's own foreground and
+    /// distinguishes itself by weight.** That is why field names are bold rather
+    /// than coloured. They were bright black, which is the "comment" slot in
+    /// almost every theme and therefore deliberately low-contrast — a reader has
+    /// to squint at the one column that tells them what they are looking at.
+    ///
+    /// **A colour may only carry a distinction that is also carried some other
+    /// way.** The digit alternation is grouping, and the groups are still three
+    /// digits apart with the colour off. Warning and error colour a code the
+    /// reader can also read — `UCAL-W0006` says what it is in text.
     pub const fn colored() -> Style {
         use anstyle::{AnsiColor, Color, Effects, Style as S};
         Style {
             title: S::new().effects(Effects::BOLD),
-            key: S::new().fg_color(Some(Color::Ansi(AnsiColor::BrightBlack))),
+            // Bold on the reader's own foreground, not a colour. A field name is
+            // the column that says what everything else *is*, so it has to
+            // survive a palette nobody chose for it.
+            key: S::new().effects(Effects::BOLD),
             value: S::new(),
             digits: S::new(),
             // A *hue* step, not a lightness step, and the distinction is not
             // cosmetic. Alternating between normal and dim says the faint groups
-            // matter less, which is false — they are the same number — and on a
-            // dark background bright black is close enough to the background to
-            // be hard to read at all. Cyan contrasts on both light and dark
-            // palettes and carries no rank.
+            // matter less, which is false — they are the same number. Whatever a
+            // theme maps cyan to, both halves stay equally readable, which a
+            // lightness step cannot promise.
             //
             // Red and yellow are unavailable: they are Error and Warning, and a
             // digit group must never be mistaken for a diagnostic.
             digit_alt: S::new().fg_color(Some(Color::Ansi(AnsiColor::Cyan))),
             padding: S::new().effects(Effects::DIMMED),
             separator: S::new().effects(Effects::DIMMED),
-            note: S::new().effects(Effects::DIMMED),
+            // Prose, and prose is for reading. Dimming it was the same mistake
+            // as dimming the field names: it made the longest text in the output
+            // the hardest to see.
+            note: S::new(),
             warning: S::new().fg_color(Some(Color::Ansi(AnsiColor::Yellow))),
             error: S::new().fg_color(Some(Color::Ansi(AnsiColor::Red))),
         }
@@ -381,6 +403,12 @@ pub fn group_decimal(render: &Render, s: &str) -> String {
         out.push_str(&render.style.paint(Role::Digits, digits));
         return out;
     }
+    // The alternation earns its place on a long run and not on a short one. A
+    // four-digit tier count read as `2` then a coloured `481` is two colours of
+    // number where a reader needed none: the whole value fits in one glance, so
+    // the banding carries nothing and only adds to what the eye has to ignore.
+    // Three groups is where a run stops being takeable at a glance.
+    let alternate = digits.len() > 6;
 
     // Group from the right, so the leading group is the short one.
     let first = match digits.len() % 3 {
@@ -398,7 +426,7 @@ pub fn group_decimal(render: &Render, s: &str) -> String {
                 out.push_str(&render.style.paint(Role::Separator, &sep.to_string()));
             }
         }
-        let role = if group % 2 == 0 {
+        let role = if !alternate || group % 2 == 0 {
             Role::Digits
         } else {
             Role::DigitAlt
@@ -513,6 +541,32 @@ mod tests {
     use super::*;
 
     #[test]
+    fn short_numbers_are_not_banded() {
+        // A four-digit count is one glance. Colouring three of its four digits
+        // is noise, and the separator (when asked for) already groups it.
+        let c = Render::styled(Style::colored());
+        let alt = Style::colored().get(Role::DigitAlt).to_string();
+        for n in ["1000", "2481", "123456"] {
+            assert!(
+                !group_decimal(&c, n).contains(&alt),
+                "{n} was banded"
+            );
+        }
+        // Seven digits is three groups, and there the banding helps.
+        assert!(group_decimal(&c, "1234567").contains(&alt));
+    }
+
+    #[test]
+    fn the_separator_does_not_wait_for_the_banding() {
+        // Thousands separators are conventional from four digits; the colour is
+        // not. The two thresholds are different on purpose.
+        let r = Render::PLAIN.group(Some('_'));
+        assert_eq!(group_decimal(&r, "1000"), "1_000");
+        assert_eq!(group_decimal(&r, "2481"), "2_481");
+        assert_eq!(group_decimal(&r, "999"), "999");
+    }
+
+    #[test]
     fn plain_paints_nothing() {
         let s = Style::PLAIN;
         assert!(s.is_plain());
@@ -562,6 +616,29 @@ mod tests {
                 "{r:?} uses a diagnostic colour"
             );
         }
+    }
+
+    #[test]
+    fn everything_meant_to_be_read_survives_a_hostile_palette() {
+        // A theme can map any ANSI slot to anything — cyan has been seen
+        // rendering as salmon. So the roles a reader has to *read* must use the
+        // terminal's own foreground and distinguish themselves by weight, not by
+        // a colour someone else chose, and none may be dimmed into the
+        // "comment" range.
+        let s = Style::colored();
+        for r in [Role::Title, Role::Key, Role::Value, Role::Note] {
+            let st = s.get(r);
+            assert!(
+                st.get_fg_color().is_none(),
+                "{r:?} depends on a palette slot to be legible"
+            );
+            assert!(
+                !st.get_effects().contains(anstyle::Effects::DIMMED),
+                "{r:?} is dimmed, and it is meant to be read"
+            );
+        }
+        // And a field name is still distinguishable from its value.
+        assert_ne!(s.get(Role::Key), s.get(Role::Value));
     }
 
     #[test]

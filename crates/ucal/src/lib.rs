@@ -442,7 +442,8 @@ pub fn cmd_explain(input: &str, show_claim: bool) -> CmdResult {
             (
                 "note".into(),
                 Value::text(
-                    "the beat is the universe second (§0.5), 5^60 ticks; this                      count carries no Earth content",
+                    "the beat is the universe second (§0.5), 5^60 ticks; this count \
+                     carries no Earth content",
                 ),
             ),
         ]),
