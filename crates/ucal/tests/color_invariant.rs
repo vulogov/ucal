@@ -110,19 +110,37 @@ fn colour_never_changes_a_character() {
 }
 
 #[test]
-fn the_separator_is_the_only_thing_that_adds_characters() {
-    // And it only ever adds separators — the digits themselves are untouched, so
-    // a reader can still recover the integer by deleting the separator.
+fn the_separator_changes_grouping_and_layout_and_nothing_else() {
+    // Weaker than the first draft, and deliberately. A separator widens a cell,
+    // so a table's column widths and padding move with it — that is the layout
+    // doing its job, not a defect. What must not move is the content: with
+    // separators and whitespace removed, the two renderings are the same
+    // characters in the same order, so no digit was altered, dropped or added.
     for (name, doc) in documents() {
-        let bare = doc.to_text();
-        for sep in ['_', ' ', '·'] {
-            let grouped = doc.render(&Render::PLAIN.group(Some(sep)));
+        let strip = |s: &str, sep: char| -> String {
+            s.chars()
+                .filter(|c| *c != sep && !c.is_whitespace())
+                .collect()
+        };
+        for sep in ['_', '·'] {
+            let bare = strip(&doc.to_text(), sep);
+            let grouped = strip(&doc.render(&Render::PLAIN.group(Some(sep))), sep);
             assert_eq!(
-                grouped.replace(sep, ""),
-                bare.replace(sep, ""),
-                "`{name}`: separator `{sep}` changed something other than grouping"
+                grouped, bare,
+                "`{name}`: separator `{sep}` changed content, not only grouping"
             );
         }
+    }
+}
+
+#[test]
+fn a_grouped_number_still_reassembles() {
+    // The narrow property the one above gave up, checked where it actually
+    // holds: on the value itself rather than on a laid-out document.
+    for sep in ['_', ' ', '·'] {
+        let r = Render::PLAIN.group(Some(sep));
+        let n = "8070205189123984864657505252035637180530466139316558837890625";
+        assert_eq!(group_decimal(&r, n).replace(sep, ""), n);
     }
 }
 

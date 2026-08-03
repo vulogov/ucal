@@ -15,6 +15,7 @@
 
 pub mod emit;
 pub mod style;
+pub mod table;
 
 use emit::{Doc, Value};
 use ucal_core::backend::TickInt;
@@ -779,7 +780,7 @@ pub fn cmd_ladder(loc: LocaleId, named_only: bool) -> CmdResult {
                  canonical identity of a tier is its exponent.",
             ),
         )
-        .field("tiers", Value::Section(rows))
+        .field("tiers", Value::rows("tier", rows))
         .note(
             "The beat is the universe second (§0.5): 5^60 ticks, a pure power of \
              the tick with no Earth content. The bridge second is a declared \
@@ -889,7 +890,7 @@ pub fn cmd_cal_list() -> CmdResult {
 
     Ok(Doc::new()
         .title("ucal cal list")
-        .field("calendars", Value::Section(rows))
+        .field("calendars", Value::rows("calendar", rows))
         .note(
             "A derived calendar is a consequence of a body's periods (Rule K). A \
              legacy one is a declared table preserved for interoperation (§8.6) \
@@ -970,7 +971,7 @@ pub fn cmd_show(input: &str, calendars: &[String]) -> CmdResult {
             "human",
             Value::text(codec::render(&t, &Fmt::human()).unwrap_or_default()),
         )
-        .field("calendars", Value::Section(rows))
+        .field("calendars", Value::rows("calendar", rows))
         .note(
             "One instant, several local calendars. Each derived rendering carries \
              its anchor revision (Rule J.5) and the width of the window that \
@@ -1201,7 +1202,7 @@ pub fn cmd_events_list() -> CmdResult {
     Ok(Doc::new()
         .title("ucal events list")
         .field("citation_set", Value::text(events::CITATION_SET))
-        .field("events", Value::Section(rows))
+        .field("events", Value::rows("event", rows))
         .note(
             "Every entry is an interval, because not one of them is known to a \
              tick. The one exact value is a declaration, not a measurement.",
@@ -1308,7 +1309,7 @@ pub fn cmd_timeline(tier: Tier) -> CmdResult {
     Ok(Doc::new()
         .title(format!("ucal timeline — at tier {tier}"))
         .field("tier", Value::text(tier.to_string()))
-        .field("events", Value::Section(rows))
+        .field("events", Value::rows("event", rows))
         .note(
             "Positions are the windows' midpoints floored to the stated tier. The \
              midpoint is a rendering choice; the window is the value (Rule U).",
@@ -1349,7 +1350,7 @@ pub fn cmd_ruler(from: &str, to: &str, step: Tier) -> CmdResult {
         .field("to", Value::number(b.ticks().to_dec_string()))
         .field("step", Value::text(step.to_string()))
         .field("whole_steps", Value::number(n.to_string()))
-        .field("marks", Value::Section(marks));
+        .field("marks", Value::rows_of("n", "at", marks));
     if n > MAX_MARKS {
         // No silent caps: §21.3's spirit, and the note the workflow guidance asks
         // for when a bound truncates output.

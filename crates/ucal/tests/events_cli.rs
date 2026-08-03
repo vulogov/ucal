@@ -41,12 +41,14 @@ fn every_timeline_entry_renders_at_every_tier() {
 #[test]
 fn every_entry_is_cited_and_interval_valued() {
     let doc = cmd_events_list().unwrap();
-    let Some(Value::Section(events)) = doc.get("events") else {
+    // `events` renders as a table, so it is a `Rows`. Read through the accessor
+    // that does not care which: the choice is a rendering one.
+    let Some(events) = doc.rows("events") else {
         panic!("expected an events section");
     };
     assert!(events.len() >= 10, "the catalogue must be substantial");
     for (id, v) in events {
-        let Value::Section(fields) = v else {
+        let Some(fields) = v.as_rows() else {
             panic!("{id} is not a section")
         };
         let keys: Vec<&str> = fields.iter().map(|(k, _)| k.as_str()).collect();

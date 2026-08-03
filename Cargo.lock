@@ -649,6 +649,7 @@ version = "0.3.0"
 dependencies = [
  "anstyle",
  "clap",
+ "terminal_size",
  "ucal-body",
  "ucal-civil",
  "ucal-core",

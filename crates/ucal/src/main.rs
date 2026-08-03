@@ -3,6 +3,8 @@
 //! Parse, dispatch, print, exit. All the work is in the library, so that §20's
 //! golden tests can call the commands as functions.
 
+use std::io::IsTerminal as _;
+
 use clap::{Parser, Subcommand};
 use ucal::style::{parse_group_sep, resolve_for_output, ColorChoice, Render, Role, Style};
 use ucal::{cmd_datum, cmd_doctor, cmd_explain, cmd_ladder, exit_code, parse_rounding, parse_tier};
@@ -51,6 +53,11 @@ struct Cli {
     /// Never colour. An alias for `--color never`, and it wins over `--color`.
     #[arg(long, global = true)]
     no_color: bool,
+
+    /// Columns to render tables at. Never below 80; defaults to the terminal
+    /// width when there is one, and to 80 when output is redirected.
+    #[arg(long, global = true, value_name = "N")]
+    width: Option<usize>,
 
     /// Separator between three-digit groups in decimal counts, e.g. `--tick-sep _`.
     ///
@@ -372,7 +379,17 @@ fn main() {
             std::process::exit(exit_code(&e));
         }
     };
-    let render = Render::styled(style).group(sep);
+    // Off a terminal the width is the baseline, always: if it followed the
+    // terminal on a redirected stream, `ucal ladder > f` and `ucal ladder | cat`
+    // would differ, and so would the same command on two machines.
+    let terminal = if std::io::stdout().is_terminal() {
+        terminal_size::terminal_size().map(|(terminal_size::Width(w), _)| w as usize)
+    } else {
+        None
+    };
+    let render = Render::styled(style)
+        .group(sep)
+        .width(Render::resolve_width(cli.width, terminal));
 
     match result {
         Ok(doc) => {

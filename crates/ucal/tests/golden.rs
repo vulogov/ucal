@@ -409,9 +409,18 @@ fn ladder_renders_every_tier_in_both_locales() {
     for loc in LocaleId::ALL {
         let doc = cmd_ladder(*loc, false).unwrap();
         let text = doc.to_text();
-        // One entry per tier, named or not.
+        // One entry per tier, named or not. Asserted on the rows rather than on
+        // the rendering: `tiers` is a table now, and whether a row key is
+        // followed by a colon is a layout question, not this test's.
+        let tiers = doc.rows("tiers").expect("ladder has tier rows");
         for k in [32i8, 5, 0, -3, -12] {
-            assert!(text.contains(&format!("T{k}:")), "T{k} missing in {}", loc.tag());
+            let want = format!("T{k}");
+            assert!(
+                tiers.iter().any(|(id, _)| *id == want),
+                "T{k} missing in {}",
+                loc.tag()
+            );
+            assert!(text.contains(&want), "T{k} not rendered in {}", loc.tag());
         }
         // The bridge equivalent is always alongside (§4.3, D-2).
         assert!(text.contains("seconds"));

@@ -29,6 +29,20 @@ pub enum Value {
     List(Vec<String>),
     /// A nested section.
     Section(Vec<(String, Value)>),
+    /// A row-shaped field, rendered as a table for a person.
+    ///
+    /// Holds exactly what [`Value::Section`] holds and serialises identically —
+    /// the variant tells the *text* renderer that the shape is a grid, and
+    /// touches `ucal-json/1` not at all. See [`crate::table`].
+    Rows {
+        /// Header for the column holding each row's key.
+        key: String,
+        /// Header for the value column, when the rows are scalars rather than
+        /// sections. `ucal ruler` is the case: an index and a mark.
+        value: Option<String>,
+        /// The rows, in order.
+        rows: Vec<(String, Value)>,
+    },
     /// A rendered timestamp form: a `UC1` text form, a `UC1/5` form, or a UCID.
     ///
     /// Distinguished from [`Value::Text`] only so the renderer can tell the
@@ -50,6 +64,34 @@ impl Value {
     /// A rendered timestamp form.
     pub fn form(s: impl Into<String>) -> Value {
         Value::Form(s.into())
+    }
+    /// The rows of a section or a table, whichever this is.
+    pub fn as_rows(&self) -> Option<&[(String, Value)]> {
+        match self {
+            Value::Section(f) => Some(f),
+            Value::Rows { rows, .. } => Some(rows),
+            _ => None,
+        }
+    }
+    /// Rows of sections, rendered as a table.
+    pub fn rows(key: impl Into<String>, rows: Vec<(String, Value)>) -> Value {
+        Value::Rows {
+            key: key.into(),
+            value: None,
+            rows,
+        }
+    }
+    /// Rows of scalars, rendered as two columns.
+    pub fn rows_of(
+        key: impl Into<String>,
+        value: impl Into<String>,
+        rows: Vec<(String, Value)>,
+    ) -> Value {
+        Value::Rows {
+            key: key.into(),
+            value: Some(value.into()),
+            rows,
+        }
     }
     /// A list of strings.
     pub fn list<I: IntoIterator<Item = S>, S: Into<String>>(it: I) -> Value {
@@ -97,6 +139,15 @@ impl Doc {
         self.fields.iter().map(|(k, _)| k.as_str()).collect()
     }
 
+    /// Look up a field's rows, whether it is a section or a table.
+    ///
+    /// A consumer reading structure should not have to know which of the two a
+    /// command chose — that choice is a rendering decision, and this is the
+    /// accessor that keeps it one.
+    pub fn rows(&self, key: &str) -> Option<&[(String, Value)]> {
+        self.get(key).and_then(Value::as_rows)
+    }
+
     /// Look up a field.
     pub fn get(&self, key: &str) -> Option<&Value> {
         self.fields.iter().find(|(k, _)| k == key).map(|(_, v)| v)
@@ -134,7 +185,7 @@ impl Doc {
         let width = self
             .fields
             .iter()
-            .filter(|(_, v)| !matches!(v, Value::Section(_) | Value::List(_)))
+            .filter(|(_, v)| !matches!(v, Value::Section(_) | Value::List(_) | Value::Rows { .. }))
             .map(|(k, _)| k.chars().count())
             .max()
             .unwrap_or(0);
@@ -188,6 +239,23 @@ fn role_of_prose(t: &str) -> Role {
     }
 }
 
+/// Paint one scalar value.
+///
+/// Shared with [`crate::table`] so a cell and a field render a value the same
+/// way — grouping, leading-zero dimming and diagnostic colour all follow the
+/// value into a grid.
+pub(crate) fn render_scalar(r: &Render, v: &Value) -> String {
+    match v {
+        Value::Text(t) => r.style.paint(role_of_prose(t), t),
+        Value::Number(n) => group_decimal(r, n),
+        Value::Form(f) => paint_form(r, f),
+        Value::Bool(b) => r.style.paint(Role::Value, &b.to_string()),
+        // Not scalars; `crate::table::render` refuses rows containing them, and
+        // the field renderer handles them before reaching here.
+        Value::Section(_) | Value::List(_) | Value::Rows { .. } => String::new(),
+    }
+}
+
 /// Pad `text` to `width` *display* columns, then paint it.
 ///
 /// The order is the point: padding is measured on the characters a reader sees,
@@ -209,7 +277,7 @@ fn render_field_text(s: &mut String, k: &str, v: &Value, width: usize, depth: us
             let _ = writeln!(s, "{pad}{}:", style.paint(Role::Key, k));
             let inner = fields
                 .iter()
-                .filter(|(_, v)| !matches!(v, Value::Section(_) | Value::List(_)))
+                .filter(|(_, v)| !matches!(v, Value::Section(_) | Value::List(_) | Value::Rows { .. }))
                 .map(|(k, _)| k.chars().count())
                 .max()
                 .unwrap_or(0);
@@ -238,6 +306,20 @@ fn render_field_text(s: &mut String, k: &str, v: &Value, width: usize, depth: us
                 padded(style, Role::Key, k, width),
                 group_decimal(r, n)
             );
+        }
+        Value::Rows { key, value, rows } => {
+            let _ = writeln!(s, "{pad}{}:", style.paint(Role::Key, k));
+            let indent = pad.len() + 2;
+            let mut body = String::new();
+            if crate::table::render(&mut body, r, indent, key, value.as_deref(), rows) {
+                s.push_str(&body);
+            } else {
+                // Not grid-shaped. The nested rendering is still correct, and a
+                // guessed flattening would not be.
+                for (rk, rv) in rows {
+                    render_field_text(s, rk, rv, 0, depth + 1, r);
+                }
+            }
         }
         Value::Form(f) => {
             let _ = writeln!(
@@ -287,6 +369,9 @@ fn render_value_json(s: &mut String, v: &Value, depth: usize) {
             }
             let _ = write!(s, "{pad}]");
         }
+        // Rows is Section with a rendering hint. Emitting it through the same
+        // arm is what keeps `ucal-json/1` fixed.
+        Value::Rows { rows, .. } => render_value_json(s, &Value::Section(rows.clone()), depth),
         Value::Section(fields) => {
             if fields.is_empty() {
                 let _ = write!(s, "{{}}");

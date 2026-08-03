@@ -23,6 +23,9 @@ clap = { version = "4", features = ["derive", "wrap_help"] }
 # manifest and nothing to the dependency graph. Only the SGR value types are
 # used -- the tty test is std's `IsTerminal` and the choice logic is ours.
 anstyle = "1"
+# Also already in the tree through clap. Used for one call: how many columns the
+# terminal has, when there is one.
+terminal_size = "0.4"
 
 [features]
 default = ["u512", "std", "civil", "body", "events", "cosmo"]

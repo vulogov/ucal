@@ -177,6 +177,12 @@ impl Style {
     }
 }
 
+impl Default for Render {
+    fn default() -> Render {
+        Render::PLAIN
+    }
+}
+
 impl Default for Style {
     fn default() -> Style {
         Style::PLAIN
@@ -254,7 +260,7 @@ pub fn resolve_for_output(choice: ColorChoice, json: bool) -> Style {
 /// changes the characters, so it is not covered by the strip invariant and must
 /// not be — the invariant is a claim about *colour*, and quietly widening it to
 /// cover a flag that inserts characters would make it vacuous.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Render {
     /// The role-to-appearance table.
     pub style: Style,
@@ -268,6 +274,8 @@ pub struct Render {
     /// the separator anyway, or who is reading without colour — down a pipe,
     /// in a log, on a terminal that has none.
     pub group: Option<char>,
+    /// Available columns. See [`crate::table`] for why the floor is fixed.
+    pub cols: usize,
 }
 
 impl Render {
@@ -276,11 +284,37 @@ impl Render {
     pub const PLAIN: Render = Render {
         style: Style::PLAIN,
         group: None,
+        cols: crate::table::BASELINE_WIDTH,
     };
 
-    /// A style with no separator.
+    /// A style with no separator, at the baseline width.
     pub fn styled(style: Style) -> Render {
-        Render { style, group: None }
+        Render {
+            style,
+            ..Render::PLAIN
+        }
+    }
+
+    /// Set the available width, never below the documented baseline.
+    ///
+    /// The floor is one-directional on purpose. A wider terminal is used; a
+    /// narrower one is not, because a layout that reflows below 80 columns would
+    /// make the same command emit different bytes on different machines.
+    pub fn width(mut self, w: usize) -> Render {
+        self.cols = w.max(crate::table::BASELINE_WIDTH);
+        self
+    }
+
+    /// The width to render at, given an explicit `--width` and the terminal.
+    ///
+    /// Off a terminal the answer is the baseline, always. If width followed the
+    /// terminal on a redirected stream, the same command would put different
+    /// bytes into a pipe than into a file.
+    pub fn resolve_width(explicit: Option<usize>, terminal: Option<usize>) -> usize {
+        explicit
+            .or(terminal)
+            .unwrap_or(crate::table::BASELINE_WIDTH)
+            .max(crate::table::BASELINE_WIDTH)
     }
 
     /// Set the digit-group separator.
