@@ -4,7 +4,7 @@
 //! golden tests can call the commands as functions.
 
 use clap::{Parser, Subcommand};
-use ucal::style::{resolve_for_output, ColorChoice, Role, Style};
+use ucal::style::{parse_group_sep, resolve_for_output, ColorChoice, Render, Role, Style};
 use ucal::{cmd_datum, cmd_doctor, cmd_explain, cmd_ladder, exit_code, parse_rounding, parse_tier};
 use ucal_core::LocaleId;
 use ucal_core::codec::Form;
@@ -51,6 +51,14 @@ struct Cli {
     /// Never colour. An alias for `--color never`, and it wins over `--color`.
     #[arg(long, global = true)]
     no_color: bool,
+
+    /// Separator between three-digit groups in decimal counts, e.g. `--tick-sep _`.
+    ///
+    /// Off by default: a tick count is often copied out of this output into
+    /// something that wants an integer, and a separator breaks that. With colour
+    /// the groups are already distinguishable without adding a character.
+    #[arg(long, global = true, value_name = "CHAR")]
+    tick_sep: Option<String>,
 
     #[command(subcommand)]
     command: Command,
@@ -357,6 +365,14 @@ fn main() {
         }
     };
     let style = resolve_for_output(choice, cli.json);
+    let sep = match cli.tick_sep.as_deref().map(parse_group_sep).transpose() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("{e}");
+            std::process::exit(exit_code(&e));
+        }
+    };
+    let render = Render::styled(style).group(sep);
 
     match result {
         Ok(doc) => {
@@ -365,7 +381,7 @@ fn main() {
                 if cli.json {
                     doc.to_json()
                 } else {
-                    doc.to_ansi(&style)
+                    doc.render(&render)
                 }
             );
         }

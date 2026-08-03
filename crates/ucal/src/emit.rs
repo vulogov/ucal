@@ -11,7 +11,7 @@
 
 use std::fmt::Write as _;
 
-use crate::style::{Role, Style};
+use crate::style::{group_decimal, paint_form, Render, Role, Style};
 
 /// The `--json` schema version (§19.1).
 pub const JSON_FORMAT: &str = "ucal-json/1";
@@ -29,6 +29,13 @@ pub enum Value {
     List(Vec<String>),
     /// A nested section.
     Section(Vec<(String, Value)>),
+    /// A rendered timestamp form: a `UC1` text form, a `UC1/5` form, or a UCID.
+    ///
+    /// Distinguished from [`Value::Text`] only so the renderer can tell the
+    /// leading zero run from the digits. In JSON it is a string, identical to
+    /// what `Text` emits, which is why this variant does not touch
+    /// `ucal-json/1`.
+    Form(String),
 }
 
 impl Value {
@@ -39,6 +46,10 @@ impl Value {
     /// A numeric value, given as a decimal string.
     pub fn number(s: impl Into<String>) -> Value {
         Value::Number(s.into())
+    }
+    /// A rendered timestamp form.
+    pub fn form(s: impl Into<String>) -> Value {
+        Value::Form(s.into())
     }
     /// A list of strings.
     pub fn list<I: IntoIterator<Item = S>, S: Into<String>>(it: I) -> Value {
@@ -98,7 +109,12 @@ impl Doc {
     /// layouts cannot drift, and it is what makes the strip invariant a statement
     /// about styles rather than about two functions agreeing.
     pub fn to_text(&self) -> String {
-        self.to_ansi(&Style::PLAIN)
+        self.render(&Render::PLAIN)
+    }
+
+    /// Render for a person, with colour and no group separator.
+    pub fn to_ansi(&self, style: &Style) -> String {
+        self.render(&Render::styled(*style))
     }
 
     /// Render for a person, with colour.
@@ -107,7 +123,8 @@ impl Doc {
     /// added last, so a coloured column lines up with a plain one. Getting this
     /// backwards is the classic defect here: `{k:<width$}` on an already-painted
     /// string pads to the width of the escape sequences.
-    pub fn to_ansi(&self, style: &Style) -> String {
+    pub fn render(&self, r: &Render) -> String {
+        let style = &r.style;
         let mut s = String::new();
         if let Some(t) = &self.title {
             let _ = writeln!(s, "{}", style.paint(Role::Title, t));
@@ -122,7 +139,7 @@ impl Doc {
             .max()
             .unwrap_or(0);
         for (k, v) in &self.fields {
-            render_field_text(&mut s, k, v, width, 0, style);
+            render_field_text(&mut s, k, v, width, 0, r);
         }
         for n in &self.notes {
             let _ = writeln!(s, "\n{}", style.paint(role_of_prose(n), n));
@@ -184,7 +201,8 @@ fn padded(style: &Style, role: Role, text: &str, width: usize) -> String {
     out
 }
 
-fn render_field_text(s: &mut String, k: &str, v: &Value, width: usize, depth: usize, style: &Style) {
+fn render_field_text(s: &mut String, k: &str, v: &Value, width: usize, depth: usize, r: &Render) {
+    let style = &r.style;
     let pad = "  ".repeat(depth);
     match v {
         Value::Section(fields) => {
@@ -196,7 +214,7 @@ fn render_field_text(s: &mut String, k: &str, v: &Value, width: usize, depth: us
                 .max()
                 .unwrap_or(0);
             for (ik, iv) in fields {
-                render_field_text(s, ik, iv, inner, depth + 1, style);
+                render_field_text(s, ik, iv, inner, depth + 1, r);
             }
         }
         Value::List(items) => {
@@ -218,7 +236,15 @@ fn render_field_text(s: &mut String, k: &str, v: &Value, width: usize, depth: us
                 s,
                 "{pad}{}  {}",
                 padded(style, Role::Key, k, width),
-                style.paint(Role::Digits, n)
+                group_decimal(r, n)
+            );
+        }
+        Value::Form(f) => {
+            let _ = writeln!(
+                s,
+                "{pad}{}  {}",
+                padded(style, Role::Key, k, width),
+                paint_form(r, f)
             );
         }
         Value::Bool(b) => {
@@ -234,7 +260,9 @@ fn render_field_text(s: &mut String, k: &str, v: &Value, width: usize, depth: us
 fn render_value_json(s: &mut String, v: &Value, depth: usize) {
     let pad = "  ".repeat(depth);
     match v {
-        Value::Text(t) => {
+        // A Form is a string in JSON, byte-identical to what Text emits. That
+        // is the whole reason the variant does not bump `ucal-json/1`.
+        Value::Text(t) | Value::Form(t) => {
             let _ = write!(s, "\"{}\"", escape(t));
         }
         // Tick counts exceed every JSON number implementation in practice, and a

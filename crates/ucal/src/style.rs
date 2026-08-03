@@ -22,10 +22,24 @@
 //!
 //! # What colour is allowed to say
 //!
-//! Nothing that is not also said in words. The clearest case is [`Role::Padding`]:
-//! the digits below a value's stated precision are dimmed, which makes Rule T's
-//! interval visible in the value itself — but the `precision` field stays in every
-//! rendering, because a reader who cannot see the dimming must still be told.
+//! Nothing that is not also said in words.
+//!
+//! The design opened with a different plan for [`Role::Padding`]: dim the digits
+//! *below* a value's stated precision, making Rule T's interval visible in the
+//! value. Measuring the output killed it. No shipped rendering pads below its
+//! precision — every form truncates, so `--precision beat` produces a shorter
+//! string rather than a padded one, and Rule T is already visible by length.
+//! There was nothing to dim.
+//!
+//! What the forms do carry is padding at the other end. Rule S makes the base-5
+//! form fixed-width so that lexicographic order is chronological order, and at
+//! the present epoch that means 27 of its 45 groups are leading zeros — 135
+//! base-5 digits of domain nobody has reached. Those are what `Padding` marks,
+//! and dimming them shows at a glance how little of a 512-bit range is in use.
+//!
+//! The `precision` field still appears in every rendering, unchanged. Colour
+//! shows a reader where the value sits in the domain; it is never the only place
+//! something is said.
 
 use std::io::IsTerminal as _;
 
@@ -45,8 +59,20 @@ pub enum Role {
     Value,
     /// A digit run that is part of the measured value.
     Digits,
-    /// A digit run *below the stated precision*: structurally zero, and not
-    /// determined by the input. Never the only indication — see the module note.
+    /// The alternating group in a long digit run.
+    ///
+    /// A sixty-one-digit integer is unreadable in one run, and every fix that
+    /// inserts a character makes it unpastable. Alternating the appearance of
+    /// three-digit groups leaves the character stream identical, so selecting the
+    /// number still yields the number. When a separator *is* asked for, this role
+    /// still applies — the two are independent, and a reader who wants both gets
+    /// both.
+    DigitAlt,
+    /// The leading zero run of a fixed-width form.
+    ///
+    /// Structurally zero because Rule S fixes the width at the profile's domain
+    /// rather than at the value's magnitude — not zero because anything was
+    /// rounded away. Never the only indication; see the module note.
     Padding,
     /// A separator inside a rendered form: the group mark, the tier boundary.
     Separator,
@@ -69,6 +95,7 @@ pub struct Style {
     key: anstyle::Style,
     value: anstyle::Style,
     digits: anstyle::Style,
+    digit_alt: anstyle::Style,
     padding: anstyle::Style,
     separator: anstyle::Style,
     note: anstyle::Style,
@@ -83,6 +110,7 @@ impl Style {
         key: anstyle::Style::new(),
         value: anstyle::Style::new(),
         digits: anstyle::Style::new(),
+        digit_alt: anstyle::Style::new(),
         padding: anstyle::Style::new(),
         separator: anstyle::Style::new(),
         note: anstyle::Style::new(),
@@ -103,6 +131,9 @@ impl Style {
             key: S::new().fg_color(Some(Color::Ansi(AnsiColor::BrightBlack))),
             value: S::new(),
             digits: S::new(),
+            // The alternation has to be visible without being decorative: this
+            // is one number, not two colours of number.
+            digit_alt: S::new().fg_color(Some(Color::Ansi(AnsiColor::BrightBlack))),
             padding: S::new().effects(Effects::DIMMED),
             separator: S::new().effects(Effects::DIMMED),
             note: S::new().effects(Effects::DIMMED),
@@ -126,6 +157,7 @@ impl Style {
             Role::Key => self.key,
             Role::Value => self.value,
             Role::Digits => self.digits,
+            Role::DigitAlt => self.digit_alt,
             Role::Padding => self.padding,
             Role::Separator => self.separator,
             Role::Note => self.note,
@@ -214,6 +246,191 @@ pub fn resolve_for_output(choice: ColorChoice, json: bool) -> Style {
         return Style::PLAIN;
     }
     choice.resolve()
+}
+
+/// How to render a document: the style table, plus the choices a reader makes.
+///
+/// Separate from [`Style`] because these are not appearance. A group separator
+/// changes the characters, so it is not covered by the strip invariant and must
+/// not be — the invariant is a claim about *colour*, and quietly widening it to
+/// cover a flag that inserts characters would make it vacuous.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub struct Render {
+    /// The role-to-appearance table.
+    pub style: Style,
+    /// Separator inserted between decimal digit groups, if any.
+    ///
+    /// Off by default, and that default is a deliberate trade rather than an
+    /// oversight. A tick count is frequently copied out of this output and
+    /// pasted into something that wants an integer; a separator breaks that,
+    /// and the colour alternation gives a reader the same grouping without
+    /// touching a single character. `--tick-sep` is for the reader who wants
+    /// the separator anyway, or who is reading without colour — down a pipe,
+    /// in a log, on a terminal that has none.
+    pub group: Option<char>,
+}
+
+impl Render {
+    /// No colour, no separator. What [`Doc::to_text`](crate::emit::Doc::to_text)
+    /// renders with, and byte-identical to the output that predates this module.
+    pub const PLAIN: Render = Render {
+        style: Style::PLAIN,
+        group: None,
+    };
+
+    /// A style with no separator.
+    pub fn styled(style: Style) -> Render {
+        Render { style, group: None }
+    }
+
+    /// Set the digit-group separator.
+    pub fn group(mut self, sep: Option<char>) -> Render {
+        self.group = sep;
+        self
+    }
+}
+
+/// Validate a digit-group separator.
+///
+/// A digit would be indistinguishable from the number it is separating, which is
+/// the same reason §6.3 forbids one for the text forms. The rule is repeated here
+/// rather than shared because the two flags are about different renderings and a
+/// future divergence should be a decision, not a surprise.
+pub fn parse_group_sep(s: &str) -> Result<char, ucal_core::TimeError> {
+    let mut it = s.chars();
+    let (Some(c), None) = (it.next(), it.next()) else {
+        return Err(ucal_core::TimeError::with_context(
+            ucal_core::Code::E0001,
+            "the group separator must be exactly one character",
+        ));
+    };
+    if c.is_ascii_digit() {
+        return Err(ucal_core::TimeError::with_context(
+            ucal_core::Code::E0001,
+            "the group separator must not be a digit (§6.3)",
+        ));
+    }
+    Ok(c)
+}
+
+/// Render a decimal integer in three-digit groups.
+///
+/// Two mechanisms over the same grouping, and they are independent:
+///
+/// - the appearance alternates between [`Role::Digits`] and [`Role::DigitAlt`],
+///   which adds no character and so survives a copy-paste;
+/// - a separator is inserted when one was asked for, which does add characters
+///   and is therefore off unless requested.
+///
+/// Anything that is not a plain optionally-signed integer is returned painted as
+/// a single [`Role::Digits`] run. Splitting a value this does not understand
+/// would risk changing it, and a renderer that guesses at a format is how an
+/// exact integer stops being one.
+pub fn group_decimal(render: &Render, s: &str) -> String {
+    let (sign, digits) = match s.strip_prefix('-') {
+        Some(rest) => ("-", rest),
+        None => ("", s),
+    };
+    if digits.is_empty() || !digits.bytes().all(|b| b.is_ascii_digit()) {
+        return render.style.paint(Role::Digits, s);
+    }
+    // Nothing to gain below two groups, and a separator there is just noise.
+    if digits.len() <= 3 {
+        let mut out = String::from(sign);
+        out.push_str(&render.style.paint(Role::Digits, digits));
+        return out;
+    }
+
+    // Group from the right, so the leading group is the short one.
+    let first = match digits.len() % 3 {
+        0 => 3,
+        n => n,
+    };
+    let mut out = String::from(sign);
+    let mut idx = 0;
+    let mut group = 0;
+    while idx < digits.len() {
+        let take = if idx == 0 { first } else { 3 };
+        let end = (idx + take).min(digits.len());
+        if idx > 0 {
+            if let Some(sep) = render.group {
+                out.push_str(&render.style.paint(Role::Separator, &sep.to_string()));
+            }
+        }
+        let role = if group % 2 == 0 {
+            Role::Digits
+        } else {
+            Role::DigitAlt
+        };
+        out.push_str(&render.style.paint(role, &digits[idx..end]));
+        idx = end;
+        group += 1;
+    }
+    out
+}
+
+/// Paint a rendered timestamp form: `UC1 0031·0687·…`, `UC1/5 00000.…`, a UCID.
+///
+/// Three regions, and the split is structural rather than a guess at what looks
+/// good:
+///
+/// - the form tag up to the first space, which names the encoding;
+/// - the leading zero run, which is domain the value has not reached — Rule S
+///   fixes the width at the profile's ceiling, not at the value's magnitude;
+/// - the digits, with their group separators.
+///
+/// A string with no space is taken as all body, which is what a UCID is.
+pub fn paint_form(render: &Render, s: &str) -> String {
+    let style = &render.style;
+    let (tag, body) = match s.find(' ') {
+        Some(i) => (&s[..=i], &s[i + 1..]),
+        None => ("", s),
+    };
+
+    let mut out = String::with_capacity(s.len());
+    if !tag.is_empty() {
+        out.push_str(&style.paint(Role::Value, tag));
+    }
+
+    // Leading zeros end at the first character that is neither `0` nor a
+    // separator. A separator inside the run stays part of it, so a whole group
+    // of zeros dims as one region rather than in five-character pieces.
+    let leading_end = body
+        .char_indices()
+        .find(|(_, c)| c.is_alphanumeric() && *c != '0')
+        .map(|(i, _)| i)
+        .unwrap_or(body.len());
+
+    // Batch runs of one role, so a 135-digit region costs one pair of sequences
+    // rather than 135.
+    let mut run = String::new();
+    let mut run_role: Option<Role> = None;
+    let flush = |out: &mut String, run: &mut String, role: &mut Option<Role>| {
+        if let Some(r) = role.take() {
+            out.push_str(&style.paint(r, run));
+        }
+        run.clear();
+    };
+    for (i, c) in body.char_indices() {
+        // A separator inside the leading run takes the run's role rather than
+        // its own. Otherwise the region alternates between two roles and emits
+        // a sequence pair per group: 27 groups became 54 pairs for one prefix,
+        // and the dimming read as stripes instead of a region.
+        let role = if i < leading_end {
+            Role::Padding
+        } else if !c.is_alphanumeric() {
+            Role::Separator
+        } else {
+            Role::Digits
+        };
+        if run_role != Some(role) {
+            flush(&mut out, &mut run, &mut run_role);
+            run_role = Some(role);
+        }
+        run.push(c);
+    }
+    flush(&mut out, &mut run, &mut run_role);
+    out
 }
 
 /// Remove every SGR sequence from `s`.

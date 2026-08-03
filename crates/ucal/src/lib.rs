@@ -385,15 +385,15 @@ pub fn cmd_explain(input: &str, show_claim: bool) -> CmdResult {
         )
         .field(
             "human",
-            Value::text(codec::render(&t, &Fmt::human()).unwrap_or_default()),
+            Value::form(codec::render(&t, &Fmt::human()).unwrap_or_default()),
         )
         .field(
             "digit5",
-            Value::text(codec::render(&t, &Fmt::digit5()).unwrap_or_default()),
+            Value::form(codec::render(&t, &Fmt::digit5()).unwrap_or_default()),
         )
         .field(
             "ucid",
-            Value::text(match t.to_ucid() {
+            Value::form(match t.to_ucid() {
                 Ok(u) => u.to_string(),
                 Err(_) => "— (outside 2^256, UCAL-E0031)".to_string(),
             }),
@@ -681,7 +681,7 @@ pub fn cmd_now(precision: Tier, form: Form) -> CmdResult {
     };
     let mut doc = instant_doc("ucal now", &t);
     if let Ok(r) = codec::render(&t, &fmt) {
-        doc = doc.field("rendered", Value::text(r));
+        doc = doc.field("rendered", Value::form(r));
     }
     Ok(doc
         .field("precision", Value::text(precision.to_string()))
@@ -704,11 +704,11 @@ fn instant_doc(title: &str, t: &Instant<UC1>) -> Doc {
         .field("ticks", Value::number(t.ticks().to_dec_string()))
         .field(
             "human",
-            Value::text(codec::render(t, &Fmt::human()).unwrap_or_default()),
+            Value::form(codec::render(t, &Fmt::human()).unwrap_or_default()),
         )
         .field(
             "ucid",
-            Value::text(match t.to_ucid() {
+            Value::form(match t.to_ucid() {
                 Ok(u) => u.to_string(),
                 Err(_) => "— (outside 2^256)".to_string(),
             }),

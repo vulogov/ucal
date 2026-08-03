@@ -14,7 +14,7 @@
 //! meant to catch.
 
 use ucal::emit::{Doc, Value};
-use ucal::style::{strip_ansi, ColorChoice, Role, Style};
+use ucal::style::{group_decimal, paint_form, strip_ansi, ColorChoice, Render, Role, Style};
 
 /// Every document the shipped commands can produce, without reading the clock.
 ///
@@ -90,17 +90,89 @@ fn styles() -> Vec<(&'static str, Style)> {
 
 #[test]
 fn colour_never_changes_a_character() {
+    // Held at every separator setting, not only the default. The claim is that
+    // *colour* adds no character, so the comparison is against the same document
+    // rendered plainly with the same separator — widening it to ignore the
+    // separator too would make the invariant vacuous.
     for (name, doc) in documents() {
-        let plain = doc.to_text();
-        for (sname, style) in styles() {
-            let painted = doc.to_ansi(&style);
+        for sep in [None, Some('_'), Some(' ')] {
+            let plain = doc.render(&Render::PLAIN.group(sep));
+            for (sname, style) in styles() {
+                let painted = doc.render(&Render::styled(style).group(sep));
+                assert_eq!(
+                    strip_ansi(&painted),
+                    plain,
+                    "`{name}` style `{sname}` sep {sep:?}: colour altered the text"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn the_separator_is_the_only_thing_that_adds_characters() {
+    // And it only ever adds separators — the digits themselves are untouched, so
+    // a reader can still recover the integer by deleting the separator.
+    for (name, doc) in documents() {
+        let bare = doc.to_text();
+        for sep in ['_', ' ', '·'] {
+            let grouped = doc.render(&Render::PLAIN.group(Some(sep)));
             assert_eq!(
-                strip_ansi(&painted),
-                plain,
-                "`{name}` under style `{sname}`: colour altered the text"
+                grouped.replace(sep, ""),
+                bare.replace(sep, ""),
+                "`{name}`: separator `{sep}` changed something other than grouping"
             );
         }
     }
+}
+
+#[test]
+fn grouping_preserves_the_integer() {
+    let r = Render::PLAIN.group(Some('_'));
+    for n in [
+        "0",
+        "5",
+        "42",
+        "999",
+        "1000",
+        "-1000",
+        "8070205189123984864657505252035637180530466139316558837890625",
+        "-318856914364362819469533860683441162109375",
+    ] {
+        let g = group_decimal(&r, n);
+        assert_eq!(g.replace('_', ""), n, "grouping changed {n}");
+    }
+    // Under three digits there is nothing to group and no separator appears.
+    assert_eq!(group_decimal(&r, "42"), "42");
+    assert_eq!(group_decimal(&r, "999"), "999");
+    assert_eq!(group_decimal(&r, "1000"), "1_000");
+    // The leading group is the short one, so groups align from the right.
+    assert_eq!(group_decimal(&r, "12345"), "12_345");
+    assert_eq!(group_decimal(&r, "123456"), "123_456");
+    assert_eq!(group_decimal(&r, "1234567"), "1_234_567");
+    assert_eq!(group_decimal(&r, "-1234567"), "-1_234_567");
+}
+
+#[test]
+fn grouping_declines_what_it_does_not_understand() {
+    // A renderer that guesses at a format is how an exact integer stops being
+    // one. Anything that is not a plain signed integer passes through whole.
+    let r = Render::PLAIN.group(Some('_'));
+    for s in ["", "-", "12.34", "1e9", "0x1f", "12 34", "[1000, 2000]", "abc"] {
+        assert_eq!(group_decimal(&r, s), s, "mangled {s:?}");
+    }
+}
+
+#[test]
+fn the_default_render_inserts_no_separator() {
+    // The default has to stay paste-safe: a tick count copied out of this output
+    // must still be an integer.
+    let out = Render::PLAIN;
+    assert_eq!(out.group, None);
+    assert_eq!(
+        group_decimal(&out, "8070205189123984864657505252035637180530466139316558837890625"),
+        "8070205189123984864657505252035637180530466139316558837890625"
+    );
 }
 
 #[test]
@@ -109,7 +181,7 @@ fn the_plain_style_emits_no_escape_sequences_at_all() {
     // then a matching reset around nothing. The plain path must be byte-identical
     // to what it was before colour existed, not merely equivalent after stripping.
     for (name, doc) in documents() {
-        let plain = doc.to_ansi(&Style::PLAIN);
+        let plain = doc.render(&Render::PLAIN);
         assert!(
             !plain.contains('\u{1b}'),
             "`{name}`: the plain style emitted an escape sequence"
@@ -192,4 +264,96 @@ fn diagnostic_codes_take_their_own_roles() {
     for d in [&warn, &err, &plain_note] {
         assert_eq!(strip_ansi(&d.to_ansi(&s)), d.to_text());
     }
+}
+
+// ------------------------------------------------------------------- forms
+
+#[test]
+fn a_form_keeps_every_character() {
+    let r = Render::styled(Style::colored());
+    for f in [
+        "UC1 0031·0687·2481·3000·2434·1316:0750·0016",
+        "UC1/5 00000.00000.00111.10222",
+        "0000000000050PM6K45P2JZZTJ587Q9TBQSDGZFKF0T83MAJ9FJ1",
+        "— (outside 2^256, UCAL-E0031)",
+        "",
+    ] {
+        assert_eq!(strip_ansi(&paint_form(&r, f)), f, "form altered: {f:?}");
+    }
+}
+
+#[test]
+fn the_leading_zero_run_is_one_region_not_one_per_group() {
+    // 27 dimmed groups separated by 26 dots is 53 alternations if a separator
+    // inside the run takes its own role. That reads as stripes and emits a
+    // sequence pair per group, so the run has to paint as one region.
+    //
+    // Asserted on the painted substring rather than by counting sequences: the
+    // shipped scheme gives `Padding` and `Separator` the same appearance, so a
+    // count cannot tell which role produced what.
+    let r = Render::styled(Style::colored());
+    let f = "UC1/5 00000.00000.00000.00000.00111.10222";
+    let painted = paint_form(&r, f);
+    let dim = Style::colored().get(Role::Padding);
+    let run = format!("{dim}00000.00000.00000.00000.00{dim:#}");
+    assert!(
+        painted.contains(&run),
+        "the leading run did not paint as a single region:\n{painted:?}"
+    );
+    assert_eq!(strip_ansi(&painted), f);
+}
+
+#[test]
+fn the_run_ends_at_the_first_significant_digit_not_at_a_group_boundary() {
+    // `00111` is two leading zeros and three digits. Rounding the boundary out
+    // to the group would dim a `1`, which is a measured digit.
+    let r = Render::styled(Style::colored());
+    let painted = paint_form(&r, "UC1/5 00000.00111");
+    let dim = Style::colored().get(Role::Padding);
+    assert!(painted.contains(&format!("{dim}00000.00{dim:#}")));
+    assert!(!painted.contains(&format!("{dim}00000.00111{dim:#}")));
+}
+
+#[test]
+fn a_form_with_no_leading_zeros_dims_nothing() {
+    // A UCID has no separators, so nothing but `Padding` can produce a dim
+    // sequence here — which is what makes the assertion mean what it says.
+    let r = Render::styled(Style::colored());
+    let painted = paint_form(&r, "50PM6K45P2JZZTJ587Q9TBQSDGZFKF0T83MAJ9FJ1");
+    let dim = Style::colored().get(Role::Padding).to_string();
+    assert!(!painted.contains(&dim), "dimmed a value with no leading zeros");
+}
+
+#[test]
+fn a_ucids_leading_zeros_are_one_dimmed_region() {
+    // The real shape: a UCID at the present epoch spends its first ten
+    // characters on domain nobody has reached.
+    let r = Render::styled(Style::colored());
+    let f = "0000000000050PM6K45P2JZZTJ587Q9TBQSDGZFKF0T83MAJ9FJ1";
+    let painted = paint_form(&r, f);
+    let dim = Style::colored().get(Role::Padding);
+    assert!(painted.contains(&format!("{dim}00000000000{dim:#}")));
+    assert_eq!(painted.matches(&dim.to_string()).count(), 1);
+    assert_eq!(strip_ansi(&painted), f);
+}
+
+#[test]
+fn an_all_zero_form_is_entirely_padding() {
+    // Tick 0 itself: every digit is a leading zero and none is a measurement.
+    let r = Render::styled(Style::colored());
+    let f = "UC1/5 00000.00000";
+    let painted = paint_form(&r, f);
+    assert_eq!(strip_ansi(&painted), f);
+    let dim = Style::colored().get(Role::Padding);
+    assert!(painted.contains(&format!("{dim}00000.00000{dim:#}")));
+}
+
+#[test]
+fn form_values_are_plain_strings_in_json() {
+    // The variant exists so the text renderer can see structure. If it changed
+    // the JSON it would be a breaking change to `ucal-json/1`, which is exactly
+    // what U2 and U3 were scoped to avoid.
+    let t = Doc::new().field("x", Value::text("UC1 0000·0001"));
+    let f = Doc::new().field("x", Value::form("UC1 0000·0001"));
+    assert_eq!(t.to_json(), f.to_json());
 }
