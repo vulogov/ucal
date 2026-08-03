@@ -131,9 +131,16 @@ impl Style {
             key: S::new().fg_color(Some(Color::Ansi(AnsiColor::BrightBlack))),
             value: S::new(),
             digits: S::new(),
-            // The alternation has to be visible without being decorative: this
-            // is one number, not two colours of number.
-            digit_alt: S::new().fg_color(Some(Color::Ansi(AnsiColor::BrightBlack))),
+            // A *hue* step, not a lightness step, and the distinction is not
+            // cosmetic. Alternating between normal and dim says the faint groups
+            // matter less, which is false — they are the same number — and on a
+            // dark background bright black is close enough to the background to
+            // be hard to read at all. Cyan contrasts on both light and dark
+            // palettes and carries no rank.
+            //
+            // Red and yellow are unavailable: they are Error and Warning, and a
+            // digit group must never be mistaken for a diagnostic.
+            digit_alt: S::new().fg_color(Some(Color::Ansi(AnsiColor::Cyan))),
             padding: S::new().effects(Effects::DIMMED),
             separator: S::new().effects(Effects::DIMMED),
             note: S::new().effects(Effects::DIMMED),
@@ -511,6 +518,63 @@ mod tests {
         assert!(s.is_plain());
         assert_eq!(s.paint(Role::Padding, "0000"), "0000");
         assert_eq!(s.paint(Role::Error, "UCAL-E0001"), "UCAL-E0001");
+    }
+
+    #[test]
+    fn digit_grouping_carries_no_rank() {
+        // The alternation groups a number; it does not rank the groups. So the
+        // two digit roles must differ by *hue* and neither may be dim or bold —
+        // an intensity step would say the faint half matters less, which is
+        // false, and on a dark background it is also hard to read.
+        let s = Style::colored();
+        let (a, b) = (s.get(Role::Digits), s.get(Role::DigitAlt));
+        assert_ne!(a, b, "the alternation is invisible");
+        assert_eq!(
+            a.get_effects(),
+            b.get_effects(),
+            "the digit roles differ by an effect rather than a colour"
+        );
+        for r in [Role::Digits, Role::DigitAlt] {
+            let e = s.get(r).get_effects();
+            assert!(!e.contains(anstyle::Effects::DIMMED), "{r:?} is dimmed");
+            assert!(!e.contains(anstyle::Effects::BOLD), "{r:?} is bold");
+        }
+    }
+
+    #[test]
+    fn no_ordinary_role_wears_a_diagnostic_colour() {
+        // A digit group must never read as an error or a warning.
+        let s = Style::colored();
+        let (err, warn) = (s.get(Role::Error), s.get(Role::Warning));
+        for r in [
+            Role::Title,
+            Role::Key,
+            Role::Value,
+            Role::Digits,
+            Role::DigitAlt,
+            Role::Padding,
+            Role::Separator,
+            Role::Note,
+        ] {
+            let c = s.get(r).get_fg_color();
+            assert!(
+                c.is_none() || (c != err.get_fg_color() && c != warn.get_fg_color()),
+                "{r:?} uses a diagnostic colour"
+            );
+        }
+    }
+
+    #[test]
+    fn padding_recedes_and_that_is_deliberate() {
+        // Padding is the one place a lightness step is *correct*: those digits
+        // are domain nobody has reached, so receding is what they should do. The
+        // contrast with the digit roles above is the whole point of separating
+        // them.
+        let s = Style::colored();
+        assert!(s
+            .get(Role::Padding)
+            .get_effects()
+            .contains(anstyle::Effects::DIMMED));
     }
 
     #[test]
