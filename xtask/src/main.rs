@@ -17,6 +17,7 @@
 //! Usage: `cargo run -p xtask -- [check | emit | report]`
 
 mod citations;
+mod publish;
 mod declared;
 mod derivation;
 mod gendocs;
@@ -106,6 +107,10 @@ fn main() {
     }
     if mode == "verify-vectors" {
         std::process::exit(run_verify_vectors());
+    }
+    if mode == "publish" {
+        let execute = std::env::args().any(|a| a == "--execute");
+        std::process::exit(publish::run(execute));
     }
 
     println!("UC-P0 constants harness — RFC UCAL-1, profile UC-1\n");

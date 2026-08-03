@@ -67,14 +67,30 @@ one-line version and links to it.
    a `0.2.x` core.
 4. `cargo test --workspace --release`, both backends, plus
    `cargo run -p xtask -- lint`, `check-docs` and `verify-vectors`.
-5. `cargo publish --workspace --dry-run --no-verify` to confirm every crate
-   packages, then publish **one crate at a time in dependency order**:
-   `ucal-core`, `ucal-body`, `ucal-civil`, `ucal-events`, `ucal-cosmo`, `ucal`.
+5. `cargo run -p xtask -- publish` for the dry run, then
+   `cargo run -p xtask -- publish --execute` for real.
+
+   It derives the order from the dependency graph rather than repeating a list,
+   packages every crate before uploading any, refuses on a dirty working tree,
+   and then publishes one crate at a time.
+
+   The two cargo invocations are not symmetric, and the asymmetry is the whole
+   procedure. Packaging **must** use `--workspace`: in workspace mode cargo
+   knows all six versions are going out together and resolves the internal
+   requirements against the local tree, where per-crate it resolves
+   `ucal-core = "^0.3.0"` against the registry and fails, because that version
+   is exactly what is about to be uploaded. Publishing **must not** use
+   `--workspace`, for the reason below.
 
    Not `cargo publish --workspace`. It fails on this workspace with a cargo
    internal error — `no hash listed for ucal-core` — because it tries to verify
    a dependent against a dependency that is not on the index yet. Publishing
    sequentially is not a workaround that skips verification: each crate is
    verified normally, against the real index, once the one below it is live.
+
+   Dev-dependencies constrain the order too. `ucal-cosmo` needs `ucal-events`
+   only for its float oracle, and cargo still resolves it when verifying the
+   package — so the edge is real even though nothing in the shipped code uses
+   it.
 6. Tag `vX.Y.Z`, annotated and signed, and push the tag.
 7. Open the next file.
