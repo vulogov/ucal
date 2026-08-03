@@ -134,6 +134,11 @@ impl Doc {
         self
     }
 
+    /// Every field, in order. For tests that must walk what a command emitted.
+    pub fn fields(&self) -> &[(String, Value)] {
+        &self.fields
+    }
+
     /// The field keys, in order. Used by the golden tests to pin §19.2's ordering.
     pub fn keys(&self) -> Vec<&str> {
         self.fields.iter().map(|(k, _)| k.as_str()).collect()
@@ -193,7 +198,15 @@ impl Doc {
             render_field_text(&mut s, k, v, width, 0, r);
         }
         for n in &self.notes {
-            let _ = writeln!(s, "\n{}", style.paint(role_of_prose(n), n));
+            // A trailing note hangs at column zero, so it wraps to the margin
+            // rather than to a field's value column.
+            let painted = style.paint(role_of_prose(n), n);
+            let body = if n.chars().count() > r.cols {
+                crate::table::wrap_painted(&painted, 0, 0, r.cols)
+            } else {
+                painted
+            };
+            let _ = writeln!(s, "\n{body}");
         }
         s
     }
@@ -269,6 +282,29 @@ fn padded(style: &Style, role: Role, text: &str, width: usize) -> String {
     out
 }
 
+/// Write one `key  value` line, wrapping the value under itself when it is too
+/// long for the width.
+///
+/// A tick count is 61 digits and a base-5 form is over 200. Left alone, the
+/// terminal wraps them back to column zero, so the second half of a value lands
+/// under the field names and reads as though it belonged to a different row.
+/// Hanging it under its own column keeps it one value.
+///
+/// Nothing is shortened and nothing is broken that has an alternative: the wrap
+/// prefers a separator, and the value is recoverable by rejoining the lines.
+fn write_field(s: &mut String, r: &Render, pad: &str, key: &str, width: usize, painted: &str) {
+    let style = &r.style;
+    let label = padded(style, Role::Key, key, width);
+    let col = pad.chars().count() + width.max(key.chars().count()) + 2;
+    let shown = crate::style::strip_ansi(painted).chars().count();
+    let body = if col + shown > r.cols {
+        crate::table::wrap_painted(painted, col, col, r.cols)
+    } else {
+        painted.to_string()
+    };
+    let _ = writeln!(s, "{pad}{label}  {body}");
+}
+
 fn render_field_text(s: &mut String, k: &str, v: &Value, width: usize, depth: usize, r: &Render) {
     let style = &r.style;
     let pad = "  ".repeat(depth);
@@ -287,25 +323,22 @@ fn render_field_text(s: &mut String, k: &str, v: &Value, width: usize, depth: us
         }
         Value::List(items) => {
             let _ = writeln!(s, "{pad}{}:", style.paint(Role::Key, k));
+            let col = pad.chars().count() + 2;
             for i in items {
-                let _ = writeln!(s, "{pad}  {}", style.paint(role_of_prose(i), i));
+                let painted = style.paint(role_of_prose(i), i);
+                let body = if col + i.chars().count() > r.cols {
+                    crate::table::wrap_painted(&painted, col, col, r.cols)
+                } else {
+                    painted
+                };
+                let _ = writeln!(s, "{pad}  {body}");
             }
         }
         Value::Text(t) => {
-            let _ = writeln!(
-                s,
-                "{pad}{}  {}",
-                padded(style, Role::Key, k, width),
-                style.paint(role_of_prose(t), t)
-            );
+            write_field(s, r, &pad, k, width, &style.paint(role_of_prose(t), t));
         }
         Value::Number(n) => {
-            let _ = writeln!(
-                s,
-                "{pad}{}  {}",
-                padded(style, Role::Key, k, width),
-                group_decimal(r, n)
-            );
+            write_field(s, r, &pad, k, width, &group_decimal(r, n));
         }
         Value::Rows { key, value, rows } => {
             let _ = writeln!(s, "{pad}{}:", style.paint(Role::Key, k));
@@ -322,19 +355,10 @@ fn render_field_text(s: &mut String, k: &str, v: &Value, width: usize, depth: us
             }
         }
         Value::Form(f) => {
-            let _ = writeln!(
-                s,
-                "{pad}{}  {}",
-                padded(style, Role::Key, k, width),
-                paint_form(r, f)
-            );
+            write_field(s, r, &pad, k, width, &paint_form(r, f));
         }
         Value::Bool(b) => {
-            let _ = writeln!(
-                s,
-                "{pad}{}  {b}",
-                padded(style, Role::Key, k, width)
-            );
+            write_field(s, r, &pad, k, width, &style.paint(Role::Value, &b.to_string()));
         }
     }
 }

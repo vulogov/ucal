@@ -11,10 +11,15 @@
 //! it is not an exact integer, so a layout that cannot fit a value moves it, and
 //! never edits it.
 //!
-//! Prose is out of scope on purpose. The `note` on `ucal ladder` is 182
-//! characters and stays that way: a terminal soft-wraps a sentence perfectly
-//! well, and hard-wrapping it would put line breaks into `--json`-adjacent text
-//! for no gain. What must never be broken or shortened is a *value*.
+//! Prose is in scope too, since a long field value hangs under its own label.
+//! A terminal soft-wrapping a 225-character form back to column zero puts half
+//! of it under the field names, where it reads as another row; hanging it under
+//! its own column keeps it one value. Breaks prefer a word boundary, then a
+//! separator, then nothing — so prose breaks between words and a base-5 form
+//! breaks between groups.
+//!
+//! `--json` is untouched by any of it. Wrapping happens in the text renderer,
+//! and a consumer still receives one string.
 
 use ucal::emit::{Doc, Value};
 use ucal::style::{strip_ansi, Render, Style};
@@ -208,5 +213,99 @@ fn colour_does_not_change_the_layout() {
                 "`{name}`: coloured layout differs from plain at\n{l}"
             );
         }
+    }
+}
+
+
+// ------------------------------------------------- long values hang under their label
+
+/// Documents whose fields include values too long for 80 columns.
+fn long_valued() -> Vec<(&'static str, Doc)> {
+    let mut v: Vec<(&'static str, Doc)> = vec![
+        ("doctor", ucal::cmd_doctor().unwrap()),
+        ("explain", ucal::cmd_explain(T, false).unwrap()),
+        ("datum", ucal::cmd_datum().unwrap()),
+    ];
+    #[cfg(all(feature = "body", feature = "civil"))]
+    v.push((
+        "show",
+        ucal::cmd_show(T, &["earth-d".into(), "mars-d".into()]).unwrap(),
+    ));
+    v
+}
+
+#[test]
+fn a_long_value_hangs_under_its_own_column() {
+    // Left alone the terminal wraps a 225-character form back to column zero, so
+    // half of it lands under the field names and reads as another row.
+    for (name, doc) in long_valued() {
+        for line in doc.render(&Render::PLAIN.width(BASELINE_WIDTH)).lines() {
+            assert!(
+                line.chars().count() <= BASELINE_WIDTH,
+                "`{name}`: {}-character line\n{line}",
+                line.chars().count()
+            );
+        }
+    }
+}
+
+#[test]
+fn a_wrapped_value_is_recoverable() {
+    // The property that makes wrapping safe for an exact quantity: rejoining the
+    // continuation lines returns the value, character for character.
+    for (name, doc) in long_valued() {
+        let text = doc.render(&Render::PLAIN.width(BASELINE_WIDTH));
+        let joined: String = text.lines().map(str::trim_start).collect();
+        for (_, v) in doc.fields() {
+            let want = match v {
+                Value::Number(n) => n.clone(),
+                Value::Form(f) => f.clone(),
+                _ => continue,
+            };
+            assert!(
+                joined.contains(&want),
+                "`{name}`: a value did not survive wrapping\n  wanted: {want}"
+            );
+        }
+    }
+}
+
+#[test]
+fn no_wrapped_line_carries_trailing_whitespace() {
+    for (name, doc) in long_valued() {
+        for line in doc.render(&Render::PLAIN.width(BASELINE_WIDTH)).lines() {
+            assert!(!line.ends_with(' '), "`{name}`: trailing space on\n{line:?}");
+        }
+    }
+}
+
+#[test]
+fn wrapping_a_value_breaks_at_a_separator_not_mid_group() {
+    // A base-5 form should break between groups, so a reader never has to
+    // reassemble one across two lines.
+    let doc = ucal::cmd_explain(T, false).unwrap();
+    let text = doc.render(&Render::PLAIN.width(BASELINE_WIDTH));
+    let wrapped: Vec<&str> = text
+        .lines()
+        .filter(|l| l.trim_start().starts_with("00000.") || l.contains("UC1/5"))
+        .collect();
+    assert!(wrapped.len() > 1, "digit5 did not wrap at 80 columns");
+    for l in &wrapped[..wrapped.len() - 1] {
+        assert!(
+            l.ends_with('.'),
+            "a base-5 line broke inside a group:\n{l}"
+        );
+    }
+}
+
+#[test]
+fn colour_wraps_in_exactly_the_same_places() {
+    // Break positions are computed from visible characters only, so the coloured
+    // rendering breaks where the plain one does — which is what keeps the strip
+    // invariant true across wrapping.
+    for (name, doc) in long_valued() {
+        let plain = doc.render(&Render::PLAIN.width(BASELINE_WIDTH));
+        let painted = doc.render(&Render::styled(Style::colored()).width(BASELINE_WIDTH));
+        assert_eq!(strip_ansi(&painted), plain, "`{name}`: wrapping differs with colour");
     }
 }

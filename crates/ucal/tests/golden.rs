@@ -171,9 +171,17 @@ fn doctor_reports_everything_19_3_names() {
         assert!(keys.contains(&required), "doctor is missing `{required}`");
     }
     let text = doc.to_text();
-    // The domain ceiling, exactly.
-    assert!(text.contains(
-        "13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433649006084095"
+    // The domain ceiling, exactly. 155 digits do not fit in 80 columns, so it
+    // hangs under its own label across three lines — rejoining them must return
+    // it character for character, which is the property that makes wrapping safe
+    // for an exact quantity. Checked against the *structure* too, so this cannot
+    // pass on a value that merely appears somewhere in the prose.
+    const CEILING: &str = "13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433649006084095";
+    let joined: String = text.lines().map(str::trim_start).collect();
+    assert!(joined.contains(CEILING), "the domain ceiling did not survive wrapping");
+    assert!(matches!(
+        doc.get("domain_max_ticks"),
+        Some(Value::Number(n)) if n == CEILING
     ));
     // The leap-second table version (§8.4).
     assert!(text.contains("Bulletin C"), "the leap table version must be reported");

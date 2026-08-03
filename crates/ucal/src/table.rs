@@ -502,3 +502,126 @@ mod tests {
         }
     }
 }
+
+/// Wrap an already-painted run to `width` columns, hanging under `indent`.
+///
+/// Works on the painted string rather than on plain text and then re-painting,
+/// which matters: a rendered form carries several roles across its length — a
+/// dimmed leading-zero region, banded digit groups, separators — and re-painting
+/// wrapped pieces with one role would throw all of that away.
+///
+/// Escape sequences occupy no columns and are emitted where they fall, so a
+/// colour opened before a break stays open across it and its reset arrives on
+/// the continuation line. Break positions are computed from *visible characters
+/// only*, which is what keeps the strip invariant true: the coloured rendering
+/// breaks in exactly the places the plain one does.
+///
+/// `first` is the column the run starts at, so the first line gets the room it
+/// actually has rather than a full width.
+pub fn wrap_painted(painted: &str, first: usize, indent: usize, width: usize) -> String {
+    if width <= indent + 8 {
+        // No usable room for a hanging indent. Overflowing a terminal is a
+        // visual problem; breaking a value into a shape nobody asked for is a
+        // worse one.
+        return painted.to_string();
+    }
+
+    // Split into escape sequences and visible characters, so column arithmetic
+    // can ignore the former without losing them.
+    enum Seg {
+        Esc(String),
+        Ch(char),
+    }
+    let mut segs = Vec::new();
+    let mut it = painted.chars().peekable();
+    while let Some(c) = it.next() {
+        if c != '\u{1b}' {
+            segs.push(Seg::Ch(c));
+            continue;
+        }
+        let mut e = String::from(c);
+        if let Some('[') = it.peek() {
+            e.push(it.next().unwrap_or('['));
+            for c in it.by_ref() {
+                e.push(c);
+                if ('\u{40}'..='\u{7e}').contains(&c) {
+                    break;
+                }
+            }
+        } else if let Some(c) = it.next() {
+            e.push(c);
+        }
+        segs.push(Seg::Esc(e));
+    }
+
+    let mut out = String::with_capacity(painted.len());
+    let mut line = String::new();
+    let mut col = first;
+    // Candidate break points: after the last space, and after the last
+    // separator of any kind. Each records where in `line` it falls and what
+    // column it would leave behind. A word boundary is preferred, so prose
+    // breaks between words rather than after a bracket, and a value with no
+    // spaces still breaks between its groups.
+    let mut brk_space: Option<(usize, usize)> = None;
+    let mut brk_sep: Option<(usize, usize)> = None;
+    let flush = |out: &mut String, line: &mut String| {
+        out.push_str(line);
+        out.push('\n');
+        out.push_str(&" ".repeat(indent));
+        line.clear();
+    };
+
+    for seg in &segs {
+        match seg {
+            Seg::Esc(e) => line.push_str(e),
+            Seg::Ch(c) => {
+                if col >= width {
+                    let half = (indent + width) / 2;
+                    let chosen = match (brk_space, brk_sep) {
+                        (Some((a, bc)), _) if bc > half => Some((a, bc, true)),
+                        (_, Some((a, bc))) if bc > half => Some((a, bc, false)),
+                        _ => None,
+                    };
+                    match chosen {
+                        // Break at the candidate when it is far enough in that
+                        // the head is not nearly empty.
+                        Some((at, bcol, was_space)) => {
+                            let tail = line.split_off(at);
+                            let tail_cols = col - bcol;
+                            // A break taken *at* a space consumes it, which is
+                            // what prose wants and what leaves no trailing
+                            // whitespace. It is safe for a value because the only
+                            // space a rendered form contains is in its tag —
+                            // `UC1 `, `UC1/5 ` — which sits before the halfway
+                            // mark and is therefore never chosen here.
+                            if was_space {
+                                while line.ends_with(' ') {
+                                    line.pop();
+                                }
+                            }
+                            flush(&mut out, &mut line);
+                            line.push_str(&tail);
+                            col = indent + tail_cols;
+                        }
+                        _ => {
+                            flush(&mut out, &mut line);
+                            col = indent;
+                        }
+                    }
+                    brk_space = None;
+                    brk_sep = None;
+                }
+                line.push(*c);
+                col += 1;
+                if !c.is_alphanumeric() {
+                    brk_sep = Some((line.len(), col));
+                    if c.is_whitespace() {
+                        brk_space = Some((line.len(), col));
+                    }
+                }
+            }
+        }
+    }
+    out.push_str(&line);
+    out
+}
