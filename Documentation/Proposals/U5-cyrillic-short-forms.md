@@ -10,7 +10,7 @@ answer is `T[k]` and `5^e`.
 
 ## Why the locale is the right scope
 
-The `ru` locale already ships the full Cyrillic ladder — глубь, дрейф, срок,
+The `ru` locale already shipped a full Cyrillic ladder — глубь, дрейф, срок,
 обход, дуга, бой, мерцание, блик, искра, тик — and Rule N already sanctions it
 as display-only. Short forms scoped to that locale inherit the sanction, and
 inherit something better: **locale-invariance holds by construction rather than
@@ -35,6 +35,9 @@ designs out rather than documents around. Cyrillic against Latin is that problem
 at scale.
 
 ## The homoglyph analysis
+
+Run against the names as they stood *before* this proposal, which is why `срок`
+appears below and no longer appears in the table above.
 
 Twelve lowercase Cyrillic letters are pixel-identical to Latin ones in most
 terminal fonts: **а с е о р х у к м н в т**. A short form built only from those
@@ -75,7 +78,7 @@ ambiguous. That makes it a detection problem instead of a guessing one.
 |---|---|---|---|---|
 | T5 | 5^85 | глубь | `гл` | г, л |
 | T4 | 5^80 | дрейф | `др` | д |
-| T3 | 5^75 | срок | **— see below** | none available |
+| T3 | 5^75 | пролёт *(was срок)* | `пр` | п — see below |
 | T2 | 5^70 | обход | `обх` | б |
 | T1 | 5^65 | дуга | `ду` | д |
 | T0 | 5^60 | бой | `бо` | б |
