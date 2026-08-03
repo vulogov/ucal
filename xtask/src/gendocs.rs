@@ -211,6 +211,49 @@ pub fn render() -> String {
     );
     let _ = writeln!(s);
 
+    // U5: the notation question, answered in the file the tier table lives in
+    // rather than in a document that could drift from it.
+    let _ = writeln!(s, "## How to write a tier in a formula");
+    let _ = writeln!(s);
+    let _ = writeln!(
+        s,
+        "**`T[k]` and `5^e`.** Both are accepted wherever a name is, because \
+         Rule N requires it, and either is the right thing to write in prose, in \
+         a formula, or in an argument: `t = 3.5 x 5^80` is exact and needs no \
+         glossary, and `T4` sorts."
+    );
+    let _ = writeln!(s);
+    let _ = writeln!(
+        s,
+        "There is no abbreviation scheme, and the reason is not typographic. \
+         **Names are locale-dependent** — the `en` and `ru` columns above are \
+         different words for the same exponent — so a short form derived from a \
+         name cannot be universal. `bt` for *beat* means nothing under \
+         `--locale ru`. Anything short enough to want would either vary by \
+         locale, which makes it a second parse surface with a different meaning \
+         in each, or be invented independently of the names, which is what the \
+         exponent already is."
+    );
+    let _ = writeln!(s);
+    let _ = writeln!(
+        s,
+        "Greek was considered and rejected. In this project's own neighbourhood \
+         `Λ` is the cosmological constant of the flat ΛCDM model `ucal-cosmo` \
+         implements, `β` and `γ` are Lorentz quantities, `τ` is proper time and \
+         `t_P` is already the Planck time. Beyond the collisions, a Greek letter \
+         in a formula *reads* as a physical quantity, which invites exactly the \
+         inference Rule N forbids — that a tier is something other than an \
+         exponent with a display name attached."
+    );
+    let _ = writeln!(s);
+    let _ = writeln!(
+        s,
+        "Short forms scoped to a *locale* are a different question and are not \
+         ruled out by any of this; see \
+         `Documentation/Proposals/U5-cyrillic-short-forms.md`."
+    );
+    let _ = writeln!(s);
+
     let _ = writeln!(
         s,
         "| k | exponent | beats (universe seconds) | bridge units | human | en | ru | ticks |"

@@ -12,6 +12,16 @@ The **bridge** column is a foreign unit, shown alongside as §4.3 requires and n
 
 The bridge column is informative (Rule A.5). It is rendered from the exact rational `5^e / SECOND` under half-even rounding, in one step — not chained from the neighbouring row, which is how Appendix B's published column came to disagree in the fifth significant figure (delta D-A3).
 
+## How to write a tier in a formula
+
+**`T[k]` and `5^e`.** Both are accepted wherever a name is, because Rule N requires it, and either is the right thing to write in prose, in a formula, or in an argument: `t = 3.5 x 5^80` is exact and needs no glossary, and `T4` sorts.
+
+There is no abbreviation scheme, and the reason is not typographic. **Names are locale-dependent** — the `en` and `ru` columns above are different words for the same exponent — so a short form derived from a name cannot be universal. `bt` for *beat* means nothing under `--locale ru`. Anything short enough to want would either vary by locale, which makes it a second parse surface with a different meaning in each, or be invented independently of the names, which is what the exponent already is.
+
+Greek was considered and rejected. In this project's own neighbourhood `Λ` is the cosmological constant of the flat ΛCDM model `ucal-cosmo` implements, `β` and `γ` are Lorentz quantities, `τ` is proper time and `t_P` is already the Planck time. Beyond the collisions, a Greek letter in a formula *reads* as a physical quantity, which invites exactly the inference Rule N forbids — that a tier is something other than an exponent with a display name attached.
+
+Short forms scoped to a *locale* are a different question and are not ruled out by any of this; see `Documentation/Proposals/U5-cyrillic-short-forms.md`.
+
 | k | exponent | beats (universe seconds) | bridge units | human | en | ru | ticks |
 |---:|---:|---:|---:|---:|---|---|---:|
 | 32 | 220 | 6.8423e+111 | 3.1996e+110 | — | — | — | `5^220` |
