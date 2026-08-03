@@ -136,6 +136,35 @@ pub const GE2_ACHIEVABLE_WIDTH: &str =
      parameter width 10 917 yr. One tick is unreachable by ~55 orders of magnitude; \
      UCAL-W0004 is set on every result.";
 
+/// C4, measured: the finest tolerance `z_of_t` can actually reach, and why.
+///
+/// The companion to [`GE2_ACHIEVABLE_WIDTH`], for the inversion rather than the
+/// forward integral, and the answer has the same shape: one tick is unreachable,
+/// and the obstacle is not the thing that looked like the obstacle.
+///
+/// `z_of_t` bisects `[0, 10 000]`, so each midpoint is `(lo + hi)/2` and its
+/// denominator doubles at every step. Evaluating `t_of_z` at a midpoint whose
+/// denominator has passed roughly 37 decimal digits exceeds the 512-bit domain
+/// and fails with `UCAL-E0021`. That happens at step 125, with the time bracket
+/// still about `7.8 × 10^26` ticks wide — some forty attoseconds, and twenty-six
+/// orders of magnitude from a tick.
+///
+/// So the reachable floor is set by the domain, not by the step budget and not
+/// by the quadrature. The last of those is measured rather than argued: the
+/// failure lands at step 125 with a 37-digit denominator at depth 4, 8 and 12
+/// alike. A narrower panel bound makes each *age* sharper and does not make the
+/// next midpoint representable.
+///
+/// That closes the second-order quadrature question from the other side. Its
+/// case was already weak on the forward integral, where the arithmetic width is
+/// forty times smaller than the parameter width; the inversion does not supply
+/// the missing motive, because the constraint it hits is depth-independent.
+///
+/// Raising [`LambdaCdm::MAX_BISECT_STEPS`] from 64 to 96 is what the measurement
+/// supports, and no more.
+pub const C4_ACHIEVABLE_TOLERANCE: &str =
+    "z_of_t at depth 12, scale 12: converges at 1 year in 46 steps, 1 second in 71,      1 millisecond in 81. A one-tick request reaches step 125 and fails UCAL-E0021      when a bisection midpoint leaves the 512-bit domain, bracket still ~7.8e26 ticks.      The budget is 96; the floor is the domain.";
+
 /// §16 names a distinct error type; it is the crate's, because the Appendix E
 /// codes are the contract.
 pub type CosmoError = TimeError;
@@ -492,6 +521,58 @@ impl LambdaCdm {
     /// recombination and comfortably outside anything the catalogue records.
     const Z_CEILING: u64 = 10_000;
 
+    /// Halvings allowed per side of the inversion.
+    ///
+    /// # C4, measured: the budget was not the constraint
+    ///
+    /// This was 64, recorded as "a ceiling nobody has tried to raise". Raising it
+    /// and measuring — `cargo run --release -p ucal-cosmo --example
+    /// c4_bisection_ceiling`, depth 12, scale 12, target the age at `z = 1`:
+    ///
+    /// ```text
+    /// tolerance   steps   outcome
+    ///    1 year      46   converged
+    ///     1 day      54   converged
+    ///    1 hour      59   converged
+    ///  1 second      71   converged
+    ///      1 ms      81   converged
+    ///    1 tick     125   UCAL-E0021 — exact rational arithmetic left the domain
+    /// ```
+    ///
+    /// Two findings, and the second is the one that matters.
+    ///
+    /// **64 was too low.** Anything finer than about a year returned
+    /// `UCAL-E0071` — "did not reach the requested tolerance within the step
+    /// budget" — when a larger budget reaches it. That message was true and the
+    /// implication was not: the tolerance was reachable, and the budget was the
+    /// only thing in the way.
+    ///
+    /// **The wall past that is not the budget either.** Each midpoint is
+    /// `(lo + hi)/2`, so its denominator doubles every step; by step 125,
+    /// evaluating `t_of_z` at one exceeds the 512-bit domain and fails with
+    /// `UCAL-E0021`. The bracket at that point is still about `7.8 x 10^26`
+    /// ticks — roughly 40 attoseconds, and 26 orders of magnitude from a tick.
+    ///
+    /// The wall is in the same place at every depth:
+    ///
+    /// ```text
+    /// depth   steps   outcome                denominator digits
+    ///     4     125   UCAL-E0021                             37
+    ///     8     125   UCAL-E0021                             37
+    ///    12     125   UCAL-E0021                             37
+    /// ```
+    ///
+    /// Identical, which is the finding rather than a coincidence: the limit is on
+    /// *representing the next midpoint*, and a finer quadrature makes each age
+    /// sharper without making that midpoint representable. See
+    /// [`C4_ACHIEVABLE_TOLERANCE`].
+    ///
+    /// So the ceiling is 96: past every tolerance the arithmetic can actually
+    /// deliver, and short of the region where the failure changes meaning. A
+    /// request finer than [`C4_ACHIEVABLE_TOLERANCE`] is refused for the reason it
+    /// is really refused.
+    pub const MAX_BISECT_STEPS: u32 = 96;
+
     /// Redshift from absolute time, by monotone bisection (§10.4).
     ///
     /// # Why this brackets both sides
@@ -584,7 +665,7 @@ impl LambdaCdm {
         let mut t_lo = age(&lo)?;
         let mut t_hi = age(&hi)?;
 
-        for _ in 0..64 {
+        for _ in 0..Self::MAX_BISECT_STEPS {
             // Converged when the bracket no longer resolves anything in time.
             if t_lo.since(&t_hi)? <= *tolerance {
                 return Ok(if use_hi { hi } else { lo });
@@ -601,9 +682,15 @@ impl LambdaCdm {
                 t_hi = t_mid;
             }
         }
+        // The message names the measured floor rather than the budget. C4 found
+        // that the budget was the wrong thing to blame: a tolerance the
+        // arithmetic can reach is now inside it, and one it cannot is refused
+        // for that reason instead of for running out of steps.
         Err(TimeError::with_context(
             Code::E0071,
-            "inversion did not reach the requested tolerance within the step budget",
+            "inversion did not converge: the finest tolerance this model reaches \
+             is about a millisecond, past which the bisection midpoints leave the \
+             512-bit domain (C4)",
         ))
     }
 
