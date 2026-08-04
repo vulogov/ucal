@@ -13,6 +13,7 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod cert;
 pub mod emit;
 pub mod style;
 pub mod table;
@@ -110,6 +111,10 @@ pub fn parse_rounding(s: &str) -> Result<Rounding, TimeError> {
 fn dec(r: &Ratio, digits: u32) -> String {
     r.to_decimal_string(digits, Rounding::HalfEven)
         .unwrap_or_else(|_| r.to_ratio_string())
+}
+
+pub(crate) fn ratio_of(a: &Ticks, b: &Ticks) -> Ratio {
+    tick_ratio(a, b)
 }
 
 fn tick_ratio(a: &Ticks, b: &Ticks) -> Ratio {
