@@ -344,6 +344,13 @@ pub struct CosmoResult<T> {
     pub arithmetic_width: Delta,
     /// Width contributed by the model's parameter uncertainty.
     pub parameter_width: Delta,
+    /// Width contributed by an **interval input**, if the caller gave one.
+    ///
+    /// Zero for a point input. Separate from the other two for the reason Rule X
+    /// separates those: a caller's own uncertainty is not the measurement's and
+    /// is not this program's, and merging any two of the three hides which one
+    /// is doing the work.
+    pub input_width: Delta,
     /// The subdivision depth used.
     pub depth: u32,
     /// The fixed-point scale used for the directed square roots (D-6).
@@ -518,10 +525,87 @@ impl LambdaCdm {
             value,
             arithmetic_width,
             parameter_width,
+            input_width: Delta::zero(),
             depth,
             scale,
             model: self.model,
             citation: self.citation,
+            warnings,
+        })
+    }
+
+    /// The age over an **interval** of redshift, as one certified enclosure.
+    ///
+    /// # Why the hull is formed this way, and why it is checked
+    ///
+    /// `t` is decreasing in `z`: the substitution `u0 = 1/(1+z)` is decreasing,
+    /// the integrand `u/sqrt(g(u))` is non-negative on `[0, u0]` because
+    /// `Omega_r > 0` keeps `g` positive, and an integral of a non-negative
+    /// function over a growing range grows. So the oldest admissible age comes
+    /// from `z_lo` and the youngest from `z_hi`, and the hull is
+    /// `[ t(z_hi).lo , t(z_lo).hi ]`.
+    ///
+    /// Appendix H.4 requires monotonicity to be **asserted, not assumed**, and
+    /// the argument above is an assertion. So the ordering is also *checked* at
+    /// runtime: if the two enclosures do not sit the way monotonicity says they
+    /// must, that is an internal invariant violation and it is reported as one
+    /// rather than quietly producing a hull that means nothing.
+    ///
+    /// # The third width
+    ///
+    /// A caller's own uncertainty is not the model's, and folding it into
+    /// `parameter_width` would be the same conflation Rule X forbids between
+    /// arithmetic and parameter error (F8). The returned
+    /// [`input_width`](CosmoResult::input_width) is what the *input interval*
+    /// contributed, and it is zero for a point input.
+    pub fn t_of_z_interval(
+        &self,
+        z: &RatInterval,
+        depth: u32,
+        scale: u32,
+    ) -> Result<CosmoResult<Window<UC1>>> {
+        let at_lo = self.t_of_z(z.lo(), depth, scale)?;
+        if z.lo() == z.hi() {
+            return Ok(at_lo);
+        }
+        let at_hi = self.t_of_z(z.hi(), depth, scale)?;
+
+        // Monotonicity, checked rather than trusted.
+        if at_hi.value.lo() > at_lo.value.lo() || at_hi.value.hi() > at_lo.value.hi() {
+            return Err(TimeError::with_context(
+                // Exit 8, "cosmology model or enclosure error" (§19.5). It is the
+                // enclosure that would be wrong, and this refuses to emit one
+                // rather than emitting a hull that means nothing.
+                Code::E0070,
+                "t(z) is not decreasing across the requested interval, so the hull \
+                 would not be an enclosure. Appendix H.4 requires monotonicity to \
+                 be asserted rather than assumed; this is that assertion failing",
+            ));
+        }
+
+        let value = Window::new(at_hi.value.lo().clone(), at_lo.value.hi().clone())?;
+        // What the input interval added, over and above what a point at `z_lo`
+        // would already have cost.
+        let input_width = value
+            .width()
+            .checked_sub(&at_lo.value.width())
+            .unwrap_or_else(|_| Delta::zero());
+
+        let mut warnings = at_lo.warnings.clone();
+        for w in at_hi.warnings {
+            if !warnings.contains(&w) {
+                warnings.push(w);
+            }
+        }
+        Ok(CosmoResult {
+            value,
+            arithmetic_width: at_lo.arithmetic_width,
+            parameter_width: at_lo.parameter_width,
+            input_width,
+            depth,
+            scale,
+            model: at_lo.model,
+            citation: at_lo.citation,
             warnings,
         })
     }
@@ -644,6 +728,7 @@ impl LambdaCdm {
             // because both ends were found against interval-valued ages.
             arithmetic_width: tolerance.clone(),
             parameter_width: Delta::zero(),
+            input_width: Delta::zero(),
             depth,
             scale,
             model: self.model,
@@ -792,6 +877,15 @@ impl LambdaCdm {
         v.push((
             "10. quantise to ticks".to_string(),
             "OUTWARD. The lower bound floors and the upper bound ceils. Until 0.4.0 both floored, which narrowed the upper end by up to one tick; writing this audit is what found it"
+                .to_string(),
+        ));
+        v.push((
+            "11. an interval input".to_string(),
+            "OUTWARD, when one is given. t decreases in z -- u0 = 1/(1+z) shrinks \
+             and the integrand is non-negative -- so the hull runs from the age at \
+             the largest z to the age at the smallest. That ordering is checked at \
+             runtime rather than trusted, and what the input interval cost is \
+             reported apart from the other two widths"
                 .to_string(),
         ));
         v.push((

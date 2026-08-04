@@ -432,15 +432,26 @@ ucal cosmo z --at <INSTANT> [--tolerance-years N] [--depth N] [--scale N]
 | `--scale` | `12` | Decimal digits for the directed square roots. |
 | `--audit` | off | Also print how the enclosure was reached, and which direction each rounding moved. |
 
+`--z` accepts a point or an **interval**: `--z 1100` or `--z 1090..1110`. The
+machinery is interval-valued end to end, so a caller carrying their own
+uncertainty can pass it through rather than picking a midpoint and losing it.
+
 | field | meaning |
 |---|---|
-| `z` | The redshift asked for. |
+| `z` | The redshift asked for, as a point or an interval. |
 | `enclosure.lo_ticks` / `.hi_ticks` | The age, as an interval of ticks. The answer is the *pair*. |
 | `enclosure.lo_years` / `.hi_years` | The same in years. |
 | `enclosure.at_drift` | The same on the ladder. |
 | `widths.arithmetic_years` | How much of the width comes from the quadrature. |
 | `widths.parameter_years` | How much comes from **Planck's own error bars**. |
 | `quadrature.depth` / `.panels` / `.sqrt_scale_digits` | What was actually computed. |
+| `input_width.years` | Present **only** for an interval input: what the caller's own uncertainty cost, over and above a point at the interval's lower end. Reported apart from the other two widths so none of the three can be mistaken for another. |
+
+For an interval, `t` is decreasing in `z` — `u₀ = 1/(1+z)` shrinks and the
+integrand is non-negative — so the hull runs from the age at the largest `z` to
+the age at the smallest. Appendix H.4 requires monotonicity to be *asserted, not
+assumed*, so that ordering is checked at runtime and a failure is `UCAL-E0070`
+rather than a hull that means nothing.
 
 `--audit` adds an `audit` section: the substitution, why the panels use an
 interval extension rather than endpoints, the panel count, and then **the

@@ -577,3 +577,86 @@ fn quantising_to_ticks_rounds_outward_on_both_ends() {
          no longer provably contains what the quadrature bounded"
     );
 }
+
+// ---------------------------------------------------------------------------
+// V5 — interval inputs
+// ---------------------------------------------------------------------------
+
+#[test]
+fn an_interval_input_encloses_both_of_its_ends() {
+    // The property that makes the hull an enclosure rather than a guess.
+    let m = model();
+    let (lo, hi) = (Ratio::from_u64(1090), Ratio::from_u64(1110));
+    let over = m
+        .t_of_z_interval(&RatInterval::new(lo.clone(), hi.clone()).unwrap(), 4, S)
+        .unwrap()
+        .value;
+    for z in [&lo, &hi] {
+        let at = m.t_of_z(z, 4, S).unwrap().value;
+        assert!(
+            over.lo() <= at.lo() && over.hi() >= at.hi(),
+            "the hull does not contain the enclosure at z = {}",
+            z.to_decimal_string(0, Rounding::Trunc).unwrap()
+        );
+    }
+}
+
+#[test]
+fn a_point_interval_is_the_point() {
+    // A degenerate interval must not widen anything, or every caller pays for a
+    // feature they did not use.
+    let m = model();
+    let z = Ratio::from_u64(1100);
+    let point = m.t_of_z(&z, 4, S).unwrap();
+    let degenerate = m
+        .t_of_z_interval(&RatInterval::exact(z), 4, S)
+        .unwrap();
+    assert_eq!(point.value, degenerate.value);
+    assert!(degenerate.input_width.ticks().is_zero_ticks());
+}
+
+#[test]
+fn the_input_width_is_reported_apart_from_the_other_two() {
+    // Rule X separates arithmetic from parameter error because merging them
+    // hides which is doing the work. A caller's own uncertainty is a third
+    // thing, and folding it into either would be the same mistake.
+    let m = model();
+    let wide = m
+        .t_of_z_interval(
+            &RatInterval::new(Ratio::from_u64(1000), Ratio::from_u64(1200)).unwrap(),
+            4,
+            S,
+        )
+        .unwrap();
+    assert!(!wide.input_width.ticks().is_zero_ticks(), "a wide input cost nothing?");
+    // And the three account for the total.
+    let sum = wide
+        .arithmetic_width
+        .checked_add(&wide.parameter_width)
+        .and_then(|d| d.checked_add(&wide.input_width))
+        .unwrap();
+    assert_eq!(
+        sum.ticks(),
+        wide.value.width().ticks(),
+        "the three widths must add up to the enclosure"
+    );
+}
+
+#[test]
+fn a_wider_input_gives_a_wider_answer() {
+    let m = model();
+    let w = |lo: u64, hi: u64| {
+        m.t_of_z_interval(
+            &RatInterval::new(Ratio::from_u64(lo), Ratio::from_u64(hi)).unwrap(),
+            4,
+            S,
+        )
+        .unwrap()
+        .value
+        .width()
+        .ticks()
+        .clone()
+    };
+    assert!(w(1000, 1200) > w(1090, 1110));
+    assert!(w(1090, 1110) > w(1100, 1100));
+}

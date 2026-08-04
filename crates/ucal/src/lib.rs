@@ -21,7 +21,7 @@ pub mod table;
 use emit::{Doc, Value};
 use ucal_core::backend::TickInt;
 use ucal_core::codec::{self, Fmt, Form};
-use ucal_core::num::Ratio;
+use ucal_core::num::{RatInterval, Ratio};
 use ucal_core::locale::{self, LocaleId};
 use ucal_core::qualified::Kind;
 use ucal_core::{
@@ -1389,6 +1389,27 @@ fn ticks_in_years(t: &Ticks, digits: u32) -> String {
     dec(&tick_ratio(t, &year), digits)
 }
 
+/// Parse a redshift: a point, or an interval written `lo..hi`.
+///
+/// The machinery is interval-valued end to end and until 0.4.0 would only accept
+/// a point, so a caller carrying their own uncertainty had to pick a midpoint
+/// and lose it — which is the move this project spends thirty chapters objecting
+/// to when other people make it.
+#[cfg(feature = "cosmo")]
+fn parse_redshift(s: &str) -> Result<RatInterval, TimeError> {
+    let t = s.trim();
+    match t.split_once("..") {
+        Some((lo, hi)) => {
+            let (lo, hi) = (
+                Ratio::from_decimal_str(lo.trim())?,
+                Ratio::from_decimal_str(hi.trim())?,
+            );
+            RatInterval::new(lo, hi)
+        }
+        None => Ok(RatInterval::exact(Ratio::from_decimal_str(t)?)),
+    }
+}
+
 /// The same conversion, certified.
 ///
 /// A count of ticks divided by a Julian year is a rational, and whether its
@@ -1421,12 +1442,24 @@ pub fn cmd_cosmo_age(z: &str, depth: u32, scale: u32) -> CmdResult {
 #[cfg(feature = "cosmo")]
 pub fn cmd_cosmo_age_audited(z: &str, depth: u32, scale: u32, audit: bool) -> CmdResult {
     let model = ucal_cosmo::LambdaCdm::planck2018();
-    let z = Ratio::from_decimal_str(z.trim())?;
-    let out = model.t_of_z(&z, depth, scale)?;
+    let zi = parse_redshift(z)?;
+    let z = zi.lo().clone();
+    let out = model.t_of_z_interval(&zi, depth, scale)?;
 
     let mut doc = Doc::new()
         .title("ucal cosmo age")
-        .field("z", Value::quantity(&z, 4, Rounding::HalfEven))
+        .field(
+            "z",
+            if zi.lo() == zi.hi() {
+                Value::quantity(zi.lo(), 4, Rounding::HalfEven)
+            } else {
+                Value::text(format!(
+                    "{} .. {}",
+                    dec(zi.lo(), 4),
+                    dec(zi.hi(), 4)
+                ))
+            },
+        )
         .field("model", Value::text(out.model.0))
         .field(
             "enclosure",
@@ -1473,6 +1506,28 @@ pub fn cmd_cosmo_age_audited(z: &str, depth: u32, scale: u32, audit: bool) -> Cm
         )
         .field("parameters", Value::text(model.describe()))
         .field("citation", Value::text(out.citation.source));
+
+    // A third width, and only when the caller supplied an interval. Always
+    // present and always zero would be noise; absent says the input was a point.
+    // Separate from the other two for the reason Rule X separates those: a
+    // caller's uncertainty is not the measurement's and is not this program's.
+    if !zi.lo().eq(zi.hi()) {
+        doc = doc.field(
+            "input_width",
+            Value::Section(vec![
+                ("years".into(), years_quantity(out.input_width.ticks(), 1)),
+                (
+                    "note".into(),
+                    Value::text(
+                        "what the requested z interval contributed, over and above \
+                         what a point at its lower end would already have cost. \
+                         Reported apart from the other two widths so that no one \
+                         of the three can be mistaken for another.",
+                    ),
+                ),
+            ]),
+        );
+    }
 
     if audit {
         doc = doc.field(
