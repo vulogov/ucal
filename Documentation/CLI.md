@@ -8,10 +8,19 @@ commands. This file is the manual, and the fields are its point — a reader
 looking at `remainder_ticks` or `window_ticks` should not have to read `lib.rs`
 to find out what they are.
 
-**Scope note.** Command names, subcommands and global options are checked
-against the source by `cargo run -p xtask -- check-docs`, which fails when this
-file and the CLI disagree. The prose is not generated and can still go stale;
-where it does, the source is right.
+**What is checked, and what is not.**
+
+Two things are mechanical. `cargo run -p xtask -- check-docs` fails when a
+command or global option exists and is undocumented, or is documented and no
+longer exists. `crates/ucal/tests/manual_fields.rs` fails when a **field** this
+file documents is emitted by no command, or a field a command emits is
+documented nowhere.
+
+So this file is verified **complete and current**. It is *not* verified
+**correct**: whether a description says something true about the field it names
+is not mechanically checkable, and claiming otherwise would be the kind of
+overclaim the rest of the project exists to prevent. Where prose and source
+disagree, the source is right.
 
 ---
 
@@ -154,6 +163,7 @@ ucal datum
 | `rounding.residual_rendered` | The same residual in seconds: `−0.017190364 s`. |
 | `rounding.rationale` | Why a whole-beat datum was chosen. |
 | `earth_dependency` | A plain statement of where Earth enters: the input arrives in Julian years and the bridge anchor is an Earth date. Both are metrology (Rule Y); neither enters a computation. |
+| `implied_age.seconds` | Under `--bridge`: the implied age in SI seconds. |
 | `implied_age` | A *consequence* of the declared datum, not a measurement. The measurement is `datum_provenance.input`. §19.2 forbids presenting this as an age of the universe, and a lint enforces the wording. |
 
 ---
@@ -182,6 +192,7 @@ ucal explain <INSTANT> [--claim]
 | `si_bridge.unit` | The declared foreign unit: the SI second. |
 | `si_bridge.epoch` | The civil instant the bridge is anchored to. |
 | `si_bridge.seconds_from_epoch` | The instant expressed through the bridge. Informative (Rule A.5) — this is the *only* place Earth enters, and it is division, so it is the only place a rounding mode is chosen. |
+| `claim` | Present with `--claim`: `BIG_BANG_CLAIM`, verbatim. Metadata, never an operand (Rule Q.3). |
 | `warning` | Present when the instant lies inside the claim's half-width (`UCAL-W0006`). |
 
 ---
@@ -234,7 +245,7 @@ both.
 | `ticks` | The instant that was converted. |
 | `qualified` | The rendered label with its calendar qualifier attached, so a bare date can never circulate without saying which calendar it is in. |
 | `calendar_id` / `kind` | Which calendar, and whether it is `derived` or `legacy` (§19.4 requires `kind` on every rendering). |
-| `fields.*` | `year`, `month`, `day`, `hour`, `minute`, `second`, `weekday`. |
+| `fields.year`, `fields.month`, `fields.day`, `fields.hour`, `fields.minute`, `fields.second`, `fields.weekday` | The civil label's parts. |
 | `rounding` | The mode actually applied. |
 | `lossy` | Whether digits were discarded. `false` means the label denotes the exact tick. |
 | `warning` | Any `UCAL-W####` raised by the conversion. |
@@ -261,7 +272,7 @@ ucal ladder [--named-only]
 | `tiers.T<k>.exponent` | The tier's **canonical identity**. The name is an alias; nothing decides behaviour from one (Rule N). |
 | `tiers.T<k>.name` | Singular and plural in the chosen locale, or `—` for an unnamed tier. |
 | `tiers.T<k>.beats` | The tier in universe seconds. Exact by construction — every tier is a whole power of five of the beat. |
-| `tiers.T<k>.seconds (bridge)` | The same span in SI seconds. **Informative** (Rule A.5), shown alongside and never instead. |
+| `tiers.T<k>.seconds (bridge)` | The same span in SI seconds. **Informative** (Rule A.5) and shown only under `--bridge`. |
 | `tiers.T<k>.ticks` | The tier as an exact integer count of ticks. |
 
 The two seconds are incommensurable above T-6: one bridge second is
@@ -296,10 +307,17 @@ ucal cal anchor <ID>
 | field | meaning |
 |---|---|
 | `calendar` / `kind` / `body` | Which calendar this is. |
-| `anchor` | The anchor instant, its revision, and its uncertainty window. |
-| `intercalation` | The derived leap rule and the continued-fraction expansion behind it. |
-| `fields` | The instant rendered in this calendar's local fields. |
-| `cycles` | The derived grouping cycles, if the body has any. |
+| `anchor.method` | How the anchor was determined, cited. |
+| `anchor.uncertainty` | The observation's stated uncertainty. |
+| `intercalation.rule` | The derived leap rule, as a fraction. |
+| `intercalation.whole_days_per_year` | The integer part: how many whole days a year holds before intercalation. |
+| `intercalation.bound` | The drift bound the rule was derived against — a **rate** in local units, not a duration (D-A13). |
+| `intercalation.walked` | How many continued-fraction steps were taken to reach it. |
+| `fields.year`, `fields.month`, `fields.day`, `fields.hour`, `fields.minute`, `fields.second`, `fields.weekday` | The instant in this calendar's local fields. |
+| `fields.day_fraction` | How far through the local day the instant falls. |
+| `cycles.satellite` | Which satellite the grouping cycle is derived from, if any. |
+| `cycles.cycles_per_year` | The satellite's period as a fraction of the body's year. |
+| `cycles.convergents` | The continued-fraction convergents of that ratio — the candidate cycle lengths, with the chosen one marked. |
 
 ### `cal anchor`
 
@@ -335,6 +353,7 @@ ucal show <INSTANT> [--calendars <ID,ID,…>]
 | `calendars.<id>.window_ticks` | The uncertainty the anchor contributes, in ticks. A local date is only as sharp as the anchor behind it. |
 | `calendars.<id>.day_is_ambiguous` | Whether the instant falls close enough to a day boundary that the anchor's window straddles it. |
 | `calendars.<id>.error` | Present instead of fields when a calendar cannot render — a missing anchor is `UCAL-E0062`, not a guess. |
+| `calendars.<id>.arbitrary` | For a legacy calendar: which of its parameters are declared by convention rather than derived from a body. |
 
 ---
 
@@ -355,7 +374,11 @@ ucal events show <ID>
 | `events.<id>.window_ticks` | That figure converted to an interval of ticks. **Every entry is an interval**, because not one of these is known to a point. |
 | `events.<id>.citation` | The source. |
 | `events.<id>.warning` | `UCAL-W0006` where the event's window overlaps the claim's half-width — i.e. where the dating is not separable from the uncertainty in the datum itself. |
+| `description` (`show`) | What the event is, in a sentence. |
 | `stated_as` (`show`) | Whether the source gave a point, a range, or a bound. |
+| `window.lo` / `.hi` | The interval's ends, in ticks. |
+| `window.width_ticks` | Its width. |
+| `window.width_years` | The same width in Julian years, under `--bridge`. |
 | `midpoint` (`show`) | The window's midpoint. A *rendering choice*, not a claim: the window is the datum. |
 
 ---
@@ -376,7 +399,7 @@ ucal timeline [--tier <TIER>]
 |---|---|
 | `tier` | The tier positions are stated in. |
 | `events.<label>.at` | The event's position, rendered at that tier. |
-| `events.<label>.T<k>s since the datum` | The same position as a plain count of that tier. |
+| `events.<label>.tiers_since_datum` | The same position as a plain count of the stated tier. Which tier is in the document's `tier` field — it is not in this key, so a consumer's accessor survives `--tier`. |
 | `events.<label>.as_published` | The source's own figure, alongside. |
 | `events.<label>.warning` | As in `events list`. |
 
@@ -421,7 +444,9 @@ ucal cosmo z --at <INSTANT> [--tolerance-years N] [--depth N] [--scale N]
 | `model` | The model identifier, carried on every result (Rule X). |
 | `as_published.*` | `H0`, `Omega_m`, `Omega_Lambda`, `Omega_r`, each **verbatim as published**, uncertainty included. |
 | `citation` | Planck 2018. |
-| `hubble_time` | `1/H0` in ticks and in Gyr. |
+| `hubble_time.ticks_lo` | `1/H0`, the lower end, in ticks. |
+| `hubble_time.gyr` | The same in Gyr, under `--bridge`. |
+| `parameters` | The parameter set and its provenance, as one line (Rule X). |
 | `monotonicity.turns_at_u` | Where the integrand stops being monotone — `u ≈ 0.604`. Published because Appendix H.4 requires monotonicity to be *asserted, not assumed*, and here it fails, which is why the panels use an interval extension. |
 | `ge1` / `ge2` | The measured outcomes of two gated experiments, including the kill criteria that fired. |
 
@@ -443,10 +468,11 @@ uncertainty can pass it through rather than picking a midpoint and losing it.
 | `enclosure.lo_ticks` / `.hi_ticks` | The age, as an interval of ticks. The answer is the *pair*. |
 | `enclosure.lo_years` / `.hi_years` | The same in years. |
 | `enclosure.at_drift` | The same on the ladder. |
-| `widths.arithmetic_ticks` / `_drifts` / `_years` | How much of the width comes from the quadrature. |
-| `widths.parameter_ticks` / `_drifts` / `_years` | How much comes from **Planck's own error bars**. |
+| `widths.arithmetic_ticks`, `widths.arithmetic_drifts`, `widths.arithmetic_years` | How much of the width comes from the quadrature. Ticks and drifts always; years under `--bridge`. |
+| `widths.parameter_ticks`, `widths.parameter_drifts`, `widths.parameter_years` | How much comes from **Planck's own error bars**. |
+| `audit` | Present with `--audit`: how the enclosure was reached, and the direction each rounding moved. |
 | `quadrature.depth` / `.panels` / `.sqrt_scale_digits` | What was actually computed. |
-| `input_width.years` | Present **only** for an interval input: what the caller's own uncertainty cost, over and above a point at the interval's lower end. Reported apart from the other two widths so none of the three can be mistaken for another. |
+| `input_width.ticks`, `input_width.drifts`, `input_width.years` | Present **only** for an interval input: what the caller's own uncertainty cost, over and above a point at the interval's lower end. Reported apart from the other two widths so none of the three can be mistaken for another. |
 
 For an interval, `t` is decreasing in `z` — `u₀ = 1/(1+z)` shrinks and the
 integrand is non-negative — so the hull runs from the age at the largest `z` to
@@ -586,6 +612,12 @@ because "years" is ambiguous by about `2 × 10^-5` and that is *not* below the
 precision reported: at the ages `cosmo age` gives, Julian and Gregorian differ
 by roughly **eight years on 371 600**, while `arithmetic_years` prints to one
 decimal.
+
+### `year`
+
+Present on any command that can print a year, and shown under `--bridge` with
+the year fields it explains: the Julian year's definition, and that it is an
+Earth unit shown alongside rather than instead of the tick counts.
 
 ### `certification`
 

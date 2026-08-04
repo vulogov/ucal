@@ -1301,7 +1301,12 @@ pub fn cmd_timeline(tier: Tier) -> CmdResult {
         let mut fields = vec![
             ("at".into(), Value::text(render_at(&at_tier, tier))),
             (
-                format!("{tier}s since the datum"),
+                // A stable key. This was `format!("{tier}s since the datum")`,
+                // so `--tier arc` and `--tier drift` produced different *field
+                // names* and no consumer could write an accessor that survived
+                // a flag. The tier belongs in a value, and the document already
+                // carries it in its own `tier` field.
+                "tiers_since_datum".to_string(),
                 Value::number(mid.ticks().quot_rem(&tier.ticks()).0.to_dec_string()),
             ),
             ("as_published".into(), Value::text(e.as_published)),
