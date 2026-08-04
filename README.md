@@ -99,6 +99,9 @@ cargo build --release
 
 `--json` gives stable, versioned output for all of them.
 
+Every command, every option and what each output field means:
+[`Documentation/CLI.md`](Documentation/CLI.md).
+
 ## The crates
 
 | crate | contents |

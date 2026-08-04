@@ -254,3 +254,138 @@ mod tests {
         assert!(c.contains(&("section", "99.9".into())));
     }
 }
+
+// ---------------------------------------------------------------------------
+// Documentation/CLI.md against the actual command surface
+// ---------------------------------------------------------------------------
+
+/// Check that the CLI manual documents every command and global option, and no
+/// others.
+///
+/// The manual's prose cannot be generated — what `remainder_ticks` *means* is
+/// not derivable from a type — so it is written by hand. What can be checked is
+/// its surface: a command that exists and is undocumented, or a documented
+/// command that no longer exists, are both defects a reader would hit and
+/// neither is visible to any other test.
+///
+/// Read from `crates/ucal/src/main.rs` rather than by running the binary, so
+/// this stays a source check like the rest of `xtask` and needs no build of
+/// another crate.
+pub fn check_cli_docs(root: &Path) -> Result<usize, Vec<String>> {
+    let main = root.join("crates/ucal/src/main.rs");
+    let Ok(src) = std::fs::read_to_string(&main) else {
+        return Err(alloc_vec(format!("cannot read {}", main.display())));
+    };
+    let Ok(doc) = std::fs::read_to_string(root.join("Documentation/CLI.md")) else {
+        return Err(alloc_vec("Documentation/CLI.md is missing".into()));
+    };
+
+    let commands = subcommands(&src);
+    let options = global_options(&src);
+    let mut bad = Vec::new();
+
+    for c in &commands {
+        // A command is documented when the manual has a heading for it.
+        if !doc.contains(&format!("## `ucal {c}`")) {
+            bad.push(format!("`ucal {c}` has no section in Documentation/CLI.md"));
+        }
+    }
+    for o in &options {
+        if !doc.contains(&format!("`--{o}")) {
+            bad.push(format!("global option `--{o}` is undocumented"));
+        }
+    }
+    // The other direction: a section for something that no longer exists.
+    for line in doc.lines() {
+        if let Some(rest) = line.strip_prefix("## `ucal ") {
+            let name = rest.trim_end_matches('`').trim();
+            if !name.is_empty() && !commands.iter().any(|c| c == name) {
+                bad.push(format!("Documentation/CLI.md documents `ucal {name}`, which does not exist"));
+            }
+        }
+    }
+
+    if bad.is_empty() {
+        Ok(commands.len() + options.len())
+    } else {
+        Err(bad)
+    }
+}
+
+fn alloc_vec(s: String) -> Vec<String> {
+    vec![s]
+}
+
+/// Subcommand names, from the `enum Command` variants, in kebab-case.
+fn subcommands(src: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let Some(start) = src.find("enum Command {") else {
+        return out;
+    };
+    let body = &src[start..];
+    let end = body.find("\n}").map(|e| e + 2).unwrap_or(body.len());
+    for line in body[..end].lines() {
+        let l = line.trim();
+        // A variant is `Name {` or `Name,` at the top level of the enum, with
+        // four spaces of indentation in this file's formatting.
+        if !line.starts_with("    ") || line.starts_with("     ") {
+            continue;
+        }
+        let name = l.trim_end_matches(&[' ', '{', ','][..]);
+        if name.is_empty()
+            || !name.chars().next().is_some_and(|c| c.is_ascii_uppercase())
+            || !name.chars().all(|c| c.is_ascii_alphanumeric())
+        {
+            continue;
+        }
+        out.push(kebab(name));
+    }
+    out
+}
+
+/// Global option names, from `#[arg(long, global = true)]` fields.
+fn global_options(src: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let lines: Vec<&str> = src.lines().collect();
+    for (i, l) in lines.iter().enumerate() {
+        if !l.contains("global = true") {
+            continue;
+        }
+        // The field declaration is the next line shaped `name: Type`. Anything
+        // else is still the attribute — `#[arg(..)]` wraps across lines, and an
+        // earlier version of this took `value_parser = [..])]` for a field name.
+        for next in lines.iter().skip(i + 1) {
+            let t = next.trim();
+            let Some((name, rest)) = t.split_once(':') else {
+                continue;
+            };
+            let n = name.trim();
+            if n.is_empty()
+                || !n
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+                || !rest.starts_with(' ')
+            {
+                continue;
+            }
+            out.push(n.replace('_', "-"));
+            break;
+        }
+    }
+    out
+}
+
+fn kebab(camel: &str) -> String {
+    let mut s = String::new();
+    for (i, c) in camel.chars().enumerate() {
+        if c.is_ascii_uppercase() {
+            if i > 0 {
+                s.push('-');
+            }
+            s.push(c.to_ascii_lowercase());
+        } else {
+            s.push(c);
+        }
+    }
+    s
+}

@@ -946,6 +946,20 @@ fn run_docs(mode: &str) -> i32 {
                 code = 6;
             }
         }
+        // The CLI manual's *surface*. Its prose cannot be generated — what
+        // `remainder_ticks` means is not derivable from a type — but a command
+        // that exists and is undocumented, or a section for a command that no
+        // longer exists, are defects a reader hits and nothing else catches.
+        match citations::check_cli_docs(&root) {
+            Ok(n) => println!("  ok    Documentation/CLI.md covers the CLI surface ({n} items)"),
+            Err(bad) => {
+                eprintln!("  FAIL  Documentation/CLI.md is out of step:");
+                for b in &bad {
+                    eprintln!("          {b}");
+                }
+                code = 6;
+            }
+        }
         code
     }
 }
