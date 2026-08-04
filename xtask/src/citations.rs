@@ -389,3 +389,111 @@ fn kebab(camel: &str) -> String {
     }
     s
 }
+
+/// The CI workflow must run every command the release procedure lists.
+///
+/// `Documentation/Release_Notes/<version>.md` prints a verification block and
+/// `.github/workflows/verify.yml` runs it. The workflow says in a comment that
+/// the two are the same list; this is what makes that a fact rather than a
+/// comment, because a step quietly dropped from CI is invisible exactly when it
+/// matters.
+///
+/// Compares the *commands*, normalised for line continuations and whitespace —
+/// not the surrounding YAML, which is free to differ.
+pub fn check_ci_covers_the_procedure(root: &Path) -> Result<usize, Vec<String>> {
+    let wf = root.join(".github/workflows/verify.yml");
+    let Ok(workflow) = std::fs::read_to_string(&wf) else {
+        return Err(alloc_vec(format!("{} is missing", wf.display())));
+    };
+    // The newest release-notes file that has a verification block.
+    let dir = root.join("Documentation/Release_Notes");
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        return Err(alloc_vec("Documentation/Release_Notes is unreadable".into()));
+    };
+    let mut files: Vec<std::path::PathBuf> = entries
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| {
+            p.file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.ends_with(".md") && n != "README.md")
+        })
+        .collect();
+    files.sort();
+    let Some(newest) = files.last().map(|p| p.as_path()) else {
+        return Err(alloc_vec("no release-notes file to read a procedure from".into()));
+    };
+    let Ok(notes) = std::fs::read_to_string(newest) else {
+        return Err(alloc_vec(format!("cannot read {}", newest.display())));
+    };
+
+    let wanted = cargo_commands(&verification_block(&notes));
+    let have = cargo_commands(&workflow);
+    let mut bad = Vec::new();
+    for w in &wanted {
+        if !have.iter().any(|h| h == w) {
+            bad.push(format!(
+                "CI does not run `{w}`, which {} lists",
+                newest
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("the release notes")
+            ));
+        }
+    }
+    if bad.is_empty() {
+        Ok(wanted.len())
+    } else {
+        Err(bad)
+    }
+}
+
+/// The fenced block under a `## Verification` heading.
+fn verification_block(notes: &str) -> String {
+    let mut out = String::new();
+    let mut in_section = false;
+    let mut in_fence = false;
+    for line in notes.lines() {
+        if line.starts_with("## ") {
+            in_section = line.trim() == "## Verification";
+            continue;
+        }
+        if !in_section {
+            continue;
+        }
+        if line.trim_start().starts_with("```") {
+            in_fence = !in_fence;
+            continue;
+        }
+        if in_fence {
+            out.push_str(line);
+            out.push('\n');
+        }
+    }
+    out
+}
+
+/// Every `cargo …` invocation in `text`, joined across `\` continuations and
+/// normalised to single spaces.
+fn cargo_commands(text: &str) -> Vec<String> {
+    let joined = text.replace("\\\n", " ");
+    let mut out = Vec::new();
+    for line in joined.lines() {
+        let l = line.trim().trim_start_matches("&& ").trim();
+        let Some(idx) = l.find("cargo ") else { continue };
+        let cmd: String = l[idx..]
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+            .trim_end_matches(&['&', ';'][..])
+            .trim()
+            .to_string();
+        // `cargo run -p xtask && cargo run -p xtask -- lint` is two commands.
+        for part in cmd.split("&&") {
+            let p = part.trim();
+            if p.starts_with("cargo ") && !out.iter().any(|o: &String| o == p) {
+                out.push(p.to_string());
+            }
+        }
+    }
+    out
+}

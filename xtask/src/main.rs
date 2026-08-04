@@ -950,6 +950,16 @@ fn run_docs(mode: &str) -> i32 {
         // `remainder_ticks` means is not derivable from a type — but a command
         // that exists and is undocumented, or a section for a command that no
         // longer exists, are defects a reader hits and nothing else catches.
+        match citations::check_ci_covers_the_procedure(&root) {
+            Ok(n) => println!("  ok    CI runs the documented verification block ({n} commands)"),
+            Err(bad) => {
+                eprintln!("  FAIL  CI and the release procedure have drifted:");
+                for b in &bad {
+                    eprintln!("          {b}");
+                }
+                code = 6;
+            }
+        }
         match citations::check_cli_docs(&root) {
             Ok(n) => println!("  ok    Documentation/CLI.md covers the CLI surface ({n} items)"),
             Err(bad) => {

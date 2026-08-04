@@ -1412,7 +1412,11 @@ fn parse_redshift(s: &str) -> Result<RatInterval, TimeError> {
 pub const YEAR_DEFINITION: &str =
     "Julian year = 31 557 600 s exactly (365.25 d of 86 400 s), the same \
      definition ucal datum uses for Gyr. Not Gregorian (365.2425 d) and not \
-     tropical: at 371 600 years those differ by about 8.";
+     tropical: at 371 600 years those differ by about 8. And it is an EARTH \
+     unit -- 365.25 of Earth's rotations, a rounded Earth orbit -- used here to \
+     describe epochs before Earth existed. It is a bridge (Rule A.3), \
+     informative only (Rule A.5), and shown alongside the tick counts that are \
+     the actual answer, never instead of them.";
 
 /// The same conversion, certified.
 ///
@@ -1488,7 +1492,37 @@ pub fn cmd_cosmo_age_audited(z: &str, depth: u32, scale: u32, audit: bool) -> Cm
         .field(
             "widths",
             Value::Section(vec![
+                // Ticks first, because ticks are the answer. §4.3 and Rule A.5:
+                // the bridge unit is informative and shown *alongside*, never
+                // instead. Until 0.4.0 these three widths were reported in
+                // Julian years and nothing else -- an Earth orbit used as the
+                // sole measure of an epoch 13.4 Gyr before Earth existed, in the
+                // one program written to object to exactly that.
+                (
+                    "arithmetic_ticks".into(),
+                    Value::number(out.arithmetic_width.ticks().to_dec_string()),
+                ),
+                (
+                    "arithmetic_drifts".into(),
+                    Value::quantity(
+                        &tick_ratio(out.arithmetic_width.ticks(), &Tier::DRIFT.ticks()),
+                        6,
+                        Rounding::HalfEven,
+                    ),
+                ),
                 ("arithmetic_years".into(), years_quantity(out.arithmetic_width.ticks(), 1)),
+                (
+                    "parameter_ticks".into(),
+                    Value::number(out.parameter_width.ticks().to_dec_string()),
+                ),
+                (
+                    "parameter_drifts".into(),
+                    Value::quantity(
+                        &tick_ratio(out.parameter_width.ticks(), &Tier::DRIFT.ticks()),
+                        6,
+                        Rounding::HalfEven,
+                    ),
+                ),
                 ("parameter_years".into(), years_quantity(out.parameter_width.ticks(), 1)),
                 (
                     "note".into(),
@@ -1496,7 +1530,9 @@ pub fn cmd_cosmo_age_audited(z: &str, depth: u32, scale: u32, audit: bool) -> Cm
                         "Rule X: quadrature error and parameter uncertainty are \
                          reported separately and never merged (F8). The second is \
                          what the measurement does not know; the first is what this \
-                         program does not know.",
+                         program does not know. Each is given in ticks, in drifts, \
+                         and in Julian years — the last being a foreign unit shown \
+                         alongside and never instead (§4.3, Rule A.5).",
                     ),
                 ),
             ]),
@@ -1520,6 +1556,15 @@ pub fn cmd_cosmo_age_audited(z: &str, depth: u32, scale: u32, audit: bool) -> Cm
         doc = doc.field(
             "input_width",
             Value::Section(vec![
+                ("ticks".into(), Value::number(out.input_width.ticks().to_dec_string())),
+                (
+                    "drifts".into(),
+                    Value::quantity(
+                        &tick_ratio(out.input_width.ticks(), &Tier::DRIFT.ticks()),
+                        6,
+                        Rounding::HalfEven,
+                    ),
+                ),
                 ("years".into(), years_quantity(out.input_width.ticks(), 1)),
                 (
                     "note".into(),

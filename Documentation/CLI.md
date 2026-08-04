@@ -442,8 +442,8 @@ uncertainty can pass it through rather than picking a midpoint and losing it.
 | `enclosure.lo_ticks` / `.hi_ticks` | The age, as an interval of ticks. The answer is the *pair*. |
 | `enclosure.lo_years` / `.hi_years` | The same in years. |
 | `enclosure.at_drift` | The same on the ladder. |
-| `widths.arithmetic_years` | How much of the width comes from the quadrature. |
-| `widths.parameter_years` | How much comes from **Planck's own error bars**. |
+| `widths.arithmetic_ticks` / `_drifts` / `_years` | How much of the width comes from the quadrature. |
+| `widths.parameter_ticks` / `_drifts` / `_years` | How much comes from **Planck's own error bars**. |
 | `quadrature.depth` / `.panels` / `.sqrt_scale_digits` | What was actually computed. |
 | `input_width.years` | Present **only** for an interval input: what the caller's own uncertainty cost, over and above a point at the interval's lower end. Reported apart from the other two widths so none of the three can be mistaken for another. |
 
@@ -547,14 +547,28 @@ $ ucal ladder --named-only --decimals 60 --json | jq -r '.tiers["T-12"].beats'
 At sixty digits that value is **exact**, and the `certification` map below drops
 it while keeping `seconds (bridge)`, which never terminates at any digit count.
 
-### Which year?
+### Which year? And why is an Earth unit here at all?
 
 **The Julian year: 31 557 600 s exactly**, 365.25 days of 86 400 SI seconds —
 the same definition `ucal datum` uses for `Gyr`. Every command that prints a
-`*_years` field now declares it in a `year` field, because "years" is ambiguous
-by about `2 × 10^-5` and that is not below the precision reported: at the ages
+`*_years` field declares it in a `year` field, because "years" is ambiguous by
+about `2 × 10^-5` and that is not below the precision reported: at the ages
 `cosmo age` gives, Julian and Gregorian differ by roughly **eight years on
-371 600**, while `arithmetic_years` is printed to one decimal.
+371 600**, while `arithmetic_years` prints to one decimal.
+
+The second question is the better one. A Julian year is 365.25 of Earth's
+rotations — a rounded Earth orbit — and `cosmo age` uses it to describe epochs
+some 13.4 billion years before Earth existed. That is the exact irritation this
+project was built around.
+
+It is permitted, and only in one way: as a **bridge** (Rule A.3), **informative
+only** (Rule A.5), shown **alongside** the answer and never instead of it
+(§4.3). The answer is `lo_ticks` and `hi_ticks` — exact integers carrying no
+Earth content — with `at_drift` placing them on the body-independent ladder.
+
+Until 0.4.0 the `widths` section reported in Julian years **and nothing else**,
+which is *instead* rather than alongside. Each width is now given in ticks, in
+drifts and in years, in that order.
 
 ### `certification`
 
