@@ -64,7 +64,12 @@ impl LocaleId {
 }
 
 /// A tier's names in one locale: singular, plural, and a short form.
+///
+/// `#[non_exhaustive]`: construct one through the crate rather than with a
+/// struct literal. Added in 0.3.0, which already broke literals by introducing
+/// `short`, so the break was paid this release either way.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct Names {
     /// One of them.
     pub singular: &'static str,

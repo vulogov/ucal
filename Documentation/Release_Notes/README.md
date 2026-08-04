@@ -12,7 +12,7 @@ knows only what it did.
 
 | version | date | state |
 |---|---|---|
-| [0.3.0](0.3.0.md) | — | **unreleased** — legibility |
+| [0.3.0](0.3.0.md) | 2026-08-03 | released — legibility |
 | [0.2.0](0.2.0.md) | 2026-08-01 | released — supersede RFC UCAL-1 |
 | [0.1.1](0.1.1.md) | 2026-07-31 | released |
 | [0.1.0](0.1.0.md) | 2026-07-31 | released |

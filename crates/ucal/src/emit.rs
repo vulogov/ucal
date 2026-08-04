@@ -17,7 +17,13 @@ use crate::style::{group_decimal, paint_form, Render, Role, Style};
 pub const JSON_FORMAT: &str = "ucal-json/1";
 
 /// A rendered value: a scalar, a list, or a nested section.
+///
+/// `#[non_exhaustive]`: a consumer must carry a wildcard arm. Added in 0.3.0,
+/// which already broke exhaustive matches by introducing `Rows` and `Form` — so
+/// the cost of requiring the arm was paid this release either way, and paying it
+/// once is better than paying it again at every future variant.
 #[derive(Clone, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub enum Value {
     /// A string. Rendered verbatim in text, quoted in JSON.
     Text(String),
