@@ -12,7 +12,7 @@ categories = ["date-and-time", "science"]
 keywords = ["time", "calendar", "leap-seconds", "utc", "tai"]
 
 [dependencies]
-ucal-core = { version = "0.2.0", path = "../ucal-core", default-features = false }
+ucal-core = { workspace = true }
 # §8.1 names hifitime for civil time. Only its integer-exact surface is used —
 # `to_gregorian`, `from_duration`, `total_nanoseconds() -> i128` and
 # `leap_seconds_iers() -> i32`. Its `f64` accessors (`to_seconds`, `to_tai_days`,

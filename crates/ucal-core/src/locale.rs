@@ -63,17 +63,46 @@ impl LocaleId {
     }
 }
 
-/// A tier's names in one locale: singular and plural.
+/// A tier's names in one locale: singular, plural, and a short form.
+///
+/// `#[non_exhaustive]`: construct one through the crate rather than with a
+/// struct literal. Added in 0.3.0, which already broke literals by introducing
+/// `short`, so the break was paid this release either way.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct Names {
     /// One of them.
     pub singular: &'static str,
     /// More than one.
     pub plural: &'static str,
+    /// A two- or three-letter form for tables and prose, or `None`.
+    ///
+    /// Locale-scoped, and that is the whole design. A short form derived from a
+    /// name cannot be universal, because names differ by locale — `bt` for
+    /// *beat* means nothing under `ru`. Scoping it to the locale makes
+    /// invariance structural rather than something to remember: the locale is
+    /// stated, so a form cannot silently mean something else elsewhere.
+    ///
+    /// `en` ships none. `T[k]` and `5^e` are already short, locale-invariant and
+    /// accepted wherever a name is, so an English abbreviation would be a second
+    /// spelling of something that has one.
+    pub short: Option<&'static str>,
 }
 
 const fn n(singular: &'static str, plural: &'static str) -> Names {
-    Names { singular, plural }
+    Names {
+        singular,
+        plural,
+        short: None,
+    }
+}
+
+const fn ns(singular: &'static str, plural: &'static str, short: &'static str) -> Names {
+    Names {
+        singular,
+        plural,
+        short: Some(short),
+    }
 }
 
 /// The English table. The stable keys and the display names coincide, which is
@@ -91,19 +120,57 @@ const EN: &[(TierName, Names)] = &[
     (TierName::Tick, n("tick", "ticks")),
 ];
 
-/// The Russian table (Appendix D, D-19).
+/// The Russian table (Appendix D, D-19), with short forms.
+///
+/// # Why every short form carries a letter with no Latin twin
+///
+/// Twelve lowercase Cyrillic letters are pixel-identical to Latin ones in most
+/// terminal fonts: `а с е о р х у к м н в т`. A form built only from those is
+/// indistinguishable from Latin text, and this project already treats visual
+/// ambiguity in a parse surface as a defect to design out rather than document
+/// around — the UCID alphabet drops `I`, `L` and `O` for exactly that reason.
+///
+/// So each form below contains at least one of `б г д ж з и й л п ф ц ч ш щ ъ ы
+/// ь э ю я`, which makes recognising it a detection rather than a guess.
+/// [`SHORT_FORMS_ARE_DETECTABLE`] states the rule and a test enforces it.
+///
+/// Two choices are not arbitrary. `обход` takes three letters because `об` and
+/// `бо` are reversals of one another and `бо` is the beat — the rung read most
+/// often, and the worst place for a pair that differs only in letter order.
+/// `мерцание` takes `мц` rather than `ме`, which is entirely homoglyphic and
+/// would render as the Latin word "me".
+///
+/// # T3 is пролёт, not срок
+///
+/// `срок` was the shipped name and has no admissible short form: с→c, р→p, о→o,
+/// к→k, so every abbreviation of it renders as Latin text. `пролёт` is the span
+/// of a bridge — *пролёт моста* — which is the structural sense the English
+/// name *span* carries, and `пр` is detectable because of the `п`.
 const RU: &[(TierName, Names)] = &[
-    (TierName::Deep, n("глубь", "глуби")),
-    (TierName::Drift, n("дрейф", "дрейфы")),
-    (TierName::Span, n("срок", "сроки")),
-    (TierName::Sweep, n("обход", "обходы")),
-    (TierName::Arc, n("дуга", "дуги")),
-    (TierName::Beat, n("бой", "бои")),
-    (TierName::Flicker, n("мерцание", "мерцания")),
-    (TierName::Glint, n("блик", "блики")),
-    (TierName::Spark, n("искра", "искры")),
-    (TierName::Tick, n("тик", "тики")),
+    (TierName::Deep, ns("глубь", "глуби", "гл")),
+    (TierName::Drift, ns("дрейф", "дрейфы", "др")),
+    (TierName::Span, ns("пролёт", "пролёты", "пр")),
+    (TierName::Sweep, ns("обход", "обходы", "обх")),
+    (TierName::Arc, ns("дуга", "дуги", "ду")),
+    (TierName::Beat, ns("бой", "бои", "бо")),
+    (TierName::Flicker, ns("мерцание", "мерцания", "мц")),
+    (TierName::Glint, ns("блик", "блики", "бл")),
+    (TierName::Spark, ns("искра", "искры", "ис")),
+    (TierName::Tick, ns("тик", "тики", "ти")),
 ];
+
+/// Lowercase Cyrillic letters with no Latin twin in a typical terminal font.
+///
+/// The complement of `а с е о р х у к м н в т`. A short form must contain at
+/// least one of these, so that it is detectably Cyrillic rather than ambiguous
+/// with Latin text.
+pub const DETECTABLE: &str = "бгджзийлпфцчшщъыьэюя";
+
+/// The rule the short forms are held to, stated where it can be cited.
+pub const SHORT_FORMS_ARE_DETECTABLE: &str =
+    "Every locale short form contains at least one letter with no Latin homoglyph \
+     (ucal_core::locale::DETECTABLE), so it cannot be mistaken for Latin text; no \
+     two collide, and none is another's reversal.";
 
 /// The table for a locale.
 pub const fn table(locale: LocaleId) -> &'static [(TierName, Names)] {
@@ -161,6 +228,15 @@ pub fn resolve(locale: LocaleId, s: &str) -> Result<Tier> {
     for (key, names) in table(locale) {
         if eq_fold(names.singular, &lowered) || eq_fold(names.plural, &lowered) {
             return tier_of_name(*key);
+        }
+        // Rule N requires the index notation to be accepted wherever a name is.
+        // A short form is a name, so it resolves in the same places rather than
+        // being display-only — an abbreviation a reader can see and not type
+        // would be a worse kind of alias than none.
+        if let Some(short) = names.short {
+            if eq_fold(short, &lowered) {
+                return tier_of_name(*key);
+            }
         }
     }
     for (k, key) in NAMED {
@@ -375,5 +451,100 @@ mod tests {
                 assert!(!s.contains(' '), "{s} is not a single word");
             }
         }
+    }
+
+    // ------------------------------------------------------------- short forms
+
+    /// Every short form the tables ship, with its locale.
+    fn shorts() -> alloc::vec::Vec<(LocaleId, &'static str)> {
+        let mut v = alloc::vec::Vec::new();
+        for loc in LocaleId::ALL {
+            for (_, names) in table(*loc) {
+                if let Some(s) = names.short {
+                    v.push((*loc, s));
+                }
+            }
+        }
+        v
+    }
+
+    #[test]
+    fn every_short_form_is_detectably_not_latin() {
+        // The rule DETECTABLE exists for. A form built only from Cyrillic
+        // letters with Latin twins renders identically to Latin text, and this
+        // project designs that out rather than documenting around it — the UCID
+        // alphabet drops I, L and O for the same reason.
+        for (loc, s) in shorts() {
+            assert!(
+                s.chars().any(|c| DETECTABLE.contains(c)),
+                "{}: `{s}` is entirely Latin-homoglyphic",
+                loc.tag()
+            );
+        }
+    }
+
+    #[test]
+    fn no_two_short_forms_collide_or_reverse_each_other() {
+        for loc in LocaleId::ALL {
+            let v: alloc::vec::Vec<&str> = table(*loc)
+                .iter()
+                .filter_map(|(_, n)| n.short)
+                .collect();
+            for (i, a) in v.iter().enumerate() {
+                for (j, b) in v.iter().enumerate() {
+                    if i == j {
+                        continue;
+                    }
+                    assert_ne!(a, b, "{}: `{a}` is used twice", loc.tag());
+                    let rev: alloc::string::String = b.chars().rev().collect();
+                    assert_ne!(
+                        *a, rev,
+                        "{}: `{a}` and `{b}` are reversals of one another",
+                        loc.tag()
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn a_short_form_resolves_wherever_a_name_does() {
+        // Rule N: index notation is accepted wherever a name is. A short form is
+        // a name, so it resolves too — an abbreviation a reader can see and not
+        // type would be a worse alias than none at all.
+        for (_, names) in table(LocaleId::Ru) {
+            let Some(short) = names.short else { continue };
+            let by_short = resolve(LocaleId::Ru, short).expect("short form resolves");
+            let by_name = resolve(LocaleId::Ru, names.singular).expect("name resolves");
+            assert_eq!(by_short, by_name, "`{short}` and `{}` differ", names.singular);
+        }
+    }
+
+    #[test]
+    fn short_forms_do_not_leak_across_locales() {
+        // The scoping is the whole design: `пр` means T3 under `ru` and nothing
+        // at all under `en`, so a form cannot silently mean something else.
+        assert!(resolve(LocaleId::En, "пр").is_err());
+        assert!(resolve(LocaleId::En, "бо").is_err());
+        // And English ships none, because T[k] is already short and invariant.
+        assert!(table(LocaleId::En).iter().all(|(_, n)| n.short.is_none()));
+    }
+
+    #[test]
+    fn t3_is_the_span_of_a_bridge() {
+        // `срок` was the shipped name and had no admissible short form: с, р, о
+        // and к all have Latin twins. Pinned so that reverting the word without
+        // reading why is a test failure.
+        let names = table(LocaleId::Ru)
+            .iter()
+            .find(|(k, _)| *k == TierName::Span)
+            .map(|(_, n)| *n)
+            .expect("T3 is named in ru");
+        assert_eq!(names.singular, "пролёт");
+        assert_eq!(names.short, Some("пр"));
+        assert!(
+            !"срок".chars().any(|c| DETECTABLE.contains(c)),
+            "срок gained a detectable letter; the reason for the change moved"
+        );
     }
 }

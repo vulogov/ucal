@@ -645,9 +645,11 @@ checksum = "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
 
 [[package]]
 name = "ucal"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
+ "anstyle",
  "clap",
+ "terminal_size",
  "ucal-body",
  "ucal-civil",
  "ucal-core",
@@ -657,14 +659,14 @@ dependencies = [
 
 [[package]]
 name = "ucal-body"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "ucal-core",
 ]
 
 [[package]]
 name = "ucal-civil"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "hifitime",
  "trybuild",
@@ -673,7 +675,7 @@ dependencies = [
 
 [[package]]
 name = "ucal-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "bnum",
  "num-bigint",
@@ -684,7 +686,7 @@ dependencies = [
 
 [[package]]
 name = "ucal-cosmo"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "ucal-core",
  "ucal-events",
@@ -692,7 +694,7 @@ dependencies = [
 
 [[package]]
 name = "ucal-events"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "ucal-core",
 ]
@@ -802,7 +804,7 @@ checksum = "23b97319f7b8343df12cc98938e5c3eb436064524c8d2b4e30a1d3a36eecdf81"
 
 [[package]]
 name = "xtask"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "bnum",
  "num-bigint",

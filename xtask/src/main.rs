@@ -17,6 +17,7 @@
 //! Usage: `cargo run -p xtask -- [check | emit | report]`
 
 mod citations;
+mod publish;
 mod declared;
 mod derivation;
 mod gendocs;
@@ -106,6 +107,10 @@ fn main() {
     }
     if mode == "verify-vectors" {
         std::process::exit(run_verify_vectors());
+    }
+    if mode == "publish" {
+        let execute = std::env::args().any(|a| a == "--execute");
+        std::process::exit(publish::run(execute));
     }
 
     println!("UC-P0 constants harness — RFC UCAL-1, profile UC-1\n");
@@ -937,6 +942,20 @@ fn run_docs(mode: &str) -> i32 {
                 }
                 if bad.len() > 20 {
                     eprintln!("          ... and {} more", bad.len() - 20);
+                }
+                code = 6;
+            }
+        }
+        // The CLI manual's *surface*. Its prose cannot be generated — what
+        // `remainder_ticks` means is not derivable from a type — but a command
+        // that exists and is undocumented, or a section for a command that no
+        // longer exists, are defects a reader hits and nothing else catches.
+        match citations::check_cli_docs(&root) {
+            Ok(n) => println!("  ok    Documentation/CLI.md covers the CLI surface ({n} items)"),
+            Err(bad) => {
+                eprintln!("  FAIL  Documentation/CLI.md is out of step:");
+                for b in &bad {
+                    eprintln!("          {b}");
                 }
                 code = 6;
             }

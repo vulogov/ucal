@@ -3,8 +3,13 @@
 //! Parse, dispatch, print, exit. All the work is in the library, so that §20's
 //! golden tests can call the commands as functions.
 
+use std::io::IsTerminal as _;
+
 use clap::{Parser, Subcommand};
-use ucal::{cmd_datum, cmd_doctor, cmd_explain, cmd_ladder, exit_code, parse_rounding, parse_tier};
+use ucal::style::{parse_group_sep, resolve_for_output, ColorChoice, Render, Role, Style};
+use ucal::{
+    cmd_datum, cmd_doctor, cmd_explain, cmd_ladder, exit_code, parse_rounding, parse_tier_in,
+};
 use ucal_core::LocaleId;
 use ucal_core::codec::Form;
 
@@ -41,6 +46,28 @@ struct Cli {
     /// Emit stable, versioned JSON instead of text (§19.1).
     #[arg(long, global = true)]
     json: bool,
+
+    /// When to colour the output. `auto` colours only into a terminal.
+    #[arg(long, global = true, default_value = "auto",
+          value_parser = ["auto", "always", "never"])]
+    color: String,
+
+    /// Never colour. An alias for `--color never`, and it wins over `--color`.
+    #[arg(long, global = true)]
+    no_color: bool,
+
+    /// Columns to render tables at. Never below 80; defaults to the terminal
+    /// width when there is one, and to 80 when output is redirected.
+    #[arg(long, global = true, value_name = "N")]
+    width: Option<usize>,
+
+    /// Separator between three-digit groups in decimal counts, e.g. `--tick-sep _`.
+    ///
+    /// Off by default: a tick count is often copied out of this output into
+    /// something that wants an integer, and a separator breaks that. With colour
+    /// the groups are already distinguishable without adding a character.
+    #[arg(long, global = true, value_name = "CHAR")]
+    tick_sep: Option<String>,
 
     #[command(subcommand)]
     command: Command,
@@ -289,9 +316,13 @@ fn main() {
             EventCommand::Show { id } => ucal::cmd_events_show(id),
         },
         #[cfg(feature = "events")]
-        Command::Timeline { tier } => parse_tier(tier).and_then(ucal::cmd_timeline),
+        Command::Timeline { tier } => LocaleId::parse(&cli.locale)
+            .and_then(|l| parse_tier_in(l, tier))
+            .and_then(ucal::cmd_timeline),
         Command::Ruler { from, to, step } => {
-            parse_tier(step).and_then(|s| ucal::cmd_ruler(from, to, s))
+            LocaleId::parse(&cli.locale)
+                .and_then(|l| parse_tier_in(l, step))
+                .and_then(|s| ucal::cmd_ruler(from, to, s))
         }
         #[cfg(all(feature = "body", feature = "civil"))]
         Command::Cal { what } => match what {
@@ -311,7 +342,7 @@ fn main() {
             LocaleId::parse(&cli.locale).and_then(|l| cmd_ladder(l, *named_only))
         }
         Command::Explain { instant, claim } => cmd_explain(instant, *claim),
-        Command::Now { precision, form } => run_now(precision, form),
+        Command::Now { precision, form } => run_now(&cli.locale, precision, form),
         #[cfg(feature = "civil")]
         Command::FromCivil {
             date,
@@ -333,26 +364,91 @@ fn main() {
             .and_then(|(s, r, c)| cmd_to_civil(instant, s, *digits, r, c)),
     };
 
-    match result {
-        Ok(doc) => {
-            print!("{}", if cli.json { doc.to_json() } else { doc.to_text() });
+    // --no-color beats --color, because it is the flag a script sets when it
+    // cannot know what the caller's environment has already put in `--color`.
+    let choice = if cli.no_color {
+        ColorChoice::Never
+    } else {
+        match ColorChoice::parse(&cli.color) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("{e}");
+                std::process::exit(exit_code(&e));
+            }
         }
+    };
+    let style = resolve_for_output(choice, cli.json);
+    let sep = match cli.tick_sep.as_deref().map(parse_group_sep).transpose() {
+        Ok(c) => c,
         Err(e) => {
             eprintln!("{e}");
+            std::process::exit(exit_code(&e));
+        }
+    };
+    // Off a terminal the width is the baseline, always: if it followed the
+    // terminal on a redirected stream, `ucal ladder > f` and `ucal ladder | cat`
+    // would differ, and so would the same command on two machines.
+    let terminal = if std::io::stdout().is_terminal() {
+        terminal_size::terminal_size().map(|(terminal_size::Width(w), _)| w as usize)
+    } else {
+        None
+    };
+    let render = Render::styled(style)
+        .group(sep)
+        .width(Render::resolve_width(cli.width, terminal));
+
+    match result {
+        Ok(doc) => {
+            print!(
+                "{}",
+                if cli.json {
+                    doc.to_json()
+                } else {
+                    doc.render(&render)
+                }
+            );
+        }
+        Err(e) => {
+            // stderr is a different stream with its own answer to "is this a
+            // terminal", so it gets its own resolution rather than reusing the
+            // one computed for stdout.
+            let err_style = error_style(choice);
+            eprintln!("{}", err_style.paint(Role::Error, &e.to_string()));
             std::process::exit(exit_code(&e));
         }
     }
 }
 
+/// The style for diagnostics on stderr.
+///
+/// `--json` does not suppress it: the JSON contract in §19.1 is about stdout,
+/// and a diagnostic is not part of the document a consumer parses.
+fn error_style(choice: ColorChoice) -> Style {
+    use std::io::IsTerminal as _;
+    match choice {
+        ColorChoice::Never => Style::PLAIN,
+        ColorChoice::Always => Style::colored(),
+        ColorChoice::Auto => {
+            if std::env::var_os("NO_COLOR").is_some_and(|v| !v.is_empty())
+                || !std::io::stderr().is_terminal()
+            {
+                Style::PLAIN
+            } else {
+                Style::colored()
+            }
+        }
+    }
+}
+
 #[cfg(all(feature = "civil", feature = "std"))]
-fn run_now(precision: &str, form: &str) -> ucal::CmdResult {
-    let tier = parse_tier(precision)?;
+fn run_now(locale: &str, precision: &str, form: &str) -> ucal::CmdResult {
+    let tier = parse_tier_in(LocaleId::parse(locale)?, precision)?;
     let f = parse_form(form)?;
     ucal::cmd_now(tier, f)
 }
 
 #[cfg(not(all(feature = "civil", feature = "std")))]
-fn run_now(_precision: &str, _form: &str) -> ucal::CmdResult {
+fn run_now(_locale: &str, _precision: &str, _form: &str) -> ucal::CmdResult {
     Err(ucal_core::TimeError::with_context(
         ucal_core::Code::E0001,
         "`ucal now` requires the `civil` and `std` features",

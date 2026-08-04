@@ -12,13 +12,20 @@ categories = ["command-line-utilities", "date-and-time", "science"]
 keywords = ["time", "calendar", "datetime", "planck", "cosmology"]
 
 [dependencies]
-ucal-core = { version = "0.2.0", path = "../ucal-core", default-features = false }
-ucal-civil = { version = "0.2.0", path = "../ucal-civil", default-features = false, optional = true }
+ucal-core = { workspace = true }
+ucal-civil = { workspace = true, optional = true }
 # The facade may depend on both; §12 forbids only ucal-body -> ucal-civil.
-ucal-body = { version = "0.2.0", path = "../ucal-body", default-features = false, optional = true }
-ucal-events = { version = "0.2.0", path = "../ucal-events", default-features = false, optional = true }
-ucal-cosmo = { version = "0.2.0", path = "../ucal-cosmo", default-features = false, optional = true }
+ucal-body = { workspace = true, optional = true }
+ucal-events = { workspace = true, optional = true }
+ucal-cosmo = { workspace = true, optional = true }
 clap = { version = "4", features = ["derive", "wrap_help"] }
+# Already in the tree through clap: making it direct adds a line to this
+# manifest and nothing to the dependency graph. Only the SGR value types are
+# used -- the tty test is std's `IsTerminal` and the choice logic is ours.
+anstyle = "1"
+# Also already in the tree through clap. Used for one call: how many columns the
+# terminal has, when there is one.
+terminal_size = "0.4"
 
 [features]
 default = ["u512", "std", "civil", "body", "events", "cosmo"]
@@ -31,7 +38,7 @@ events = ["dep:ucal-events"]
 cosmo = ["dep:ucal-cosmo"]
 
 [dev-dependencies]
-ucal-events = { version = "0.2.0", path = "../ucal-events", default-features = false }
+ucal-events = { workspace = true }
 
 [[bin]]
 name = "ucal"

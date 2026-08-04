@@ -10,6 +10,11 @@
 //! | no wrapping/saturating arithmetic on time types | Rule O | F7 |
 //! | no overclaiming prose about tick 0 | Rule Q.1 | F13 |
 //! | `ucal-body` must not depend on `ucal-civil` | §12 | F9 |
+//! | internal version requirements track the workspace version | — | — |
+//!
+//! The last has no failure-mode number because it guards a packaging defect
+//! rather than a specification one: a stale internal requirement resolves,
+//! builds, tests green and publishes, and is only visible to a consumer.
 //!
 //! Comments and string literals are stripped before the identifier lints run,
 //! because the rules are about *identifiers* — §13.2 forbids naming a foreign
@@ -602,7 +607,114 @@ pub fn run(workspace_root: &Path) -> Vec<Violation> {
         }
     }
 
+    v.extend(version_lockstep(workspace_root));
+
     v
+}
+
+/// Every internal version requirement must equal the workspace package version.
+///
+/// The requirements were consolidated into `[workspace.dependencies]` in 0.3.0,
+/// which takes thirteen copies down to five but does not make drift impossible —
+/// it only puts the copies where one edit can reach them all. This check is what
+/// makes the consolidation load-bearing.
+///
+/// The scope is narrower than it first looks, and worth stating precisely.
+///
+/// 0.2.0 put a `version` key on every internal path dependency, and that alone
+/// catches drift *across* a compatible range: bump the workspace to `0.3.0` with
+/// a requirement still reading `0.2.0` and cargo refuses to resolve, because the
+/// path crate's `0.3.0` does not satisfy `^0.2.0`. Verified by injection — that
+/// case is a hard error and needs no lint.
+///
+/// What survives is drift *inside* a range. Bump to `0.3.1`, leave the
+/// requirements at `0.3.0`, and `^0.3.0` admits `0.3.1`: the workspace builds
+/// green, tests pass, and publishes. Only a consumer sees it, and what they see
+/// is a resolver free to pair `ucal 0.3.1` with a registry `ucal-core 0.3.0` —
+/// a mixture this workspace was never tested as. Patch releases are exactly
+/// when that goes unnoticed, which is why it is checked rather than remembered.
+fn version_lockstep(workspace_root: &Path) -> Vec<Violation> {
+    let mut v = Vec::new();
+    let manifest = workspace_root.join("Cargo.toml");
+    let Ok(src) = std::fs::read_to_string(&manifest) else {
+        return v;
+    };
+
+    let Some(want) = table_value(&src, "[workspace.package]", "version") else {
+        v.push(Violation {
+            lint: "version-lockstep",
+            file: manifest,
+            line: 1,
+            text: "[workspace.package] has no version".into(),
+            rule: "the workspace version is the single source every member inherits",
+        });
+        return v;
+    };
+
+    let mut in_deps = false;
+    for (n, line) in src.lines().enumerate() {
+        let l = line.trim();
+        if l.starts_with('[') {
+            in_deps = l == "[workspace.dependencies]";
+            continue;
+        }
+        if !in_deps || l.starts_with('#') || l.is_empty() {
+            continue;
+        }
+        // Internal crates only. A third-party requirement has no reason to track
+        // this workspace's version, and pinning one to it would be the defect.
+        let name = l.split('=').next().map(str::trim).unwrap_or("");
+        if !name.starts_with("ucal") {
+            continue;
+        }
+        let Some(idx) = l.find("version") else { continue };
+        let Some(got) = quoted_after_eq(&l[idx + "version".len()..]) else {
+            continue;
+        };
+        if got != want {
+            v.push(Violation {
+                lint: "version-lockstep",
+                file: manifest.clone(),
+                line: n + 1,
+                text: l.to_string(),
+                rule: "internal version requirements must equal the workspace package version",
+            });
+        }
+    }
+    v
+}
+
+/// The value of `key` in the given top-level table of a manifest.
+fn table_value(src: &str, table: &str, key: &str) -> Option<String> {
+    let mut inside = false;
+    for line in src.lines() {
+        let l = line.trim();
+        if l.starts_with('[') {
+            inside = l == table;
+            continue;
+        }
+        if inside && !l.starts_with('#') {
+            if let Some(rest) = l.strip_prefix(key) {
+                if let Some(q) = quoted_after_eq(rest) {
+                    return Some(q);
+                }
+            }
+        }
+    }
+    None
+}
+
+/// The first double-quoted run in `s`, requiring only `=` and space before it.
+///
+/// Deliberately not a TOML parser. It reads exactly the two shapes this
+/// workspace writes, and returns `None` on anything else rather than guessing —
+/// a lint that silently skips what it cannot read is worse than no lint, so the
+/// tests below pin the shapes it must accept.
+fn quoted_after_eq(s: &str) -> Option<String> {
+    let s = s.trim_start().strip_prefix('=')?.trim_start();
+    let rest = s.strip_prefix('"')?;
+    let end = rest.find('"')?;
+    Some(rest[..end].to_string())
 }
 
 #[cfg(test)]
@@ -795,5 +907,94 @@ let c = 2;
         let idx = find_whole_words(&code, "f64")[0];
         assert_eq!(line_of(&code, idx), 3);
         assert!(line_text(&code, idx).contains("let x"));
+    }
+
+    // ---------------------------------------------------------------- lockstep
+
+    fn manifest(deps: &str) -> String {
+        format!("[workspace.package]\nversion = \"0.3.0\"\nedition = \"2021\"\n\n[workspace.dependencies]\n{deps}")
+    }
+
+    /// `case` must be unique per test: these run in parallel, and the good and
+    /// stale manifests differ by a single digit, so anything derived from the
+    /// content collides between exactly the two cases that must not share a file.
+    fn lockstep_of(case: &str, src: &str) -> Vec<String> {
+        let dir = std::env::temp_dir().join(format!("ucal-lockstep-{case}"));
+        let _ = std::fs::create_dir_all(&dir);
+        std::fs::write(dir.join("Cargo.toml"), src).unwrap();
+        version_lockstep(&dir).into_iter().map(|v| v.text).collect()
+    }
+
+    #[test]
+    fn lockstep_accepts_matching_requirements() {
+        let m = manifest(
+            "ucal-core = { version = \"0.3.0\", path = \"crates/ucal-core\", default-features = false }\n\
+             ucal-civil = { version = \"0.3.0\", path = \"crates/ucal-civil\", default-features = false }\n",
+        );
+        assert!(lockstep_of("match", &m).is_empty());
+    }
+
+    #[test]
+    fn lockstep_catches_drift_across_a_range() {
+        // Cargo also catches this one, since the path crate's 0.3.0 does not
+        // satisfy ^0.2.0. Kept so the lint is known to cover it too.
+        let m = manifest(
+            "ucal-core = { version = \"0.2.0\", path = \"crates/ucal-core\", default-features = false }\n\
+             ucal-civil = { version = \"0.3.0\", path = \"crates/ucal-civil\", default-features = false }\n",
+        );
+        let bad = lockstep_of("stale", &m);
+        assert_eq!(bad.len(), 1, "expected exactly the stale requirement");
+        assert!(bad[0].contains("ucal-core"));
+    }
+
+    #[test]
+    fn lockstep_catches_drift_inside_a_range() {
+        // The case that needs the lint. `^0.3.0` admits `0.3.1`, so this manifest
+        // resolves, builds, tests green and publishes. Only the lint objects, and
+        // only a consumer would ever have seen it.
+        let m = manifest(
+            "ucal-core = { version = \"0.3.0\", path = \"crates/ucal-core\", default-features = false }\n",
+        )
+        .replace("version = \"0.3.0\"\nedition", "version = \"0.3.1\"\nedition");
+        let bad = lockstep_of("patch", &m);
+        assert_eq!(bad.len(), 1, "0.3.1 workspace against a ^0.3.0 requirement");
+        assert!(bad[0].contains("ucal-core"));
+    }
+
+    #[test]
+    fn lockstep_ignores_third_party_requirements() {
+        // bnum's version has no reason to track this workspace's, and pinning it
+        // to one would be the defect rather than the fix.
+        let m = manifest(
+            "bnum = { version = \"0.14\", default-features = false }\n\
+             num-bigint = { version = \"0.4\", default-features = false }\n\
+             ucal-core = { version = \"0.3.0\", path = \"crates/ucal-core\" }\n",
+        );
+        assert!(lockstep_of("third-party", &m).is_empty());
+    }
+
+    #[test]
+    fn lockstep_ignores_comments() {
+        let m = manifest(
+            "# ucal-core = { version = \"0.1.0\", path = \"crates/ucal-core\" }\n\
+             ucal-core = { version = \"0.3.0\", path = \"crates/ucal-core\" }\n",
+        );
+        assert!(lockstep_of("comments", &m).is_empty());
+    }
+
+    #[test]
+    fn lockstep_reports_a_missing_workspace_version() {
+        let bad = lockstep_of("no-version", "[workspace.dependencies]\nucal-core = { version = \"0.3.0\" }\n");
+        assert_eq!(bad.len(), 1);
+        assert!(bad[0].contains("no version"));
+    }
+
+    #[test]
+    fn quoted_after_eq_reads_only_what_it_understands() {
+        assert_eq!(quoted_after_eq(" = \"0.3.0\"").as_deref(), Some("0.3.0"));
+        assert_eq!(quoted_after_eq("= \"x\", path = \"y\"").as_deref(), Some("x"));
+        // No `=`, so not a value: returning None is the honest answer.
+        assert_eq!(quoted_after_eq("\"0.3.0\""), None);
+        assert_eq!(quoted_after_eq(".workspace = true"), None);
     }
 }

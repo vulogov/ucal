@@ -226,6 +226,12 @@ fn one_year() -> Delta {
     )
 }
 
+/// One SI second, in ticks. C4 measured this at 71 halvings — inside the budget
+/// now, and outside the 64 that shipped in 0.2.0.
+fn one_second() -> Delta {
+    Delta::from_ticks(UC1::bridge().ticks.clone())
+}
+
 #[test]
 fn inversion_recovers_the_redshift() {
     let m = model();
@@ -272,16 +278,45 @@ fn a_sub_tick_inversion_tolerance_is_refused() {
 
 #[test]
 fn a_tick_tolerance_is_refused_as_unreachable_rather_than_faked() {
-    // One tick is *permitted* by §10.4 and still unreachable: sixty-four
-    // halvings of [0, 10000] resolve z to 5e-16, which is tens of seconds of
-    // cosmic time — some 10^47 ticks. E0071's text is precisely this case, and
-    // returning a bracket anyway would be claiming a resolution the method does
-    // not have.
+    // One tick is *permitted* by §10.4 and still unreachable. C4 measured why,
+    // and it is not the step budget: the bisection reaches step 125 before a
+    // midpoint's denominator leaves the 512-bit domain, with the bracket still
+    // ~7.8e26 ticks wide. Returning a bracket anyway would claim a resolution
+    // the method does not have.
     let m = model();
     let t = m.t_of_z(&Ratio::one(), 6, S).unwrap();
     let e = m.z_of_t(&t.value, &Delta::one_tick(), 6, S).unwrap_err();
     assert_eq!(e.code, Code::E0071);
-    assert!(e.to_string().contains("step budget"));
+    // The message names the measured floor, not the budget.
+    let msg = e.to_string();
+    assert!(msg.contains("millisecond"), "unexpected message: {msg}");
+    assert!(msg.contains("512-bit domain"), "unexpected message: {msg}");
+}
+
+#[test]
+fn a_one_second_tolerance_is_reachable() {
+    // C4's operative finding. This needs 71 halvings, so under the 64 that
+    // shipped in 0.2.0 it returned E0071 — "did not reach the requested
+    // tolerance within the step budget" — for a tolerance that is reachable.
+    // The message was true and its implication was not.
+    let m = model();
+    let t = m.t_of_z(&Ratio::one(), 6, S).unwrap();
+    let back = m
+        .z_of_t(&t.value, &one_second(), 6, S)
+        .expect("a one-second tolerance must converge within the budget");
+    assert!(
+        back.value.contains(&Ratio::one()),
+        "the inversion lost the redshift it was given"
+    );
+}
+
+#[test]
+fn the_budget_is_the_one_the_measurement_supports() {
+    // 96 is not a round number chosen for comfort. It is above the 81 halvings a
+    // millisecond needs and below the 125 at which the failure stops being about
+    // steps at all. Pinned so that changing it requires re-reading why.
+    assert_eq!(LambdaCdm::MAX_BISECT_STEPS, 96);
+    assert!(crate::C4_ACHIEVABLE_TOLERANCE.contains("UCAL-E0021"));
 }
 
 #[test]

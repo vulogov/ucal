@@ -12,14 +12,14 @@ categories = ["science", "mathematics"]
 keywords = ["cosmology", "redshift", "interval-arithmetic", "physics", "lambda-cdm"]
 
 [dependencies]
-ucal-core = { version = "0.2.0", path = "../ucal-core", default-features = false }
+ucal-core = { workspace = true }
 
 [dev-dependencies]
 # Rule E: a float reference implementation is permitted in dev-dependencies
 # ONLY as a test oracle, and must be marked as such. There is no float crate
 # here; the oracle is a handful of `f64` lines inside `#[cfg(test)]`, contained
 # by the `float-oracle` module and by the lint's allow marker.
-ucal-events = { version = "0.2.0", path = "../ucal-events", default-features = false }
+ucal-events = { workspace = true }
 
 [features]
 default = ["u512", "std"]
