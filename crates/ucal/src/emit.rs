@@ -52,15 +52,23 @@ pub enum Value {
         /// The rows, in order.
         rows: Vec<(String, Value)>,
     },
-    /// A rendered number that knows what kind of number it is.
+    /// A rational, rendered late.
     ///
-    /// See [`crate::cert`]. The certification is computed from the value at the
-    /// moment it is rendered, so it cannot drift from what the renderer did.
+    /// Holds the **value**, not a string. Rule R makes rendering the only site
+    /// at which a quantity may lose information, so that site is the last
+    /// possible moment — which is what lets `--decimals` and `--round` reach it.
+    /// A `Doc` built by a command carries exact rationals until something asks
+    /// to see them.
+    ///
+    /// `digits` and `mode` are the field's own defaults, used unless the caller
+    /// overrides them. See [`crate::cert`].
     Quantity {
-        /// The rendered digits.
-        text: String,
-        /// Exact, a rounding, or one bound of an enclosure.
-        cert: Certification,
+        /// The exact value.
+        value: Ratio,
+        /// Fractional digits this field renders to unless told otherwise.
+        digits: u32,
+        /// The mode this field rounds with unless told otherwise.
+        mode: Rounding,
     },
     /// A rendered timestamp form: a `UC1` text form, a `UC1/5` form, or a UCID.
     ///
@@ -72,6 +80,74 @@ pub enum Value {
 }
 
 impl Value {
+    /// The text and certification this value renders to under `r`.
+    ///
+    /// Returns `None` for anything that is not a rational. For a
+    /// [`Value::Quantity`] the caller's `--decimals` and `--round` win over the
+    /// field's own defaults, which is the whole reason the value is carried
+    /// rather than a string.
+    pub fn rendered_opt(&self, r: &Render) -> Option<(String, Certification)> {
+        let Value::Quantity {
+            value,
+            digits,
+            mode,
+        } = self
+        else {
+            return None;
+        };
+        let d = r.decimals.unwrap_or(*digits);
+        let m = r.round.unwrap_or(*mode);
+        let cert = Certification::of_ratio(value, d, m);
+        let text = value
+            .to_decimal_string(d, m)
+            .unwrap_or_else(|_| value.to_ratio_string());
+        Some((text, cert))
+    }
+
+    /// Every rendered scalar under this value, joined — for tests that need to
+    /// look at what a reader sees rather than at the tree that produced it.
+    pub fn rendered_text(&self) -> String {
+        let mut out = String::new();
+        fn walk(v: &Value, out: &mut String) {
+            match v {
+                Value::Section(f) | Value::Rows { rows: f, .. } => {
+                    for (k, iv) in f {
+                        out.push_str(k);
+                        out.push(' ');
+                        walk(iv, out);
+                    }
+                }
+                Value::List(items) => {
+                    for i in items {
+                        out.push_str(i);
+                        out.push(' ');
+                    }
+                }
+                Value::Quantity { .. } => {
+                    out.push_str(&v.rendered(&Render::PLAIN).0);
+                    out.push(' ');
+                }
+                Value::Text(t) | Value::Form(t) => {
+                    out.push_str(t);
+                    out.push(' ');
+                }
+                Value::Number(n) => {
+                    out.push_str(n);
+                    out.push(' ');
+                }
+                _ => {}
+            }
+        }
+        walk(self, &mut out);
+        out
+    }
+
+    /// As [`rendered_opt`](Value::rendered_opt), for a value known to be one.
+    pub(crate) fn rendered(&self, r: &Render) -> (String, Certification) {
+        self.rendered_opt(r)
+            .unwrap_or_else(|| (String::new(), Certification::Exact))
+    }
+
     /// A string value.
     pub fn text(s: impl Into<String>) -> Value {
         Value::Text(s.into())
@@ -85,32 +161,16 @@ impl Value {
         Value::Form(s.into())
     }
 
-    /// Render a rational to `digits` under `mode`, certified.
+    /// A rational, to be rendered at `digits` under `mode` unless overridden.
     ///
     /// The one constructor for a rendered decimal in this crate. Going through
     /// it is what makes the certification unavoidable rather than something a
     /// call site could forget.
     pub fn quantity(r: &Ratio, digits: u32, mode: Rounding) -> Value {
-        let cert = Certification::of_ratio(r, digits, mode);
-        let text = r
-            .to_decimal_string(digits, mode)
-            .unwrap_or_else(|_| r.to_ratio_string());
-        Value::Quantity { text, cert }
-    }
-
-    /// An exactly-rendered value, for a quantity that is exact by construction.
-    pub fn exact(s: impl Into<String>) -> Value {
         Value::Quantity {
-            text: s.into(),
-            cert: Certification::Exact,
-        }
-    }
-
-    /// One bound of a certified pair.
-    pub fn bound(s: impl Into<String>) -> Value {
-        Value::Quantity {
-            text: s.into(),
-            cert: Certification::Enclosure,
+            value: r.clone(),
+            digits,
+            mode,
         }
     }
     /// The rows of a section or a table, whichever this is.
@@ -211,9 +271,9 @@ impl Doc {
     /// Only the exceptions. Exactness is the expectation, so a field absent from
     /// this list is being told it is exact — which is a claim, and
     /// `tests/certification.rs` is what makes it one.
-    pub fn certifications(&self) -> Vec<(String, Certification)> {
+    pub fn certifications(&self, r: &Render) -> Vec<(String, Certification)> {
         let mut out = Vec::new();
-        collect_certs(&self.fields, "", &mut out);
+        collect_certs(&self.fields, "", r, &mut out);
         out
     }
 
@@ -256,7 +316,7 @@ impl Doc {
         for (k, v) in &self.fields {
             render_field_text(&mut s, k, v, width, 0, r);
         }
-        let certs = self.certifications();
+        let certs = self.certifications(r);
         if !certs.is_empty() {
             // Grouped by what was done rather than listed per path: a ladder has
             // forty-five rows carrying the same rounding, and forty-five
@@ -312,9 +372,14 @@ impl Doc {
         s
     }
 
-    /// Render for a program (§19.1).
+    /// Render for a program (§19.1), at the field defaults.
     pub fn to_json(&self) -> String {
-        let certs = self.certifications();
+        self.to_json_with(&Render::PLAIN)
+    }
+
+    /// Render for a program, honouring `--decimals` and `--round`.
+    pub fn to_json_with(&self, r: &Render) -> String {
+        let certs = self.certifications(r);
         let mut s = String::new();
         let _ = writeln!(s, "{{");
         let _ = writeln!(s, "  \"format\": \"{JSON_FORMAT}\",");
@@ -328,7 +393,7 @@ impl Doc {
                 ","
             };
             let _ = write!(s, "  \"{}\": ", escape(k));
-            render_value_json(&mut s, v, 1);
+            render_value_json(&mut s, v, 1, r);
             let _ = writeln!(s, "{comma}");
         }
         if !certs.is_empty() {
@@ -346,7 +411,7 @@ impl Doc {
         }
         if !self.notes.is_empty() {
             let _ = write!(s, "  \"notes\": ");
-            render_value_json(&mut s, &Value::List(self.notes.clone()), 1);
+            render_value_json(&mut s, &Value::List(self.notes.clone()), 1, r);
             let _ = writeln!(s);
         }
         let _ = writeln!(s, "}}");
@@ -362,6 +427,7 @@ fn alloc_vec(s: String) -> Vec<String> {
 fn collect_certs(
     fields: &[(String, Value)],
     prefix: &str,
+    r: &Render,
     out: &mut Vec<(String, Certification)>,
 ) {
     for (k, v) in fields {
@@ -371,9 +437,14 @@ fn collect_certs(
             format!("{prefix}.{k}")
         };
         match v {
-            Value::Quantity { cert, .. } if !cert.is_exact() => out.push((path, *cert)),
-            Value::Section(inner) => collect_certs(inner, &path, out),
-            Value::Rows { rows, .. } => collect_certs(rows, &path, out),
+            Value::Quantity { .. } => {
+                let (_, cert) = v.rendered(r);
+                if !cert.is_exact() {
+                    out.push((path, cert));
+                }
+            }
+            Value::Section(inner) => collect_certs(inner, &path, r, out),
+            Value::Rows { rows, .. } => collect_certs(rows, &path, r, out),
             _ => {}
         }
     }
@@ -405,7 +476,7 @@ pub(crate) fn render_scalar(r: &Render, v: &Value) -> String {
         Value::Text(t) => r.style.paint(role_of_prose(t), t),
         Value::Number(n) => group_decimal(r, n),
         Value::Form(f) => paint_form(r, f),
-        Value::Quantity { text, .. } => group_decimal(r, text),
+        Value::Quantity { .. } => group_decimal(r, &v.rendered(r).0),
         Value::Bool(b) => r.style.paint(Role::Value, &b.to_string()),
         // Not scalars; `crate::table::render` refuses rows containing them, and
         // the field renderer handles them before reaching here.
@@ -501,8 +572,8 @@ fn render_field_text(s: &mut String, k: &str, v: &Value, width: usize, depth: us
         Value::Form(f) => {
             write_field(s, r, &pad, k, width, &paint_form(r, f));
         }
-        Value::Quantity { text, .. } => {
-            write_field(s, r, &pad, k, width, &group_decimal(r, text));
+        Value::Quantity { .. } => {
+            write_field(s, r, &pad, k, width, &group_decimal(r, &v.rendered(r).0));
         }
         Value::Bool(b) => {
             write_field(s, r, &pad, k, width, &style.paint(Role::Value, &b.to_string()));
@@ -510,7 +581,7 @@ fn render_field_text(s: &mut String, k: &str, v: &Value, width: usize, depth: us
     }
 }
 
-fn render_value_json(s: &mut String, v: &Value, depth: usize) {
+fn render_value_json(s: &mut String, v: &Value, depth: usize, r: &Render) {
     let pad = "  ".repeat(depth);
     match v {
         // A Form is a string in JSON, byte-identical to what Text emits. That
@@ -520,8 +591,11 @@ fn render_value_json(s: &mut String, v: &Value, depth: usize) {
         // than wrapping every number in an object — which would change the shape
         // of every numeric field and break every consumer, to say something that
         // is only interesting for the minority of fields that are not exact.
-        Value::Text(t) | Value::Form(t) | Value::Quantity { text: t, .. } => {
+        Value::Text(t) | Value::Form(t) => {
             let _ = write!(s, "\"{}\"", escape(t));
+        }
+        Value::Quantity { .. } => {
+            let _ = write!(s, "\"{}\"", escape(&v.rendered(r).0));
         }
         // Tick counts exceed every JSON number implementation in practice, and a
         // consumer that silently converted one to a double would lose the
@@ -547,7 +621,7 @@ fn render_value_json(s: &mut String, v: &Value, depth: usize) {
         }
         // Rows is Section with a rendering hint. Emitting it through the same
         // arm is what keeps `ucal-json/1` fixed.
-        Value::Rows { rows, .. } => render_value_json(s, &Value::Section(rows.clone()), depth),
+        Value::Rows { rows, .. } => render_value_json(s, &Value::Section(rows.clone()), depth, r),
         Value::Section(fields) => {
             if fields.is_empty() {
                 let _ = write!(s, "{{}}");
@@ -557,7 +631,7 @@ fn render_value_json(s: &mut String, v: &Value, depth: usize) {
             for (i, (k, val)) in fields.iter().enumerate() {
                 let comma = if i + 1 == fields.len() { "" } else { "," };
                 let _ = write!(s, "{pad}  \"{}\": ", escape(k));
-                render_value_json(s, val, depth + 1);
+                render_value_json(s, val, depth + 1, r);
                 let _ = writeln!(s, "{comma}");
             }
             let _ = write!(s, "{pad}}}");

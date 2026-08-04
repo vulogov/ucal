@@ -94,7 +94,14 @@ fn datum_reports_the_claim_as_non_operand() {
     let Some(Value::Section(claim)) = doc.get("big_bang_claim") else {
         panic!("expected a big_bang_claim section");
     };
-    let joined = format!("{claim:?}").to_lowercase();
+    // Rendered, not Debug-formatted. A `Quantity` carries the exact rational
+    // and renders late, so its Debug shows a numerator and denominator where a
+    // reader sees digits — and it is the digits this test is about.
+    let joined = format!(
+        "{claim:?} {}",
+        Value::Section(claim.clone()).rendered_text()
+    )
+    .to_lowercase();
     // Rule Q.3: reportable metadata, never an operand.
     assert!(joined.contains("metadata"));
     assert!(joined.contains("rule q.3"));
@@ -145,7 +152,8 @@ fn the_implied_age_is_rendered_exactly_not_rounded() {
     let seconds = implied
         .iter()
         .find(|(k, _)| k == "seconds")
-        .map(|(_, v)| format!("{v:?}"))
+        .and_then(|(_, v)| v.rendered_opt(&ucal::style::Render::PLAIN))
+        .map(|(text, _)| text)
         .unwrap();
     assert!(
         seconds.contains("435084631199999999.982810"),

@@ -16,6 +16,7 @@
 
 use ucal::cert::Certification;
 use ucal::emit::{Doc, Value};
+use ucal::style::Render;
 use ucal_core::{Ratio, Rounding};
 
 const T: &str = "8070205189123984864657505252035637180530466139316558837890625";
@@ -119,10 +120,8 @@ fn exact_means_the_digits_reparse_to_the_value() {
         let r = Ratio::from_u64(n).div(&Ratio::from_u64(d)).unwrap();
         for digits in [0u32, 1, 2, 3, 6, 9, 12] {
             let v = Value::quantity(&r, digits, Rounding::HalfEven);
-            let Value::Quantity { text, cert } = &v else {
-                panic!("quantity() produced something else");
-            };
-            let back = Ratio::from_decimal_str(text);
+            let (text, cert) = v.rendered_opt(&Render::PLAIN).expect("a quantity");
+            let back = Ratio::from_decimal_str(&text);
             let round_trips = matches!(&back, Ok(b) if *b == r);
             assert_eq!(
                 cert.is_exact(),
@@ -140,18 +139,18 @@ fn a_value_that_does_not_reparse_is_never_called_exact() {
     // the value. Checked over the real commands, where the text is all there is.
     for (name, doc) in documents() {
         for (path, v) in scalars(&doc) {
-            let Value::Quantity { text, cert } = &v else {
+            let Some((text, cert)) = v.rendered_opt(&Render::PLAIN) else {
                 continue;
             };
             if !cert.is_exact() {
                 continue;
             }
             // An exact rendering must survive a reparse-and-render round trip.
-            if let Ok(r) = Ratio::from_decimal_str(text) {
+            if let Ok(r) = Ratio::from_decimal_str(&text) {
                 let digits = text.split_once('.').map(|(_, f)| f.len()).unwrap_or(0) as u32;
                 let again = r.to_decimal_string(digits, Rounding::HalfEven).unwrap();
                 assert_eq!(
-                    &again, text,
+                    &again, &text,
                     "`{name}`/{path}: certified exact but does not round-trip"
                 );
             }
@@ -164,9 +163,13 @@ fn a_value_that_does_not_reparse_is_never_called_exact() {
 #[test]
 fn the_certification_map_lists_every_exception_and_nothing_else() {
     for (name, doc) in documents() {
-        let listed: Vec<String> = doc.certifications().into_iter().map(|(p, _)| p).collect();
+        let listed: Vec<String> = doc
+            .certifications(&Render::PLAIN)
+            .into_iter()
+            .map(|(p, _)| p)
+            .collect();
         for (path, v) in scalars(&doc) {
-            let Value::Quantity { cert, .. } = &v else {
+            let Some((_, cert)) = v.rendered_opt(&Render::PLAIN) else {
                 continue;
             };
             let is_listed = listed.contains(&path);
@@ -184,7 +187,10 @@ fn the_certification_map_lists_every_exception_and_nothing_else() {
 fn the_map_reaches_the_json_and_the_text() {
     // A claim nobody can read is not a claim.
     let doc = ucal::cmd_ladder(ucal_core::LocaleId::En, true).unwrap();
-    assert!(!doc.certifications().is_empty(), "the ladder rounds something");
+    assert!(
+        !doc.certifications(&Render::PLAIN).is_empty(),
+        "the ladder rounds something"
+    );
     let json = doc.to_json();
     assert!(json.contains("\"certification\""), "missing from --json");
     assert!(json.contains("rounded"), "the map says nothing useful");
@@ -315,4 +321,87 @@ fn a_certification_is_computed_not_annotated() {
         Certification::Exact
     );
     assert!(!Certification::of_ratio(&eighth, 2, Rounding::HalfEven).is_exact());
+}
+
+
+// ---------------------------------------------------------------- V2
+
+#[test]
+fn decimals_and_round_reach_every_rendered_rational() {
+    // The point of carrying the value instead of a string. A tick in beats is
+    // 1/5^60 — a finite expansion sixty places long — so six digits print it as
+    // zero, forty-five digits show it, and sixty make it exact.
+    let doc = ucal::cmd_ladder(ucal_core::LocaleId::En, true).unwrap();
+    let beats = |d: Option<u32>| -> (String, Certification) {
+        let r = Render::PLAIN.decimals(d);
+        doc.rows("tiers")
+            .unwrap()
+            .iter()
+            .find(|(k, _)| k == "T-12")
+            .and_then(|(_, row)| row.as_rows())
+            .unwrap()
+            .iter()
+            .find(|(k, _)| k == "beats")
+            .unwrap()
+            .1
+            .rendered_opt(&r)
+            .unwrap()
+    };
+
+    let (six, c6) = beats(None);
+    assert_eq!(six, "0.000000", "the default must not change");
+    assert!(!c6.is_exact());
+
+    let (forty_five, _) = beats(Some(45));
+    assert!(forty_five.ends_with("1153"), "45 digits should show it: {forty_five}");
+
+    let (sixty, c60) = beats(Some(60));
+    assert!(c60.is_exact(), "60 digits is where 1/5^60 terminates");
+    assert!(sixty.ends_with("1152921504606846976"));
+}
+
+#[test]
+fn the_certification_follows_the_digit_count() {
+    // At sixty digits the beats column becomes exact and drops out of the map,
+    // while bridge seconds stay in it — they never terminate at any count.
+    let doc = ucal::cmd_ladder(ucal_core::LocaleId::En, true).unwrap();
+    let at = |d: u32| -> Vec<String> {
+        doc.certifications(&Render::PLAIN.decimals(Some(d)))
+            .into_iter()
+            .map(|(p, _)| p.rsplit('.').next().unwrap_or("").to_string())
+            .collect()
+    };
+    assert!(at(6).iter().any(|n| n == "beats"));
+    assert!(!at(60).iter().any(|n| n == "beats"), "beats terminates at 60");
+    for d in [6u32, 60, 120] {
+        assert!(
+            at(d).iter().any(|n| n == "seconds (bridge)"),
+            "bridge seconds cannot terminate at {d} digits"
+        );
+    }
+}
+
+#[test]
+fn the_round_override_changes_the_digits_and_says_so() {
+    let doc = ucal::cmd_ladder(ucal_core::LocaleId::En, true).unwrap();
+    let text = |m: Rounding| doc.render(&Render::PLAIN.round(Some(m)));
+    // Trunc and ceil must differ somewhere on a value that does not terminate.
+    assert_ne!(text(Rounding::Trunc), text(Rounding::Ceil));
+    // And the report names the mode that was actually applied.
+    assert!(text(Rounding::Ceil).contains("ceil"));
+    assert!(text(Rounding::Trunc).contains("trunc"));
+}
+
+#[test]
+fn the_defaults_change_nothing() {
+    // A caller who does not ask gets exactly what they got before V2.
+    for (name, doc) in documents() {
+        let plain = doc.render(&Render::PLAIN);
+        assert_eq!(
+            plain,
+            doc.render(&Render::PLAIN.decimals(None).round(None)),
+            "`{name}`: an absent override changed the output"
+        );
+        assert_eq!(doc.to_json(), doc.to_json_with(&Render::PLAIN));
+    }
 }

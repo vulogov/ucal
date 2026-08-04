@@ -44,6 +44,8 @@ Accepted by every command (§19.1).
 | `--no-color` | off | Alias for `--color never`, and it wins over `--color`. |
 | `--width <N>` | terminal, else 80 | Columns to lay out at. Never below 80. |
 | `--tick-sep <CHAR>` | none | Separator between three-digit groups in decimal counts. Off by default so a copied tick count is still an integer. |
+| `--decimals <N>` | each field's own | Fractional digits for every rendered rational. Without it each field keeps the precision it was written with, so the default output is unchanged. |
+| `--round <MODE>` | each field's own | `trunc`, `ceil`, `half-even` or `half-up`, for every rendered value including `to-civil`'s sub-second field. |
 
 ### Colour, and what it is allowed to mean
 
@@ -214,14 +216,17 @@ ucal from-civil <DATE> [--scale tt|tai|utc] [--calendar gregorian|julian]
 Absolute time to a civil label. **The only place this program rounds** (Rule R).
 
 ```
-ucal to-civil <INSTANT> [--scale tt|tai|utc] [--digits N]
-              [--round half-even|trunc|ceil|half-up] [--calendar gregorian|julian]
+ucal to-civil <INSTANT> [--scale tt|tai|utc] [--digits N] [--calendar gregorian|julian]
 ```
 
 | option | default | notes |
 |---|---|---|
-| `--digits` | `0` | Fractional-second digits, up to 30. |
-| `--round` | `half-even` | The mode. Named because rounding is a choice, and an unnamed choice is a hidden one. |
+| `--digits` | `0` | Fractional-second digits of the civil label, up to 30. Distinct from the global `--decimals`, which governs rendered rationals. |
+
+`--round` is global. A civil label's sub-second field and a rendered rational
+are rounded by the same declared choice, and `half-even` remains the default for
+both.
+
 
 | field | meaning |
 |---|---|
@@ -501,6 +506,24 @@ Names that mean the same thing wherever they appear.
 | `widths.parameter_years` | Width contributed by the *measurements* being computed with. Never merged with the above (failure mode F8). |
 | `citation` | Where a number came from. Every measured quantity in this program carries one. |
 | `notes[]` | Explanatory prose. Never load-bearing: nothing in the output depends on a note being read. |
+
+### Asking for more digits
+
+Rule R makes rendering the only place a value may be rounded, so that place
+answers to the caller rather than to a constant. A tick's length in beats is
+`1 / 5^60` — a finite expansion sixty places long — and the default six digits
+print it as zero:
+
+```
+$ ucal ladder --named-only | grep T-12
+T-12  0   tick / ticks   0.000000
+
+$ ucal ladder --named-only --decimals 60 --json | jq -r '.tiers["T-12"].beats'
+0.000000000000000000000000000000000000000001152921504606846976
+```
+
+At sixty digits that value is **exact**, and the `certification` map below drops
+it while keeping `seconds (bridge)`, which never terminates at any digit count.
 
 ### `certification`
 

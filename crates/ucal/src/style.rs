@@ -305,6 +305,16 @@ pub struct Render {
     pub group: Option<char>,
     /// Available columns. See [`crate::table`] for why the floor is fixed.
     pub cols: usize,
+    /// Fractional digits to render rationals at, overriding each field's own
+    /// default.
+    ///
+    /// `None` means every field keeps the precision it was written with, which
+    /// is why turning this on changes nothing for a caller who does not ask.
+    /// Rule R makes rendering the only place a value may be rounded; this is
+    /// what makes that place answerable to the caller rather than to a constant.
+    pub decimals: Option<u32>,
+    /// Rounding mode, overriding each field's own default. `None` keeps them.
+    pub round: Option<ucal_core::Rounding>,
 }
 
 impl Render {
@@ -314,6 +324,8 @@ impl Render {
         style: Style::PLAIN,
         group: None,
         cols: crate::table::BASELINE_WIDTH,
+        decimals: None,
+        round: None,
     };
 
     /// A style with no separator, at the baseline width.
@@ -349,6 +361,18 @@ impl Render {
     /// Set the digit-group separator.
     pub fn group(mut self, sep: Option<char>) -> Render {
         self.group = sep;
+        self
+    }
+
+    /// Override every field's fractional-digit count.
+    pub fn decimals(mut self, d: Option<u32>) -> Render {
+        self.decimals = d;
+        self
+    }
+
+    /// Override every field's rounding mode.
+    pub fn round(mut self, m: Option<ucal_core::Rounding>) -> Render {
+        self.round = m;
         self
     }
 }
