@@ -113,6 +113,7 @@ fn dec(r: &Ratio, digits: u32) -> String {
         .unwrap_or_else(|_| r.to_ratio_string())
 }
 
+#[cfg(test)]
 pub(crate) fn ratio_of(a: &Ticks, b: &Ticks) -> Ratio {
     tick_ratio(a, b)
 }
@@ -181,7 +182,7 @@ pub fn cmd_datum() -> CmdResult {
             ("half_width_ticks".into(), Value::number(half.to_dec_string())),
             (
                 "half_width_drifts".into(),
-                Value::text(dec(&tick_ratio(half, &Tier::DRIFT.ticks()), 2)),
+                Value::quantity(&tick_ratio(half, &Tier::DRIFT.ticks()), 2, Rounding::HalfEven),
             ),
             ("citation".into(), Value::text(citation.source)),
             (
@@ -253,7 +254,7 @@ pub fn cmd_datum() -> CmdResult {
                      (Rule Q.1). The measurement is the `input` above.",
                 ),
             ),
-            ("seconds".into(), Value::text(dec(&implied_s, 6))),
+            ("seconds".into(), Value::quantity(&implied_s, 6, Rounding::HalfEven)),
         ]),
     );
 
@@ -777,12 +778,12 @@ pub fn cmd_ladder(loc: LocaleId, named_only: bool) -> CmdResult {
                 // The universal second first: the beat is 5^60 ticks and carries
                 // no Earth content (§0.5). Every tier is a whole power of five of
                 // it, so these are exact.
-                ("beats".into(), Value::text(dec(&in_beats, 6))),
+                ("beats".into(), Value::quantity(&in_beats, 6, Rounding::HalfEven)),
                 // The bridge equivalent second, printed alongside as §4.3
                 // requires — and only ever alongside.
                 (
                     format!("{}s (bridge)", bridge.name),
-                    Value::text(dec(&in_bridge, 6)),
+                    Value::quantity(&in_bridge, 6, Rounding::HalfEven),
                 ),
                 ("ticks".into(), Value::number(tier.ticks().to_dec_string())),
             ]),
@@ -1085,11 +1086,7 @@ pub fn cmd_cal_show(id: &str, input: &str) -> CmdResult {
                 ("day".into(), Value::number(f.day.to_string())),
                 (
                     "day_fraction".into(),
-                    Value::text(
-                        f.day_fraction
-                            .to_decimal_string(6, Rounding::Trunc)
-                            .unwrap_or_default(),
-                    ),
+                    Value::quantity(&f.day_fraction, 6, Rounding::Trunc),
                 ),
                 (
                     "anchor_revision".into(),
@@ -1113,11 +1110,7 @@ pub fn cmd_cal_show(id: &str, input: &str) -> CmdResult {
                 ("satellite".into(), Value::text(cy.satellite)),
                 (
                     "cycles_per_year".into(),
-                    Value::text(
-                        cy.ratio
-                            .to_decimal_string(9, Rounding::HalfEven)
-                            .unwrap_or_default(),
-                    ),
+                    Value::quantity(&cy.ratio, 9, Rounding::HalfEven),
                 ),
                 (
                     "convergents".into(),
@@ -1396,6 +1389,19 @@ fn ticks_in_years(t: &Ticks, digits: u32) -> String {
     dec(&tick_ratio(t, &year), digits)
 }
 
+/// The same conversion, certified.
+///
+/// A count of ticks divided by a Julian year is a rational, and whether its
+/// expansion fits the digits asked for depends on the value — so it goes through
+/// the certified constructor like every other rendered rational.
+fn years_quantity(t: &Ticks, digits: u32) -> Value {
+    let year = UC1::bridge()
+        .ticks
+        .try_mul(&<Ticks as TickInt>::from_u64(31_557_600))
+        .expect("a Julian year fits the domain");
+    Value::quantity(&tick_ratio(t, &year), digits, Rounding::HalfEven)
+}
+
 /// `ucal cosmo age --z <z>`: the age of the universe at a redshift, as a
 /// certified enclosure (§10.3, Rule X).
 ///
@@ -1410,7 +1416,7 @@ pub fn cmd_cosmo_age(z: &str, depth: u32, scale: u32) -> CmdResult {
 
     let mut doc = Doc::new()
         .title("ucal cosmo age")
-        .field("z", Value::number(dec(&z, 4)))
+        .field("z", Value::quantity(&z, 4, Rounding::HalfEven))
         .field("model", Value::text(out.model.0))
         .field(
             "enclosure",
@@ -1423,14 +1429,8 @@ pub fn cmd_cosmo_age(z: &str, depth: u32, scale: u32) -> CmdResult {
                     "hi_ticks".into(),
                     Value::number(out.value.hi().ticks().to_dec_string()),
                 ),
-                (
-                    "lo_years".into(),
-                    Value::text(ticks_in_years(out.value.lo().ticks(), 0)),
-                ),
-                (
-                    "hi_years".into(),
-                    Value::text(ticks_in_years(out.value.hi().ticks(), 0)),
-                ),
+                ("lo_years".into(), years_quantity(out.value.lo().ticks(), 0)),
+                ("hi_years".into(), years_quantity(out.value.hi().ticks(), 0)),
                 (
                     "at_drift".into(),
                     Value::text(render_at(out.value.lo(), Tier::DRIFT)),
@@ -1440,14 +1440,8 @@ pub fn cmd_cosmo_age(z: &str, depth: u32, scale: u32) -> CmdResult {
         .field(
             "widths",
             Value::Section(vec![
-                (
-                    "arithmetic_years".into(),
-                    Value::text(ticks_in_years(out.arithmetic_width.ticks(), 1)),
-                ),
-                (
-                    "parameter_years".into(),
-                    Value::text(ticks_in_years(out.parameter_width.ticks(), 1)),
-                ),
+                ("arithmetic_years".into(), years_quantity(out.arithmetic_width.ticks(), 1)),
+                ("parameter_years".into(), years_quantity(out.parameter_width.ticks(), 1)),
                 (
                     "note".into(),
                     Value::text(

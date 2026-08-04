@@ -502,10 +502,43 @@ Names that mean the same thing wherever they appear.
 | `citation` | Where a number came from. Every measured quantity in this program carries one. |
 | `notes[]` | Explanatory prose. Never load-bearing: nothing in the output depends on a note being read. |
 
+### `certification`
+
+Every document that rounds anything carries a `certification` object mapping a
+field's dotted path to what was done to it:
+
+```json
+"certification": {
+  "tiers.T5.beats": "rounded, half-even, 6 digits",
+  "tiers.T5.seconds (bridge)": "rounded, half-even, 6 digits"
+}
+```
+
+**Only the exceptions are listed.** Exactness is the expectation, so a numeric
+field *absent* from this map is being told its printed digits are the value —
+and that is a claim rather than a convention: `tests/certification.rs` checks
+that the map lists every non-exact quantity and nothing else, that anything
+called exact reparses to the value it prints, and that no rendered decimal
+reaches the output without going through the certified constructor at all.
+
+`exact` is a claim about *this rendering*, not about the number in the abstract.
+A tick in beats is `1 / 5^60` — a finite expansion sixty places long — so it is
+exact at sixty digits and a rounding at six, where it prints as `0.000000`.
+
+None of this is floating point. Rule E forbids a float token in any shipped
+crate; a decimal is produced by one integer multiply-divide,
+`mul_div_rounded(numerator, 10^digits, denominator, mode)`, with a decimal point
+inserted into the result's digits.
+
 ### The `--json` contract
 
 `--json` output is stable and versioned (§19.1). Every document carries
 `"format": "ucal-json/1"`, so a consumer can tell when it changes.
+
+Stability means **existing fields keep their names, shapes and meanings**. New
+fields may be added without a version bump — `certification` was added in 0.4.0
+this way — so a consumer should ignore keys it does not know rather than reject
+them.
 
 Numbers are emitted as **strings**, deliberately. A tick count exceeds every
 JSON number implementation in practice, and a consumer that silently converted
