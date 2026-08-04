@@ -163,7 +163,10 @@ pub const GE2_ACHIEVABLE_WIDTH: &str =
 /// Raising [`LambdaCdm::MAX_BISECT_STEPS`] from 64 to 96 is what the measurement
 /// supports, and no more.
 pub const C4_ACHIEVABLE_TOLERANCE: &str =
-    "z_of_t at depth 12, scale 12: converges at 1 year in 46 steps, 1 second in 71,      1 millisecond in 81. A one-tick request reaches step 125 and fails UCAL-E0021      when a bisection midpoint leaves the 512-bit domain, bracket still ~7.8e26 ticks.      The budget is 96; the floor is the domain.";
+    "z_of_t at depth 12, scale 12: converges at 1 year in 46 steps, 1 second in 71, \
+     1 millisecond in 81. A one-tick request reaches step 125 and fails UCAL-E0021 \
+     when a bisection midpoint leaves the 512-bit domain, bracket still ~7.8e26 ticks. \
+     The budget is 96; the floor is the domain.";
 
 /// §16 names a distinct error type; it is the crate's, because the Appendix E
 /// codes are the contract.
@@ -476,10 +479,16 @@ impl LambdaCdm {
         let t_lo = full.lo().mul(self.hubble_time.lo())?;
         let t_hi = full.hi().mul(self.hubble_time.hi())?;
 
-        let to_instant = |v: &Ratio| -> Result<Instant<UC1>> {
-            Instant::from_ticks(v.floor())
-        };
-        let value = Window::new(to_instant(&t_lo)?, to_instant(&t_hi)?)?;
+        // Quantising to ticks is the last rounding in the chain, and it has to
+        // widen like every one before it: the lower bound down, the upper bound
+        // up. Flooring both — which this did until 0.4.0 — moves the upper end
+        // *inward* by up to a tick, so the window could exclude a value the
+        // quadrature had correctly bounded. Negligible against an enclosure
+        // 10^55 ticks wide, and fatal to the word *provably*.
+        let value = Window::new(
+            Instant::from_ticks(t_lo.floor())?,
+            Instant::from_ticks(t_hi.ceil())?,
+        )?;
 
         // The arithmetic width is what remains with the parameters pinned: it is
         // the quadrature's own contribution and nothing else.
@@ -692,6 +701,105 @@ impl LambdaCdm {
              is about a millisecond, past which the bisection midpoints leave the \
              512-bit domain (C4)",
         ))
+    }
+
+    /// How an enclosure was reached, step by step, in the order the steps run.
+    ///
+    /// # What this is for
+    ///
+    /// An enclosure's claim is that the true value provably lies inside it, and
+    /// that claim rests on one property: **every rounding in the chain widens
+    /// it.** A single inward rounding anywhere and the result is a narrow,
+    /// plausible interval that guarantees nothing — which is exactly what a
+    /// reader cannot check by looking at two numbers.
+    ///
+    /// So the audit names each step and the *direction* it rounds in. It is a
+    /// summary and not a trace: a depth-12 run is 4096 panels, and a per-panel
+    /// dump is not an audit but a haystack. Every panel does the same four
+    /// things, and those four things are what needs checking.
+    ///
+    /// Writing this is what found the defect fixed in 0.4.0 — the tick
+    /// quantisation floored both ends, which widens the lower bound and narrows
+    /// the upper.
+    pub fn audit(&self, z: &Ratio, depth: u32, scale: u32) -> Result<Vec<(String, String)>> {
+        use alloc::format;
+        use alloc::string::ToString;
+
+        let u0 = Ratio::one().add(z)?.recip()?;
+        let panels = 1u64 << depth.min(30);
+        let h = u0.div(&Ratio::from_u64(panels))?;
+        let d6 = |r: &Ratio| {
+            r.to_decimal_string(12, Rounding::Trunc)
+                .unwrap_or_else(|_| r.to_ratio_string())
+        };
+        let turn = self.monotonicity_turns_at()?;
+
+        let mut v = Vec::new();
+        v.push((
+            "1. substitution".to_string(),
+            format!(
+                "u = 1/(1+z) turns the improper limit into a bounded one. u0 = 1/(1+{}) = {}",
+                d6(z),
+                d6(&u0)
+            ),
+        ));
+        v.push((
+            "2. integrand".to_string(),
+            "f(u) = u / sqrt(g(u)), g(u) = Omega_r + Omega_m u + Omega_L u^4. Bounded and smooth on the whole range because Omega_r > 0 keeps the root away from zero"
+                .to_string(),
+        ));
+        v.push((
+            "3. why not endpoints".to_string(),
+            format!(
+                "f is not monotone: it turns at u = {}, and the range [0, {}] {} it. Appendix H.4 permits endpoint bounds only for a monotone integrand, so each panel is bounded by the interval extension instead",
+                d6(turn.lo()),
+                d6(&u0),
+                if &u0 > turn.lo() { "straddles" } else { "does not reach" }
+            ),
+        ));
+        v.push((
+            "4. panels".to_string(),
+            format!("2^{depth} = {panels} panels of width h = u0/{panels} = {}", d6(&h)),
+        ));
+        v.push((
+            "5. panel bound".to_string(),
+            "on [a, b], f is enclosed by [ a/sqrt(g(b)) , b/sqrt(g(a)) ] -- smallest numerator over largest root, then largest over smallest"
+                .to_string(),
+        ));
+        v.push((
+            "6. densities".to_string(),
+            "OUTWARD. The lower sum takes every Omega at its upper end, giving the largest g and so the smallest f; the upper sum takes them at their lower ends. The parameters' own uncertainty is carried, not averaged away"
+                .to_string(),
+        ));
+        v.push((
+            "7. square roots".to_string(),
+            format!(
+                "OUTWARD. Directed to {scale} decimal digits: the lower sum divides by the root's UPPER bound and the upper sum by its LOWER bound, so neither can tighten the panel it belongs to"
+            ),
+        ));
+        v.push((
+            "8. accumulation".to_string(),
+            format!(
+                "OUTWARD. Exact accumulation is impossible -- denominators compound -- so each partial sum snaps onto a grid of 10^-{}: the lower sum truncates down, the upper sum ceils up",
+                scale + depth + 16
+            ),
+        ));
+        v.push((
+            "9. Hubble time".to_string(),
+            "OUTWARD. t = (1/H0) x integral, with the lower sum multiplied by the lower end of 1/H0 and the upper sum by the upper end"
+                .to_string(),
+        ));
+        v.push((
+            "10. quantise to ticks".to_string(),
+            "OUTWARD. The lower bound floors and the upper bound ceils. Until 0.4.0 both floored, which narrowed the upper end by up to one tick; writing this audit is what found it"
+                .to_string(),
+        ));
+        v.push((
+            "conclusion".to_string(),
+            "Every step above widens. That is what the word `certified` rests on: the true value under this model provably lies inside the reported interval, and no step could have moved a bound toward it"
+                .to_string(),
+        ));
+        Ok(v)
     }
 
     /// A human-readable summary of a result's provenance (Rule X).

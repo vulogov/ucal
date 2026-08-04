@@ -298,6 +298,23 @@ impl Ratio {
         self.num.quot_rem(&self.den).0
     }
 
+    /// The least integer at or above this value.
+    ///
+    /// The companion to [`floor`](Ratio::floor), and the two are not
+    /// interchangeable at the end of an interval computation: quantising an
+    /// enclosure to integers must move the lower bound *down* and the upper
+    /// bound *up*, or the result stops containing what it bounded. Flooring both
+    /// is the mistake this exists to make impossible to write by accident.
+    pub fn ceil(&self) -> Ticks {
+        let (q, r) = self.num.quot_rem(&self.den);
+        if r.is_zero_ticks() {
+            q
+        } else {
+            q.try_add(&<Ticks as TickInt>::one())
+                .unwrap_or_else(|| self.num.quot_rem(&self.den).0)
+        }
+    }
+
     /// The fractional part, `self - floor(self)`.
     pub fn frac(&self) -> Ratio {
         let (_, r) = self.num.quot_rem(&self.den);

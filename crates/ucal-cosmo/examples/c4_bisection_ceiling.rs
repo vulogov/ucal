@@ -165,7 +165,7 @@ fn main() {
     println!("depth {depth}, scale {scale}, bracket [0, 10000], target = age at z = 1");
     println!("the shipped budget is 64 halvings\n");
 
-    println!("tolerance    budget   steps  outcome      wall     z denominator digits");
+    println!("tolerance    budget   steps  outcome      wall     z denominator digits");  // ucal-lint-allow(no-indent-in-literal): a column header, aligned on purpose
     println!("──────────   ──────   ─────  ──────────   ──────   ────────────────────");
     for (label, dec) in [
         ("1 year", ONE_YEAR),

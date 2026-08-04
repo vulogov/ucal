@@ -430,6 +430,7 @@ ucal cosmo z --at <INSTANT> [--tolerance-years N] [--depth N] [--scale N]
 |---|---|---|
 | `--depth` | `12` | `2^depth` panels. Cost grows about 4× per step. |
 | `--scale` | `12` | Decimal digits for the directed square roots. |
+| `--audit` | off | Also print how the enclosure was reached, and which direction each rounding moved. |
 
 | field | meaning |
 |---|---|
@@ -440,6 +441,16 @@ ucal cosmo z --at <INSTANT> [--tolerance-years N] [--depth N] [--scale N]
 | `widths.arithmetic_years` | How much of the width comes from the quadrature. |
 | `widths.parameter_years` | How much comes from **Planck's own error bars**. |
 | `quadrature.depth` / `.panels` / `.sqrt_scale_digits` | What was actually computed. |
+
+`--audit` adds an `audit` section: the substitution, why the panels use an
+interval extension rather than endpoints, the panel count, and then **the
+direction each rounding moves** — densities, square roots, accumulation, the
+Hubble-time multiply, and the final quantisation to ticks. An enclosure's claim
+is that the true value provably lies inside it, and that rests on every step
+widening; two numbers cannot show it and the audit can.
+
+It is a summary, not a trace. A depth-12 run is 4096 panels doing the same four
+things, and those four things are what needs checking.
 
 The two widths are **never merged**, and the reason is visible in the numbers:
 at `z = 1100` the arithmetic width is 251 years against a parameter width of

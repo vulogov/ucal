@@ -11,6 +11,7 @@
 //! | no overclaiming prose about tick 0 | Rule Q.1 | F13 |
 //! | `ucal-body` must not depend on `ucal-civil` | §12 | F9 |
 //! | internal version requirements track the workspace version | — | — |
+//! | no string literal carries a run of source indentation | — | — |
 //!
 //! The last has no failure-mode number because it guards a packaging defect
 //! rather than a specification one: a stale internal requirement resolves,
@@ -43,10 +44,22 @@ pub struct Projections {
     pub code: String,
     /// Doc comments only: `///`, `//!`, `/** */`, `/*! */`.
     pub docs: String,
-    /// String literals and non-doc comments. Not linted today; kept because the
-    /// projection is only sound if all three categories are accounted for.
+    /// String literals and non-doc comments together. Kept because the
+    /// projection is only sound if every category is accounted for.
     #[allow(dead_code)]
     pub other_prose: String,
+    /// String literals **only**.
+    ///
+    /// Separate from `other_prose` because the two need opposite treatment by
+    /// the indentation lint: a comment may line up a table with runs of spaces
+    /// and should, while a literal that contains one has almost certainly
+    /// swallowed the source's indentation.
+    ///
+    /// Blanked with `\0` rather than spaces, unlike the other projections. The
+    /// difference matters for exactly one question: `("a", text("b"))` blanks to
+    /// a run of spaces *between* two literals, which is indistinguishable from a
+    /// run *inside* one when the filler is also a space.
+    pub strings: String,
 }
 
 /// Project a Rust source file.
@@ -61,12 +74,14 @@ pub fn project(src: &str) -> Projections {
     let mut code = vec![b' '; n];
     let mut docs = vec![b' '; n];
     let mut other = vec![b' '; n];
+    let mut strings = vec![0u8; n];
     // Preserve line structure in every projection.
     for (i, ch) in b.iter().enumerate() {
         if *ch == b'\n' {
             code[i] = b'\n';
             docs[i] = b'\n';
             other[i] = b'\n';
+            strings[i] = b'\n';
         }
     }
     let copy = |dst: &mut [u8], from: usize, to: usize| {
@@ -128,6 +143,7 @@ pub fn project(src: &str) -> Projections {
                     .collect();
                 let end = src[j..].find(&close).map(|e| j + e).unwrap_or(n);
                 copy(&mut other, j, end);
+                copy(&mut strings, j, end);
                 i = (end + close.len()).min(n);
                 continue;
             }
@@ -161,6 +177,7 @@ pub fn project(src: &str) -> Projections {
                 i += 1;
             }
             copy(&mut other, start, i);
+            copy(&mut strings, start, i);
             i = (i + 1).min(n);
             continue;
         }
@@ -173,6 +190,7 @@ pub fn project(src: &str) -> Projections {
         code: String::from_utf8_lossy(&code).into_owned(),
         docs: String::from_utf8_lossy(&docs).into_owned(),
         other_prose: String::from_utf8_lossy(&other).into_owned(),
+        strings: String::from_utf8_lossy(&strings).into_owned(),
     }
 }
 
@@ -513,6 +531,31 @@ pub fn run(workspace_root: &Path) -> Vec<Violation> {
             }
         }
 
+        // A string literal wrapped across source lines without a `\`
+        // continuation keeps the next line's indentation *inside the string*,
+        // and prints as a gap mid-sentence. It has happened twice: once in
+        // `ucal explain`'s beats note, and once in `cosmo age`'s audit, both
+        // times invisible until someone read the output.
+        //
+        // Runs on the string-literal projection only. A comment or a doc block
+        // may line up a table with runs of spaces and should be left alone,
+        // which is why `strings` exists separately from `other_prose`.
+        for idx in run_of_spaces(&pr.strings, 6) {
+            if suppressed(&src, line_of(&pr.strings, idx), "no-indent-in-literal") {
+                continue;
+            }
+            v.push(Violation {
+                lint: "no-indent-in-literal",
+                file: file.clone(),
+                line: line_of(&pr.strings, idx),
+                // The source line, not the projection: a reader needs to see the
+                // literal as they wrote it, not as `\0`s around a gap.
+                text: line_text(&src, idx),
+                rule: "a wrapped string literal needs a `\\` continuation, or it carries \
+                       the next line's indentation into the output",
+            });
+        }
+
         // Rules A.2 / Y — ucal-core only, profile module exempt (it IS the bridge)
         let in_core = file.components().any(|c| c.as_os_str() == "ucal-core");
         let is_profile_module = file
@@ -610,6 +653,69 @@ pub fn run(workspace_root: &Path) -> Vec<Violation> {
     v.extend(version_lockstep(workspace_root));
 
     v
+}
+
+/// Offsets of runs of `n` or more spaces that sit inside one string literal.
+///
+/// Takes the `\0`-blanked [`Projections::strings`]: a run of real spaces there
+/// is inside a literal by construction, and the run must be bounded by literal
+/// content on both sides so that trailing or leading spaces — which are
+/// deliberate often enough — are left alone.
+fn run_of_spaces(strings: &str, n: usize) -> Vec<usize> {
+    let b = strings.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0usize;
+    let content = |c: u8| c != b' ' && c != 0 && c != b'\n';
+
+    // What sits before the run, looking back past at most one newline.
+    //
+    // Two shapes reach the output the same way. A literal wrapped without a
+    // continuation puts a newline *inside* the string, so the run follows a
+    // newline that itself follows literal content. A literal whose lines were
+    // joined without one puts the run inline. Requiring content immediately
+    // before catches only the second — which is how the first draft of this lint
+    // passed a deliberately broken literal.
+    let opens_a_run = |start: usize| -> bool {
+        if start == 0 {
+            return false;
+        }
+        if content(b[start - 1]) {
+            return true;
+        }
+        if b[start - 1] != b'\n' {
+            return false;
+        }
+        // The projection carries the literal's *source* bytes, so a properly
+        // continued literal still shows a newline and the next line's
+        // indentation here — the compiler strips them, this does not. A `\` as
+        // the last character before the newline is exactly that case, and it is
+        // the correct spelling rather than the defect.
+        let before_newline: Vec<u8> = b[..start - 1]
+            .iter()
+            .rev()
+            .take_while(|c| **c != b'\n')
+            .copied()
+            .collect();
+        if before_newline.first() == Some(&b'\\') {
+            return false;
+        }
+        before_newline.iter().any(|c| content(*c))
+    };
+
+    while i < b.len() {
+        if b[i] != b' ' {
+            i += 1;
+            continue;
+        }
+        let start = i;
+        while i < b.len() && b[i] == b' ' {
+            i += 1;
+        }
+        if i - start >= n && opens_a_run(start) && i < b.len() && content(b[i]) {
+            out.push(start);
+        }
+    }
+    out
 }
 
 /// Every internal version requirement must equal the workspace package version.

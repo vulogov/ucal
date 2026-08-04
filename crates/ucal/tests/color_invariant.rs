@@ -259,7 +259,7 @@ fn alignment_is_computed_before_painting() {
         .collect();
     assert_eq!(plain, painted);
     // And the columns really are aligned, so the test above is testing something.
-    assert!(plain.iter().any(|l| l.starts_with("a           1")));
+    assert!(plain.iter().any(|l| l.starts_with("a           1"))); // ucal-lint-allow(no-indent-in-literal): the padding is the assertion
 }
 
 #[test]

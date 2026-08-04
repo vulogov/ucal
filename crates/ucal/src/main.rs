@@ -203,6 +203,10 @@ enum CosmoCommand {
         /// Decimal digits for the directed square roots (D-6).
         #[arg(long, default_value_t = ucal_cosmo::DEFAULT_SCALE)]
         scale: u32,
+        /// Also print how the enclosure was reached, and which direction each
+        /// rounding in the chain moved.
+        #[arg(long)]
+        audit: bool,
     },
     /// The redshift at an absolute time, by bisection.
     Z {
@@ -324,7 +328,12 @@ fn main() {
         Command::Doctor => cmd_doctor(),
         #[cfg(feature = "cosmo")]
         Command::Cosmo { what } => match what {
-            CosmoCommand::Age { z, depth, scale } => ucal::cmd_cosmo_age(z, *depth, *scale),
+            CosmoCommand::Age {
+                z,
+                depth,
+                scale,
+                audit,
+            } => ucal::cmd_cosmo_age_audited(z, *depth, *scale, *audit),
             CosmoCommand::Z {
                 at,
                 tolerance_years,

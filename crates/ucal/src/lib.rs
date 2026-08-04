@@ -1410,6 +1410,16 @@ fn years_quantity(t: &Ticks, digits: u32) -> Value {
 /// F8 is exactly the habit of collapsing those into one number.
 #[cfg(feature = "cosmo")]
 pub fn cmd_cosmo_age(z: &str, depth: u32, scale: u32) -> CmdResult {
+    cmd_cosmo_age_audited(z, depth, scale, false)
+}
+
+/// `ucal cosmo age --audit`: the same, with how the enclosure was reached.
+///
+/// An enclosure's claim rests on every rounding in the chain widening it. Two
+/// numbers cannot show that; the audit names each step and the direction it
+/// rounds in, so the claim is checkable rather than asserted.
+#[cfg(feature = "cosmo")]
+pub fn cmd_cosmo_age_audited(z: &str, depth: u32, scale: u32, audit: bool) -> CmdResult {
     let model = ucal_cosmo::LambdaCdm::planck2018();
     let z = Ratio::from_decimal_str(z.trim())?;
     let out = model.t_of_z(&z, depth, scale)?;
@@ -1463,6 +1473,19 @@ pub fn cmd_cosmo_age(z: &str, depth: u32, scale: u32) -> CmdResult {
         )
         .field("parameters", Value::text(model.describe()))
         .field("citation", Value::text(out.citation.source));
+
+    if audit {
+        doc = doc.field(
+            "audit",
+            Value::Section(
+                model
+                    .audit(&z, depth, scale)?
+                    .into_iter()
+                    .map(|(step, detail)| (step, Value::text(detail)))
+                    .collect(),
+            ),
+        );
+    }
 
     for w in &out.warnings {
         doc = doc.field("warning", Value::text(w.to_string()));

@@ -484,7 +484,7 @@ fn ge1_and_ge2_measured() {
     );
 
     println!(
-        "\n depth   panels        wall   arith width (ticks)  ~yr   ticks/enclosure"
+        "\n depth   panels        wall   arith width (ticks)  ~yr   ticks/enclosure"  // ucal-lint-allow(no-indent-in-literal): a column header, aligned on purpose
     );
     for depth in [4u32, 8, 12, 14, 16, 18, 20] {
         let t0 = Clock::now();
@@ -534,5 +534,46 @@ fn ge1_and_ge2_measured() {
         " t(z=1100) = {} .. {} yr\n",
         years(out.value.lo().ticks()),
         years(out.value.hi().ticks())
+    );
+}
+
+// ---------------------------------------------------------------------------
+// The tick quantisation, which is the last rounding in the chain
+// ---------------------------------------------------------------------------
+
+#[test]
+fn quantising_to_ticks_rounds_outward_on_both_ends() {
+    // Every rounding in this computation widens: the densities are taken at
+    // opposite ends, the roots are directed apart, the accumulator snaps outward
+    // and the two sums multiply by opposite ends of 1/H0. The last step turns
+    // two rationals into two tick counts, and it has to widen too.
+    //
+    // It did not. Both ends were floored, and flooring the *upper* bound moves
+    // it down — inward — so the enclosure could exclude a true value lying in
+    // the fraction that was discarded. Found by writing V4's audit and asking
+    // what direction each step rounds in.
+    let m = model();
+    let z = Ratio::from_u64(1100);
+    let u0 = Ratio::one().add(&z).unwrap().recip().unwrap();
+    let full = super::integral_enclosure(&m, &u0, 6, S).unwrap();
+
+    let t_lo = full.lo().mul(m.hubble_time.lo()).unwrap();
+    let t_hi = full.hi().mul(m.hubble_time.hi()).unwrap();
+    // Neither bound lands on an integer, so the direction is not academic.
+    assert!(!t_lo.frac().is_zero(), "t_lo happens to be integral; pick another z");
+    assert!(!t_hi.frac().is_zero(), "t_hi happens to be integral; pick another z");
+
+    let out = m.t_of_z(&z, 6, S).unwrap().value;
+    let lo_q = Ratio::from_int(out.lo().ticks().clone());
+    let hi_q = Ratio::from_int(out.hi().ticks().clone());
+
+    assert!(
+        lo_q <= t_lo,
+        "the quantised lower bound rose above the computed one"
+    );
+    assert!(
+        hi_q >= t_hi,
+        "the quantised upper bound fell below the computed one: the enclosure \
+         no longer provably contains what the quadrature bounded"
     );
 }

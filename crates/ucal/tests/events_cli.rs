@@ -31,7 +31,7 @@ fn every_timeline_entry_renders_at_every_tier() {
     for tier in [Tier::DEEP, Tier::DRIFT, Tier::SPAN, Tier::SWEEP, Tier::BEAT] {
         let text = cmd_timeline(tier).unwrap().to_text();
         assert!(
-            !text.contains("at                   \n"),
+            !text.contains("at                   \n"),  // ucal-lint-allow(no-indent-in-literal): a column header, aligned on purpose
             "empty position at {tier}"
         );
         assert!(!text.contains("<unrenderable"), "unrenderable at {tier}");
