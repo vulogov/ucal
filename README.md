@@ -234,7 +234,7 @@ cargo run -p xtask -- verify-vectors  # conformance vectors re-derive
 ## Status
 
 Released **0.3.0** on crates.io, all six crates. `main` carries the released line;
-`0.4.0` will be where development happens. The API is **not yet stable** — a `0.x` bump
+`0.4.0` is where development happens. The API is **not yet stable** — a `0.x` bump
 may break it.
 
 Release notes: [`Documentation/Release_Notes`](Documentation/Release_Notes).
