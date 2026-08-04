@@ -315,6 +315,13 @@ pub struct Render {
     pub decimals: Option<u32>,
     /// Rounding mode, overriding each field's own default. `None` keeps them.
     pub round: Option<ucal_core::Rounding>,
+    /// Show foreign-unit renderings — SI seconds, Julian years, Gyr.
+    ///
+    /// Off by default, and that default is the project. A Julian year is 365.25
+    /// of Earth's rotations; using it to describe an epoch before Earth existed
+    /// is the substitution this whole program was written to object to. The
+    /// conversion is available on request and is not performed unasked.
+    pub bridge: bool,
 }
 
 impl Render {
@@ -326,6 +333,7 @@ impl Render {
         cols: crate::table::BASELINE_WIDTH,
         decimals: None,
         round: None,
+        bridge: false,
     };
 
     /// A style with no separator, at the baseline width.
@@ -373,6 +381,12 @@ impl Render {
     /// Override every field's rounding mode.
     pub fn round(mut self, m: Option<ucal_core::Rounding>) -> Render {
         self.round = m;
+        self
+    }
+
+    /// Show foreign-unit renderings.
+    pub fn bridge(mut self, on: bool) -> Render {
+        self.bridge = on;
         self
     }
 }

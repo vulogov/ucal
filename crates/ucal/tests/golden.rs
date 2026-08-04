@@ -149,10 +149,15 @@ fn the_implied_age_is_rendered_exactly_not_rounded() {
     let Some(Value::Section(implied)) = doc.get("implied_age") else {
         panic!("expected implied_age");
     };
+    // The implied age is a foreign-unit rendering, so it is behind `--bridge`
+    // since D-A16 — but §19.2 still governs *what* it says when asked for.
     let seconds = implied
         .iter()
         .find(|(k, _)| k == "seconds")
-        .and_then(|(_, v)| v.rendered_opt(&ucal::style::Render::PLAIN))
+        .and_then(|(_, v)| match v {
+            Value::Bridge(inner) => inner.rendered_opt(&ucal::style::Render::PLAIN),
+            other => other.rendered_opt(&ucal::style::Render::PLAIN),
+        })
         .map(|(text, _)| text)
         .unwrap();
     assert!(
@@ -279,9 +284,16 @@ fn to_civil_in_the_julian_calendar_differs_and_says_so() {
 fn explain_shows_both_forms_and_the_si_bridge() {
     let doc = cmd_explain(APPENDIX_C_2026, false).unwrap();
     let text = doc.to_text();
-    // §4.3: the SI equivalent is always printed alongside.
-    assert!(text.contains("si_bridge"));
-    assert!(text.contains("second"));
+
+    // §4.3 said the SI equivalent is *always* printed alongside. D-A16 amends
+    // that: an SI second is an Earth unit and `ucal explain` is not an Earth
+    // command, so the conversion is printed on request and not unasked. It must
+    // still be reachable, and it must still be absent by default — both halves
+    // are the amendment.
+    assert!(!text.contains("si_bridge"), "a foreign unit appeared unasked");
+    let asked = doc.render(&ucal::style::Render::PLAIN.bridge(true));
+    assert!(asked.contains("si_bridge"));
+    assert!(asked.contains("second"));
     // Both text forms (Rule D).
     assert!(text.contains("UC1 0031·0687·2481·2999·3108·2437"));
     assert!(text.contains("UC1/5"));

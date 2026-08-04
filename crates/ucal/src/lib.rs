@@ -254,7 +254,10 @@ pub fn cmd_datum() -> CmdResult {
                      (Rule Q.1). The measurement is the `input` above.",
                 ),
             ),
-            ("seconds".into(), Value::quantity(&implied_s, 6, Rounding::HalfEven)),
+            (
+                "seconds".into(),
+                Value::bridge(Value::quantity(&implied_s, 6, Rounding::HalfEven)),
+            ),
         ]),
     );
 
@@ -463,13 +466,17 @@ pub fn cmd_explain(input: &str, show_claim: bool) -> CmdResult {
         let d = UC1::origin_offset().try_sub(t.ticks()).expect("lt");
         format!("-{}", dec(&tick_ratio(&d, &bridge.ticks), 6))
     };
+    // §4.3 said `ucal explain` "always prints the SI equivalent alongside".
+    // Amended in 0.4.0 (D-A16): the conversion is available on request and is
+    // not performed unasked, because an SI second is an Earth unit and this is
+    // not an Earth command. `--bridge` prints it.
     doc = doc.field(
         "si_bridge",
-        Value::Section(vec![
+        Value::bridge(Value::Section(vec![
             ("unit".into(), Value::text(bridge.name)),
             ("epoch".into(), Value::text(bridge.epoch_label)),
             ("seconds_from_epoch".into(), Value::text(since_epoch)),
-        ]),
+        ])),
     );
 
     // §10.6: a quantity inside the claim half-width warrants UCAL-W0006.
@@ -783,7 +790,7 @@ pub fn cmd_ladder(loc: LocaleId, named_only: bool) -> CmdResult {
                 // requires — and only ever alongside.
                 (
                     format!("{}s (bridge)", bridge.name),
-                    Value::quantity(&in_bridge, 6, Rounding::HalfEven),
+                    Value::bridge(Value::quantity(&in_bridge, 6, Rounding::HalfEven)),
                 ),
                 ("ticks".into(), Value::number(tier.ticks().to_dec_string())),
             ]),
@@ -1226,13 +1233,12 @@ pub fn cmd_events_list() -> CmdResult {
 #[cfg(feature = "events")]
 pub fn cmd_events_show(id: &str) -> CmdResult {
     let e = events::by_id(id)?;
-    let bridge = UC1::bridge();
     let mid = e.window.midpoint(Rounding::HalfEven)?;
 
     let mut doc = Doc::new()
         .title(format!("ucal events show {id}"))
         .field("label", Value::text(e.label))
-        .field("year", Value::text(YEAR_DEFINITION))
+        .field("year", Value::bridge(Value::text(YEAR_DEFINITION)))
         .field("description", Value::text(e.description))
         .field("as_published", Value::text(e.as_published))
         .field(
@@ -1251,7 +1257,7 @@ pub fn cmd_events_show(id: &str) -> CmdResult {
                     "width_ticks".into(),
                     Value::number(e.uncertainty().ticks().to_dec_string()),
                 ),
-                ("width_years".into(), years_quantity(e.uncertainty().ticks(), 0)),
+                ("width_years".into(), Value::bridge(years_quantity(e.uncertainty().ticks(), 0))),
             ]),
         )
         .field(
@@ -1469,7 +1475,7 @@ pub fn cmd_cosmo_age_audited(z: &str, depth: u32, scale: u32, audit: bool) -> Cm
             },
         )
         .field("model", Value::text(out.model.0))
-        .field("year", Value::text(YEAR_DEFINITION))
+        .field("year", Value::bridge(Value::text(YEAR_DEFINITION)))
         .field(
             "enclosure",
             Value::Section(vec![
@@ -1481,8 +1487,8 @@ pub fn cmd_cosmo_age_audited(z: &str, depth: u32, scale: u32, audit: bool) -> Cm
                     "hi_ticks".into(),
                     Value::number(out.value.hi().ticks().to_dec_string()),
                 ),
-                ("lo_years".into(), years_quantity(out.value.lo().ticks(), 0)),
-                ("hi_years".into(), years_quantity(out.value.hi().ticks(), 0)),
+                ("lo_years".into(), Value::bridge(years_quantity(out.value.lo().ticks(), 0))),
+                ("hi_years".into(), Value::bridge(years_quantity(out.value.hi().ticks(), 0))),
                 (
                     "at_drift".into(),
                     Value::text(render_at(out.value.lo(), Tier::DRIFT)),
@@ -1510,7 +1516,7 @@ pub fn cmd_cosmo_age_audited(z: &str, depth: u32, scale: u32, audit: bool) -> Cm
                         Rounding::HalfEven,
                     ),
                 ),
-                ("arithmetic_years".into(), years_quantity(out.arithmetic_width.ticks(), 1)),
+                ("arithmetic_years".into(), Value::bridge(years_quantity(out.arithmetic_width.ticks(), 1))),
                 (
                     "parameter_ticks".into(),
                     Value::number(out.parameter_width.ticks().to_dec_string()),
@@ -1523,16 +1529,16 @@ pub fn cmd_cosmo_age_audited(z: &str, depth: u32, scale: u32, audit: bool) -> Cm
                         Rounding::HalfEven,
                     ),
                 ),
-                ("parameter_years".into(), years_quantity(out.parameter_width.ticks(), 1)),
+                ("parameter_years".into(), Value::bridge(years_quantity(out.parameter_width.ticks(), 1))),
                 (
                     "note".into(),
                     Value::text(
                         "Rule X: quadrature error and parameter uncertainty are \
                          reported separately and never merged (F8). The second is \
                          what the measurement does not know; the first is what this \
-                         program does not know. Each is given in ticks, in drifts, \
-                         and in Julian years — the last being a foreign unit shown \
-                         alongside and never instead (§4.3, Rule A.5).",
+                         program does not know. Each is given in ticks and in \
+                         drifts, both body-independent; `--bridge` adds the \
+                         foreign-unit conversion, which is not performed unasked.",
                     ),
                 ),
             ]),
@@ -1565,7 +1571,7 @@ pub fn cmd_cosmo_age_audited(z: &str, depth: u32, scale: u32, audit: bool) -> Cm
                         Rounding::HalfEven,
                     ),
                 ),
-                ("years".into(), years_quantity(out.input_width.ticks(), 1)),
+                ("years".into(), Value::bridge(years_quantity(out.input_width.ticks(), 1))),
                 (
                     "note".into(),
                     Value::text(
@@ -1627,8 +1633,8 @@ pub fn cmd_cosmo_z(instant: &str, tolerance_years: u64, depth: u32, scale: u32) 
     Ok(Doc::new()
         .title("ucal cosmo z")
         .field("instant_ticks", Value::number(t.ticks().to_dec_string()))
-        .field("years_after_datum", Value::text(ticks_in_years(t.ticks(), 0)))
-        .field("year", Value::text(YEAR_DEFINITION))
+        .field("years_after_datum", Value::bridge(Value::text(ticks_in_years(t.ticks(), 0))))
+        .field("year", Value::bridge(Value::text(YEAR_DEFINITION)))
         .field("model", Value::text(out.model.0))
         .field("tolerance_years", Value::number(tolerance_years.to_string()))
         .field(
@@ -1662,7 +1668,7 @@ pub fn cmd_cosmo_model() -> CmdResult {
     Ok(Doc::new()
         .title("ucal cosmo model")
         .field("model", Value::text(model.model.0))
-        .field("year", Value::text(YEAR_DEFINITION))
+        .field("year", Value::bridge(Value::text(YEAR_DEFINITION)))
         .field("as_published", Value::Section(params))
         .field("citation", Value::text(model.citation.source))
         .field(
@@ -1674,7 +1680,7 @@ pub fn cmd_cosmo_model() -> CmdResult {
                 ),
                 (
                     "gyr".into(),
-                    Value::text(dec(
+                    Value::bridge(Value::text(dec(
                         &model
                             .hubble_time
                             .lo()
@@ -1688,7 +1694,7 @@ pub fn cmd_cosmo_model() -> CmdResult {
                                     .expect("a gigayear fits the domain"),
                             ))?,
                         3,
-                    )),
+                    ))),
                 ),
                 (
                     "note".into(),

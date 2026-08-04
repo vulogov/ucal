@@ -72,7 +72,11 @@ fn pad_to(painted: &str, shown: usize, w: usize) -> String {
 /// is not a grid row. Rather than inventing a flattening, such a row falls back
 /// to the nested rendering it would have had.
 fn is_scalar(v: &Value) -> bool {
-    !matches!(v, Value::Section(_) | Value::List(_) | Value::Rows { .. })
+    match v {
+        Value::Section(_) | Value::List(_) | Value::Rows { .. } => false,
+        Value::Bridge(inner) => is_scalar(inner),
+        _ => true,
+    }
 }
 
 /// Render a row-shaped field as a table.
@@ -111,6 +115,14 @@ pub fn render(
                     return false;
                 };
                 for (k, fv) in fields {
+                    // A foreign-unit column is a column, and is omitted for the
+                    // same reason a foreign-unit field is: `--bridge` was not
+                    // asked for. Missing this left `ucal ladder`'s "seconds
+                    // (bridge)" column in place while every other rendering had
+                    // dropped it.
+                    if matches!(fv, Value::Bridge(_)) && !r.bridge {
+                        continue;
+                    }
                     if is_scalar(fv) && !columns.iter().any(|c| c == k) {
                         columns.push(k.clone());
                     }

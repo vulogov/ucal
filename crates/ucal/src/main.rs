@@ -71,6 +71,15 @@ struct Cli {
           value_parser = ["trunc", "ceil", "half-even", "half-up"])]
     round: Option<String>,
 
+    /// Also show foreign-unit conversions: SI seconds, Julian years, Gyr.
+    ///
+    /// Off by default. A Julian year is 365.25 of Earth's rotations and an SI
+    /// second is an Earth unit; using either to describe something that is not
+    /// of Earth is the substitution this program exists to object to. The
+    /// conversion is available on request and is not performed unasked.
+    #[arg(long, global = true)]
+    bridge: bool,
+
     /// Columns to render tables at. Never below 80; defaults to the terminal
     /// width when there is one, and to 80 when output is redirected.
     #[arg(long, global = true, value_name = "N")]
@@ -432,6 +441,7 @@ fn main() {
         .group(sep)
         .decimals(cli.decimals)
         .round(round)
+        .bridge(cli.bridge)
         .width(Render::resolve_width(cli.width, terminal));
 
     match result {

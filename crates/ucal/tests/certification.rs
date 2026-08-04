@@ -186,15 +186,18 @@ fn the_certification_map_lists_every_exception_and_nothing_else() {
 #[test]
 fn the_map_reaches_the_json_and_the_text() {
     // A claim nobody can read is not a claim.
+    // With `--bridge`, because the rounded column this names is a foreign unit
+    // and 0.4.0 stopped printing those unasked (D-A16).
     let doc = ucal::cmd_ladder(ucal_core::LocaleId::En, true).unwrap();
+    let r = Render::PLAIN.bridge(true);
     assert!(
-        !doc.certifications(&Render::PLAIN).is_empty(),
+        !doc.certifications(&r).is_empty(),
         "the ladder rounds something"
     );
-    let json = doc.to_json();
+    let json = doc.to_json_with(&r);
     assert!(json.contains("\"certification\""), "missing from --json");
     assert!(json.contains("rounded"), "the map says nothing useful");
-    let text = doc.to_text();
+    let text = doc.render(&r);
     assert!(text.contains("certification:"), "missing from the text");
     assert!(
         text.contains("seconds (bridge)"),
@@ -366,7 +369,7 @@ fn the_certification_follows_the_digit_count() {
     // while bridge seconds stay in it — they never terminate at any count.
     let doc = ucal::cmd_ladder(ucal_core::LocaleId::En, true).unwrap();
     let at = |d: u32| -> Vec<String> {
-        doc.certifications(&Render::PLAIN.decimals(Some(d)))
+        doc.certifications(&Render::PLAIN.bridge(true).decimals(Some(d)))
             .into_iter()
             .map(|(p, _)| p.rsplit('.').next().unwrap_or("").to_string())
             .collect()

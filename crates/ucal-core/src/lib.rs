@@ -123,4 +123,7 @@ pub const SPEC_DELTAS: &[&str] = &[
     "D-A11: obliquity is an angle and cannot be a RatedParam under Rule C (correction)",
     "D-A12: §9.6's synodic formula contradicts Appendix I.2; the year-relative form is correct (correction)",
     "D-A13: a drift bound is a rate in local units, not a Delta (correction)",
+    "D-A14: §10.3's integral cannot be quadratured as written (correction)",
+    "D-A15: Appendix H.4's monotone case does not apply to LambdaCDM (editorial)",
+    "D-A16: §4.3's SI equivalent is printed on request, not always (amendment)",
 ];

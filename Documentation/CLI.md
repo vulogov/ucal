@@ -46,6 +46,7 @@ Accepted by every command (§19.1).
 | `--tick-sep <CHAR>` | none | Separator between three-digit groups in decimal counts. Off by default so a copied tick count is still an integer. |
 | `--decimals <N>` | each field's own | Fractional digits for every rendered rational. Without it each field keeps the precision it was written with, so the default output is unchanged. |
 | `--round <MODE>` | each field's own | `trunc`, `ceil`, `half-even` or `half-up`, for every rendered value including `to-civil`'s sub-second field. |
+| `--bridge` | off | Also show foreign-unit conversions: SI seconds, Julian years, Gyr. Off by default — see below. |
 
 ### Colour, and what it is allowed to mean
 
@@ -547,28 +548,44 @@ $ ucal ladder --named-only --decimals 60 --json | jq -r '.tiers["T-12"].beats'
 At sixty digits that value is **exact**, and the `certification` map below drops
 it while keeping `seconds (bridge)`, which never terminates at any digit count.
 
-### Which year? And why is an Earth unit here at all?
+### Earth units, and `--bridge`
 
-**The Julian year: 31 557 600 s exactly**, 365.25 days of 86 400 SI seconds —
-the same definition `ucal datum` uses for `Gyr`. Every command that prints a
-`*_years` field declares it in a `year` field, because "years" is ambiguous by
-about `2 × 10^-5` and that is not below the precision reported: at the ages
-`cosmo age` gives, Julian and Gregorian differ by roughly **eight years on
-371 600**, while `arithmetic_years` prints to one decimal.
+**No Earth unit appears outside an Earth context unless you ask for one.**
 
-The second question is the better one. A Julian year is 365.25 of Earth's
-rotations — a rounded Earth orbit — and `cosmo age` uses it to describe epochs
-some 13.4 billion years before Earth existed. That is the exact irritation this
-project was built around.
+A Julian year is 365.25 of Earth's rotations. An SI second is an Earth unit.
+Using either to describe something that is not of Earth is the substitution this
+program was written to object to — and it had crept into the program itself:
+`cosmo age` reported its enclosure widths in Julian years *and nothing else*,
+for an epoch some 13.4 billion years before Earth existed.
 
-It is permitted, and only in one way: as a **bridge** (Rule A.3), **informative
-only** (Rule A.5), shown **alongside** the answer and never instead of it
-(§4.3). The answer is `lo_ticks` and `hi_ticks` — exact integers carrying no
-Earth content — with `at_drift` placing them on the body-independent ladder.
+By default, output uses **ticks** and the **tier ladder** — beats, drifts,
+spans — which are body-independent by construction. `--bridge` adds the
+conversion. The conversion is available on request and is not performed unasked.
 
-Until 0.4.0 the `widths` section reported in Julian years **and nothing else**,
-which is *instead* rather than alongside. Each width is now given in ticks, in
-drifts and in years, in that order.
+```
+$ ucal cosmo age --z 1100 --json | jq -r '.enclosure | keys[]'
+lo_ticks   hi_ticks   at_drift
+
+$ ucal cosmo age --z 1100 --bridge --json | jq -r '.enclosure | keys[]'
+lo_ticks   hi_ticks   lo_years   hi_years   at_drift
+```
+
+This amends §4.3, which said `ucal explain` "always prints the SI equivalent
+alongside" — see `spec/SPEC-DELTAS.md` D-A16.
+
+**Two contexts keep foreign units unconditionally**, and the list is short on
+purpose. `to-civil` and `from-civil` *are* Earth calendar commands — a civil
+label is an Earth label and rendering it is the whole request. And `ucal datum`'s
+provenance chain and rounding residual, which §19.2 requires: they record where
+an Earth-sourced measurement entered, and the point is that it entered there and
+nowhere else (Rule Y).
+
+**Which year, when you do ask?** The Julian year, `31 557 600 s` exactly — the
+same definition `ucal datum` uses for `Gyr`. Stated in a `year` field alongside,
+because "years" is ambiguous by about `2 × 10^-5` and that is *not* below the
+precision reported: at the ages `cosmo age` gives, Julian and Gregorian differ
+by roughly **eight years on 371 600**, while `arithmetic_years` prints to one
+decimal.
 
 ### `certification`
 

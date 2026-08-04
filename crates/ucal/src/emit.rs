@@ -70,6 +70,19 @@ pub enum Value {
         /// The mode this field rounds with unless told otherwise.
         mode: Rounding,
     },
+    /// A value in a **foreign unit**, shown only when the caller asks.
+    ///
+    /// Rule A.3 admits foreign units at three declared points; Rule A.5 makes
+    /// them informative. §4.3 requires one place to print the SI equivalent
+    /// always — `ucal explain` — and requires it nowhere else.
+    ///
+    /// Everywhere else a Julian year or an SI second is a courtesy, and a
+    /// courtesy that had become the *only* rendering in places: `cosmo age`
+    /// reported its widths in Earth years and nothing else, for epochs before
+    /// Earth existed. Wrapping the field makes "this is a foreign unit" a fact
+    /// about the value rather than a bool threaded through five signatures, and
+    /// makes omitting it the default rather than something to remember.
+    Bridge(Box<Value>),
     /// A rendered timestamp form: a `UC1` text form, a `UC1/5` form, or a UCID.
     ///
     /// Distinguished from [`Value::Text`] only so the renderer can tell the
@@ -159,6 +172,11 @@ impl Value {
     /// A rendered timestamp form.
     pub fn form(s: impl Into<String>) -> Value {
         Value::Form(s.into())
+    }
+
+    /// Mark a value as a foreign unit, shown only under `--bridge`.
+    pub fn bridge(v: Value) -> Value {
+        Value::Bridge(Box::new(v))
     }
 
     /// A rational, to be rendered at `digits` under `mode` unless overridden.
@@ -314,6 +332,9 @@ impl Doc {
             .max()
             .unwrap_or(0);
         for (k, v) in &self.fields {
+            if matches!(v, Value::Bridge(_)) && !r.bridge {
+                continue;
+            }
             render_field_text(&mut s, k, v, width, 0, r);
         }
         let certs = self.certifications(r);
@@ -386,12 +407,13 @@ impl Doc {
         // A trailing object follows the fields when there is one, so the last
         // field's comma depends on both of them, not only on `notes`.
         let more = !self.notes.is_empty() || !certs.is_empty();
-        for (i, (k, v)) in self.fields.iter().enumerate() {
-            let comma = if i + 1 == self.fields.len() && !more {
-                ""
-            } else {
-                ","
-            };
+        let shown: Vec<&(String, Value)> = self
+            .fields
+            .iter()
+            .filter(|(_, v)| r.bridge || !matches!(v, Value::Bridge(_)))
+            .collect();
+        for (i, (k, v)) in shown.iter().enumerate() {
+            let comma = if i + 1 == shown.len() && !more { "" } else { "," };
             let _ = write!(s, "  \"{}\": ", escape(k));
             render_value_json(&mut s, v, 1, r);
             let _ = writeln!(s, "{comma}");
@@ -445,6 +467,12 @@ fn collect_certs(
             }
             Value::Section(inner) => collect_certs(inner, &path, r, out),
             Value::Rows { rows, .. } => collect_certs(rows, &path, r, out),
+            // A foreign-unit field is still a rendered number when it is shown,
+            // and needs its certification like any other. Missing this made the
+            // ladder's bridge column silently uncertified under `--bridge`.
+            Value::Bridge(inner) if r.bridge => {
+                collect_certs(core::slice::from_ref(&(path.clone(), (**inner).clone())), "", r, out)
+            }
             _ => {}
         }
     }
@@ -478,6 +506,15 @@ pub(crate) fn render_scalar(r: &Render, v: &Value) -> String {
         Value::Form(f) => paint_form(r, f),
         Value::Quantity { .. } => group_decimal(r, &v.rendered(r).0),
         Value::Bool(b) => r.style.paint(Role::Value, &b.to_string()),
+        // A foreign unit renders as its inner value when asked for, and as
+        // nothing when not.
+        Value::Bridge(inner) => {
+            if r.bridge {
+                render_scalar(r, inner)
+            } else {
+                String::new()
+            }
+        }
         // Not scalars; `crate::table::render` refuses rows containing them, and
         // the field renderer handles them before reaching here.
         Value::Section(_) | Value::List(_) | Value::Rows { .. } => String::new(),
@@ -529,10 +566,14 @@ fn render_field_text(s: &mut String, k: &str, v: &Value, width: usize, depth: us
             let inner = fields
                 .iter()
                 .filter(|(_, v)| !matches!(v, Value::Section(_) | Value::List(_) | Value::Rows { .. }))
+                .filter(|(_, v)| r.bridge || !matches!(v, Value::Bridge(_)))
                 .map(|(k, _)| k.chars().count())
                 .max()
                 .unwrap_or(0);
             for (ik, iv) in fields {
+                if matches!(iv, Value::Bridge(_)) && !r.bridge {
+                    continue;
+                }
                 render_field_text(s, ik, iv, inner, depth + 1, r);
             }
         }
@@ -574,6 +615,11 @@ fn render_field_text(s: &mut String, k: &str, v: &Value, width: usize, depth: us
         }
         Value::Quantity { .. } => {
             write_field(s, r, &pad, k, width, &group_decimal(r, &v.rendered(r).0));
+        }
+        Value::Bridge(inner) => {
+            if r.bridge {
+                render_field_text(s, k, inner, width, depth, r);
+            }
         }
         Value::Bool(b) => {
             write_field(s, r, &pad, k, width, &style.paint(Role::Value, &b.to_string()));
@@ -622,7 +668,18 @@ fn render_value_json(s: &mut String, v: &Value, depth: usize, r: &Render) {
         // Rows is Section with a rendering hint. Emitting it through the same
         // arm is what keeps `ucal-json/1` fixed.
         Value::Rows { rows, .. } => render_value_json(s, &Value::Section(rows.clone()), depth, r),
+        Value::Bridge(inner) => {
+            if r.bridge {
+                render_value_json(s, inner, depth, r);
+            } else {
+                let _ = write!(s, "null");
+            }
+        }
         Value::Section(fields) => {
+            let fields: Vec<&(String, Value)> = fields
+                .iter()
+                .filter(|(_, v)| r.bridge || !matches!(v, Value::Bridge(_)))
+                .collect();
             if fields.is_empty() {
                 let _ = write!(s, "{{}}");
                 return;
