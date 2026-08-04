@@ -25,7 +25,26 @@
 //!   carries `18 548 584 399 861` in its denominator, which is neither a power
 //!   of two nor of five.
 //!
-//! The first is a labelling gap. The second is an accuracy defect that shipped.
+//! # Not a float, and not lost accuracy
+//!
+//! Worth stating, because `0.000000` looks like an underflow and is not one.
+//! Rule E forbids a float token in any shipped crate and the lint enforces it;
+//! the tree's one exemption is a marked region of `#[cfg(test)]` oracle code in
+//! `ucal-cosmo`. These strings are produced by
+//! [`Ratio::to_decimal_string`](ucal_core::num::Ratio::to_decimal_string), which
+//! computes `mul_div_rounded(num, 10^digits, den, mode)` — one integer
+//! multiply-divide with an explicit rounding mode — and then inserts a `.` into
+//! the resulting integer's digits.
+//!
+//! So a tick in beats is held exactly, as `1 / 5^60`, and rendered exactly at
+//! sixty digits: `0.000000000000000000000000000000000000000001152921504606846976`.
+//! Nothing was approximated. Six digits is simply too few places to show it.
+//!
+//! That places the defect where the design says it must be. Rule R makes
+//! rendering the *only* site at which a value may lose information, and this is
+//! that site behaving exactly as specified — while failing to say so. The fix is
+//! not more precision; there is none to add. It is that the rendering declares
+//! what it did, and that the digit count belongs to the caller.
 //!
 //! # Decided, not annotated
 //!
