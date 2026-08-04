@@ -547,6 +547,15 @@ $ ucal ladder --named-only --decimals 60 --json | jq -r '.tiers["T-12"].beats'
 At sixty digits that value is **exact**, and the `certification` map below drops
 it while keeping `seconds (bridge)`, which never terminates at any digit count.
 
+### Which year?
+
+**The Julian year: 31 557 600 s exactly**, 365.25 days of 86 400 SI seconds —
+the same definition `ucal datum` uses for `Gyr`. Every command that prints a
+`*_years` field now declares it in a `year` field, because "years" is ambiguous
+by about `2 × 10^-5` and that is not below the precision reported: at the ages
+`cosmo age` gives, Julian and Gregorian differ by roughly **eight years on
+371 600**, while `arithmetic_years` is printed to one decimal.
+
 ### `certification`
 
 Every document that rounds anything carries a `certification` object mapping a

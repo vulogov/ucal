@@ -1232,6 +1232,7 @@ pub fn cmd_events_show(id: &str) -> CmdResult {
     let mut doc = Doc::new()
         .title(format!("ucal events show {id}"))
         .field("label", Value::text(e.label))
+        .field("year", Value::text(YEAR_DEFINITION))
         .field("description", Value::text(e.description))
         .field("as_published", Value::text(e.as_published))
         .field(
@@ -1250,19 +1251,7 @@ pub fn cmd_events_show(id: &str) -> CmdResult {
                     "width_ticks".into(),
                     Value::number(e.uncertainty().ticks().to_dec_string()),
                 ),
-                (
-                    "width_years".into(),
-                    Value::text(dec(
-                        &tick_ratio(
-                            e.uncertainty().ticks(),
-                            &bridge
-                                .ticks
-                                .try_mul(&<Ticks as TickInt>::from_u64(31_557_600))
-                                .unwrap_or_else(|| bridge.ticks.clone()),
-                        ),
-                        0,
-                    )),
-                ),
+                ("width_years".into(), years_quantity(e.uncertainty().ticks(), 0)),
             ]),
         )
         .field(
@@ -1410,6 +1399,21 @@ fn parse_redshift(s: &str) -> Result<RatInterval, TimeError> {
     }
 }
 
+/// The definition behind every `*_years` field this program prints.
+///
+/// "Years" is ambiguous by roughly `2 × 10^-5` — Julian 365.25 d, Gregorian
+/// 365.2425 d, tropical ≈365.24219 d — which sounds negligible and is not: at
+/// the ages `ucal cosmo age` reports it is about eight years on 371 600, and
+/// `arithmetic_years` is printed to one decimal, so the ambiguity lands in
+/// digits a reader can see rather than below them.
+///
+/// `ucal datum` already declares this for `Gyr`. Everything else printed a year
+/// and left the reader to guess until 0.4.0.
+pub const YEAR_DEFINITION: &str =
+    "Julian year = 31 557 600 s exactly (365.25 d of 86 400 s), the same \
+     definition ucal datum uses for Gyr. Not Gregorian (365.2425 d) and not \
+     tropical: at 371 600 years those differ by about 8.";
+
 /// The same conversion, certified.
 ///
 /// A count of ticks divided by a Julian year is a rational, and whether its
@@ -1461,6 +1465,7 @@ pub fn cmd_cosmo_age_audited(z: &str, depth: u32, scale: u32, audit: bool) -> Cm
             },
         )
         .field("model", Value::text(out.model.0))
+        .field("year", Value::text(YEAR_DEFINITION))
         .field(
             "enclosure",
             Value::Section(vec![
@@ -1578,6 +1583,7 @@ pub fn cmd_cosmo_z(instant: &str, tolerance_years: u64, depth: u32, scale: u32) 
         .title("ucal cosmo z")
         .field("instant_ticks", Value::number(t.ticks().to_dec_string()))
         .field("years_after_datum", Value::text(ticks_in_years(t.ticks(), 0)))
+        .field("year", Value::text(YEAR_DEFINITION))
         .field("model", Value::text(out.model.0))
         .field("tolerance_years", Value::number(tolerance_years.to_string()))
         .field(
@@ -1611,6 +1617,7 @@ pub fn cmd_cosmo_model() -> CmdResult {
     Ok(Doc::new()
         .title("ucal cosmo model")
         .field("model", Value::text(model.model.0))
+        .field("year", Value::text(YEAR_DEFINITION))
         .field("as_published", Value::Section(params))
         .field("citation", Value::text(model.citation.source))
         .field(
