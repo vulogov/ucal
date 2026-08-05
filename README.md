@@ -233,11 +233,43 @@ cargo run -p xtask -- verify-vectors  # conformance vectors re-derive
 
 ## Status
 
-Released **0.5.0** on crates.io, all six crates. `main` carries the released line;
-`0.6.0` is where development happens. The API is **not yet stable** — a `0.x` bump
+Released **0.6.0** on crates.io, all six crates. `main` carries the released line;
+`0.7.0` is where development happens. The API is **not yet stable** — a `0.x` bump
 may break it.
 
 Release notes: [`Documentation/Release_Notes`](Documentation/Release_Notes).
+What 1.0 will promise: [`Documentation/STABILITY.md`](Documentation/STABILITY.md).
+
+## Help wanted, specifically
+
+Three things this project needs from someone who is not its author, and 1.0 does
+not ship without at least one of them —
+[`Documentation/CONTACT.md`](Documentation/CONTACT.md).
+
+The cheapest is thirty minutes in any language, with no Rust and nothing to
+install: compute `BEAT`, `SECOND` and `ORIGIN_OFFSET` from
+[`fixtures/vectors.json`](fixtures/vectors.json) your own way and say whether
+they match. A mismatch is worth more than a match, and *"I could not tell what
+to compute from the documents"* is worth more than either.
+
+## Verifying what you downloaded
+
+`fixtures/vectors.json` carries every declared constant of profile UC-1 and its
+derivation. Its digest is signed:
+
+```
+minisign -Vm fixtures/SHA256SUMS -P RWTMVJ5DqeXk0HgeN+BIdnQaamRTdzkjITkdprOPLVsGWP8R/2HYIj0r
+```
+
+The public key is `RWTMVJ5DqeXk0HgeN+BIdnQaamRTdzkjITkdprOPLVsGWP8R/2HYIj0r`,
+minisign key ID `D0E4E5A9439E54CC`.
+
+That key is printed here, in this crate's README on crates.io, and in
+`spec/CONFORMANCE.md`. Those are copies placed by one person, not independent
+authorities — but a crates.io version cannot be altered once published, so a key
+changed *in this repository* can be contradicted by one nobody can edit.
+[`spec/CONFORMANCE.md`](spec/CONFORMANCE.md)
+states the rest of what a signature here does and does not establish.
 
 ## Licence
 

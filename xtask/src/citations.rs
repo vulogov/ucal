@@ -497,3 +497,185 @@ fn cargo_commands(text: &str) -> Vec<String> {
     }
     out
 }
+
+/// Constants quoted in the contact materials must match `fixtures/vectors.json`.
+///
+/// `Documentation/CONTACT.md` and the C1 issue template embed `BEAT`, `SECOND`
+/// and `ORIGIN_OFFSET` so a stranger can check three numbers in thirty minutes
+/// without reading the vector file first. That convenience is a copy, and a copy
+/// is a thing that drifts — and this one drifts into *asking someone to
+/// reproduce the wrong number*, which would waste the scarcest resource this
+/// project has.
+pub fn check_contact_constants(root: &Path) -> Result<usize, Vec<String>> {
+    let vectors = root.join("fixtures/vectors.json");
+    let Ok(json) = std::fs::read_to_string(&vectors) else {
+        return Err(alloc_vec("fixtures/vectors.json is unreadable".into()));
+    };
+    // Not a JSON parser: the three values are long decimal runs and the file is
+    // generated, so finding them by name is enough and adds no dependency.
+    let mut want = Vec::new();
+    for name in ["BEAT", "SECOND", "ORIGIN_OFFSET"] {
+        let key = format!("\"{name}\"");
+        let Some(at) = json.find(&key) else {
+            return Err(alloc_vec(format!("{name} is not in vectors.json")));
+        };
+        let tail = &json[at + key.len()..];
+        let digits: String = tail
+            .chars()
+            .skip_while(|c| !c.is_ascii_digit())
+            .take_while(|c| c.is_ascii_digit())
+            .collect();
+        if digits.len() < 20 {
+            return Err(alloc_vec(format!("{name} in vectors.json is not a long integer")));
+        }
+        want.push((name, digits));
+    }
+
+    let files = [
+        "Documentation/CONTACT.md",
+        ".github/ISSUE_TEMPLATE/c1-reproduce-vectors.md",
+    ];
+    let mut bad = Vec::new();
+    let mut checked = 0;
+    for f in files {
+        let path = root.join(f);
+        let Ok(text) = std::fs::read_to_string(&path) else {
+            bad.push(format!("{f} is missing"));
+            continue;
+        };
+        for (name, value) in &want {
+            if !text.contains(name.to_owned()) {
+                continue;
+            }
+            checked += 1;
+            if !text.contains(value.as_str()) {
+                bad.push(format!(
+                    "{f} names {name} but does not quote the value in vectors.json"
+                ));
+            }
+        }
+    }
+    if bad.is_empty() {
+        Ok(checked)
+    } else {
+        Err(bad)
+    }
+}
+
+/// The files that must carry the signing key, and the reason each is there.
+///
+/// A key published in exactly one place is a key with one thing to compromise.
+/// These copies are not independent authorities — the same person places all of
+/// them — but two of them live in published crate READMEs, and a crates.io
+/// version cannot be altered once released. That makes a *change* to the key in
+/// this repository detectable against copies nobody can edit, which is a
+/// narrower property than a trust path and is the one actually on offer.
+const KEY_PUBLICATIONS: &[(&str, &str)] = &[
+    ("README.md", "the repository's landing page"),
+    ("crates/ucal/README.md", "published to crates.io with the CLI, immutable per version"),
+    ("crates/ucal-core/README.md", "published to crates.io with the core crate, immutable per version"),
+    ("Documentation/CONTACT.md", "where C1 asks someone to verify what they downloaded"),
+    ("spec/CONFORMANCE.md", "where the custody of the key is stated"),
+];
+
+/// Every published copy of the signing key is the key in `fixtures/ucal.pub`.
+///
+/// The copies exist so that a reader need not trust a single file, and so that
+/// one placed beyond the author's reach can contradict a repository that has
+/// been rewritten. A copy that has drifted destroys exactly that: it makes the
+/// witnesses disagree for a reason that is not an attack, which is worse than
+/// having no witnesses, because the next disagreement gets shrugged at.
+///
+/// Checked in both directions. Every declared publication must carry the key,
+/// and no document anywhere may carry a *different* one — a truncated paste or
+/// a transposed character is the realistic failure, not a forgery.
+pub fn check_signing_key(root: &Path) -> Result<usize, Vec<String>> {
+    let Ok(pubkey) = std::fs::read_to_string(root.join("fixtures/ucal.pub")) else {
+        return Err(alloc_vec("fixtures/ucal.pub is unreadable".into()));
+    };
+    // minisign's format: an untrusted comment naming the key ID, then the key.
+    let Some(key) = pubkey.lines().map(str::trim).find(|l| l.starts_with("RW") && l.len() > 40)
+    else {
+        return Err(alloc_vec("fixtures/ucal.pub has no key line".into()));
+    };
+    let key_id = pubkey
+        .lines()
+        .find(|l| l.contains("key"))
+        .and_then(|l| l.split_whitespace().last())
+        .unwrap_or_default()
+        .to_string();
+    if key_id.len() != 16 {
+        return Err(alloc_vec(format!(
+            "fixtures/ucal.pub has no key ID in its comment (read `{key_id}`)"
+        )));
+    }
+
+    let mut bad = Vec::new();
+    for (f, why) in KEY_PUBLICATIONS {
+        match std::fs::read_to_string(root.join(f)) {
+            Err(_) => bad.push(format!("{f} is missing ({why})")),
+            Ok(text) if !text.contains(key) => bad.push(format!(
+                "{f} does not carry the signing key — it is published there because it is {why}"
+            )),
+            Ok(_) => {}
+        }
+    }
+
+    // And nothing anywhere carries a different one. A near-miss is the failure
+    // that matters: a reader who checks a mistyped key learns nothing and
+    // believes they learned something.
+    for rel in markdown_files(root) {
+        let Ok(text) = std::fs::read_to_string(root.join(&rel)) else {
+            continue;
+        };
+        for token in text.split(|c: char| !(c.is_ascii_alphanumeric() || c == '+' || c == '/')) {
+            if token.starts_with("RW") && token.len() > 40 && token != key {
+                bad.push(format!("{rel} carries a key that is not the published one: {token}"));
+            }
+        }
+        if text.contains(&key_id) && !text.contains(key) {
+            bad.push(format!(
+                "{rel} names key ID {key_id} without quoting the key, so a reader cannot check it"
+            ));
+        }
+    }
+
+    if bad.is_empty() {
+        Ok(KEY_PUBLICATIONS.len())
+    } else {
+        bad.sort();
+        bad.dedup();
+        Err(bad)
+    }
+}
+
+/// Every tracked markdown file, relative to the root.
+fn markdown_files(root: &Path) -> Vec<String> {
+    fn walk(dir: &Path, root: &Path, out: &mut Vec<String>) {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for e in entries.flatten() {
+            let p = e.path();
+            let name = e.file_name();
+            let name = name.to_string_lossy();
+            if name.starts_with('.') && name != ".github" {
+                continue;
+            }
+            if name == "target" {
+                continue;
+            }
+            if p.is_dir() {
+                walk(&p, root, out);
+            } else if p.extension().is_some_and(|x| x == "md") {
+                if let Ok(rel) = p.strip_prefix(root) {
+                    out.push(rel.to_string_lossy().into_owned());
+                }
+            }
+        }
+    }
+    let mut out = Vec::new();
+    walk(root, root, &mut out);
+    out.sort();
+    out
+}

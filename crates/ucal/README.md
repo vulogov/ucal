@@ -35,6 +35,25 @@ ucal doctor                   profile, backend, ceiling, provenance
 
 Early — the API is not yet stable.
 
+## Verifying what you downloaded
+
+`fixtures/vectors.json` carries every declared constant of profile UC-1 and its
+derivation. Its digest is signed:
+
+```
+minisign -Vm fixtures/SHA256SUMS -P RWTMVJ5DqeXk0HgeN+BIdnQaamRTdzkjITkdprOPLVsGWP8R/2HYIj0r
+```
+
+The public key is `RWTMVJ5DqeXk0HgeN+BIdnQaamRTdzkjITkdprOPLVsGWP8R/2HYIj0r`,
+minisign key ID `D0E4E5A9439E54CC`.
+
+That key is printed here, in this crate's README on crates.io, and in
+`spec/CONFORMANCE.md`. Those are copies placed by one person, not independent
+authorities — but a crates.io version cannot be altered once published, so a key
+changed *in this repository* can be contradicted by one nobody can edit.
+[`spec/CONFORMANCE.md`](https://github.com/vulogov/ucal/blob/main/spec/CONFORMANCE.md)
+states the rest of what a signature here does and does not establish.
+
 ## Licence
 
 Mozilla Public License 2.0 — see [LICENSE](LICENSE).

@@ -109,8 +109,10 @@ Not a wish list. Each item answers "what would make the 1.0 promise honest".
 
 # The plan
 
-Five cycles. Each has one goal, in the shape that has worked: a stated aim every
-scope item serves, and a recorded outcome when something fails.
+Six cycles — five as first written, plus 0.9.0, added in 0.7.0 when the plan was
+found to contradict its own exit criteria. Each has one goal, in the shape that
+has worked: a stated aim every scope item serves, and a recorded outcome when
+something fails.
 
 ## 0.5.0 — finish the mechanism Rule R started
 
@@ -180,17 +182,142 @@ whether 1.0 is honest.
   them as the cycle's product rather than its cost. A 1.0 that ships without
   ever having been wrong about its surface has not learned anything.
 
-**Done when** at least one of C1–C3 has happened and its findings are recorded —
-including "nothing changed", if that is the finding.
+**Done when** — two different things, kept apart in 0.7.0 because conflating
+them was making the cycle unshippable.
 
-## 0.8.0 — the last breaking window
+**The cycle ships** when the author-side work is done: the asks are stated so a
+stranger can act on them without reading a specification first, the obstacles
+between that stranger and a completed task are removed, and whatever else the
+cycle turned up is recorded. Contact is not a condition on *releasing*. Holding
+the branch open until someone arrives would make the repository look abandoned
+to exactly the person it is waiting for, and an unreleased cycle publishes
+nothing — including the ask itself.
 
-**Goal: spend the breaking changes 0.7.0 earned, and stop.**
+**The gate closes** when at least one of C1–C3 has happened and its findings are
+recorded, including "nothing changed" if that is the finding. That is a
+condition on **1.0**, and it does not expire. If it is still open at 0.9.0 it is
+still open, and 1.0 waits.
 
-Whatever contact found. Nothing new invented; this cycle exists so that the
-findings do not have to wait for 2.0.
+## 0.8.0 — the last breaking window, and the last additions
 
-**Done when** the diff to 1.0 contains no `Breaking` section.
+**Goal: spend the breaking changes 0.7.0 earned, add what 1.0 should have, and
+stop.**
+
+Two halves, and the second was added in 0.7.0 along with 0.9.0.
+
+### B — whatever contact found
+
+Nothing invented here. This half exists so that 0.7.0's findings do not have to
+wait for 2.0, and it is why 0.8.0 is allowed a `Breaking` section when 0.9.0 is
+not.
+
+### A — the additions, and why they are here rather than in 0.9.0
+
+An additive feature is not free just because it breaks nothing. **1.0 freezes it
+either way**, and a command added in 0.9.0 reaches 1.0 with one cycle of
+settling and nobody's use behind it. 0.9.0's whole evidential value is that the
+surface stopped moving; adding surface during it undercuts the only thing that
+cycle produces. So the additions land here, where a mistake made adding them can
+still be corrected in the same cycle by the breaking half.
+
+**A1 — `ucal between <a> <b>`, the missing verb.**
+
+The project's central claim is that a duration belongs on the tier ladder, and
+no command puts one there. `explain` describes a point; `ruler` marks a span
+without measuring it. The arithmetic already exists and is unreachable from the
+binary: `Instant::since`, `Instant::between`, `Delta::in_tier`, `Delta::divmod`,
+`Delta::tier_of`.
+
+The delta in ticks, its base-5 group decomposition, its natural tier, its
+`divmod` against a named tier, and SI only behind `--bridge`. A `Signed` result
+where the order is reversed, since `between` already returns one and swallowing
+the sign would be the kind of convenience Rule Q exists to refuse.
+
+*Why it is worth a command rather than a note in the manual:* every existing
+command answers "what is this instant"; none answers "how far apart". A model
+whose unit of thought is a ratio between tiers should be able to state one.
+
+**A2 — `ucal verify`, the self-check inside the shipped binary.**
+
+Re-deriving the constants needs the repository and `xtask`. Someone who typed
+`cargo install ucal` cannot check that the binary they are holding reproduces
+the published values, and the first question an external implementer asks is
+*what should I get* — to which the answer is currently "clone a repository
+first".
+
+Emit the derivation chain and the fixtures the conformance vectors carry, with
+`--json` so it can be diffed against `fixtures/vectors.json` directly. It also
+catches a miscompiled or mis-featured backend on a user's own machine, which
+nothing else in the shipped artefact would.
+
+*This is the one item aimed at C1 rather than at a user.* If contact is the gate
+1.0 cannot pass without, then lowering the cost of the ask is the only work that
+moves the gate from inside the repository.
+
+**A3 — more bodies.**
+
+The mechanism is body-independent and ships Earth, Mars, Saturn and Titan, which
+makes a project whose central argument is anti-Earth-centric look Earth-centric
+in its own `cal list`. Candidates with published rotation and orbital
+parameters: the Moon, Mercury, Venus, Jupiter, Io, Europa, Enceladus.
+
+**Most will land exactly where Titan is** — complete in units, intercalation and
+cycles, incomplete in phase, `UCAL-E0062` on local fields — and that is the
+result, not a shortfall. A body without an anchor is the ordinary case; Earth
+and Mars are the exceptions, and a table where the exceptions outnumber the rule
+misrepresents which is which. D5's search shows what a phase citation costs to
+establish, and the answer for most of these will be the same: the rotational
+elements are published, the solar-time convention is not.
+
+Additive by construction: `data::all()` grows, `cal list` gains rows, and row
+keys are `*` in `fixtures/json-surface.txt`, so no field path changes.
+
+*Constraint:* every parameter cited, Rule Y's concession applied where it
+applies, and no anchor invented for any of them. The temptation with a new body
+is to give it a zero so the calendar renders.
+
+### What is deliberately not here
+
+Anything that would need a closed vocabulary to gain a variant — a new `Form`, a
+fifth `Rounding`, another `Scale` or `CivilCalendar`. Those read as additions
+and are breaking changes to every exhaustive match, which is the property
+`CLOSED_VOCABULARIES` records and the reason to check it before designing a
+feature rather than after.
+
+**Done when** every finding from 0.7.0 that needs a breaking change has had one,
+A1–A3 have landed or been recorded as dropped with a reason, and nothing is left
+waiting for the next window. 0.8.0 itself *has* a `Breaking` section — that is
+what it is for; the release that must not is 0.9.0.
+
+## 0.9.0 — hold still
+
+**Goal: one full cycle that breaks nothing, before the release that promises not
+to.**
+
+Added in 0.7.0 because the plan and its own exit criteria disagreed. The
+criteria ask for **two consecutive releases with no breaking change**; the four
+cycles above supply at most one, since 0.8.0 is defined as the cycle that
+*spends* 0.7.0's breaks. Reading "0.8.0 → 1.0.0" as satisfying it was an
+arithmetic error in the gate, and a gate that cannot be met is a gate that will
+be waived.
+
+There is nothing to build here, which is the point. A cycle whose diff contains
+no `Breaking` section is evidence that the surface has stopped moving, and that
+evidence cannot be manufactured faster by working harder — it is exactly the
+kind of claim this project insists must have a mechanism, and the mechanism is
+elapsed time with people using it.
+
+What may happen in 0.9.0: bug fixes, documentation, performance, and fields
+added to `#[non_exhaustive]` records where something turns out to be missing.
+What may not: anything that changes a name, a shape, a meaning or a default —
+and, since 0.7.0, **no new commands or crates either**. Those are 0.8.0's, for
+the reason given there: 1.0 freezes an addition whether or not it broke
+anything, and one added in 0.9.0 arrives frozen with nothing behind it.
+
+**Done when** 0.9.0 has shipped with an empty `Breaking` section, and nothing
+found since 0.8.0 is waiting for a breaking change to fix. If something is
+waiting, it is spent here and the counter restarts — which costs one cycle and
+is the whole reason the counter is two rather than one.
 
 ## 1.0.0 — the promise
 
@@ -204,10 +331,10 @@ Exit criteria, in the shape §20's phases use:
 | every promise 1.0 makes is written down | 0.6.0 |
 | the conformance apparatus has been used by someone else | 0.7.0 C1 |
 | the surface has survived contact | 0.7.0 |
-| two consecutive releases with no breaking change | 0.8.0 → 1.0.0 |
 | the specification and the source agree, checked | already: `check-docs`, 116 citations |
 | both backends byte-identical | already: Rule W, every release |
-| CI green on every push, with no known-failing job | 0.5.0 onward — the first run failed on three unused imports the local block could not see, and that is the class this criterion exists to keep out |
+| two consecutive releases with no breaking change | 0.9.0 → 1.0.0 |
+| CI green on every push, with no known-failing job | 0.7.0 — **not 0.5.0, as this table claimed until then.** The `features` workflow added in 0.6.0 failed on every push it ever ran, including the 0.6.0 release tag, because an assertion read colourised cargo output through an anchored `^error`. The criterion was written, nothing checked whether it held, and this document asserted it did — which is the failure this table exists to keep out, occurring in the table itself |
 
 ---
 
@@ -224,6 +351,31 @@ control, and therefore the only one that can be quietly dropped. If contact
 proves impossible, the honest outcome is **1.0 does not ship** and the crates
 stay `0.x` — which costs nothing, since `0.x` already permits everything 1.0
 would and promises less.
+
+### If contact never comes
+
+Recorded because "never" is a likely outcome for a project of this kind and an
+open-ended wait is not a plan. A specification for absolute time in Planck ticks
+has a small audience, and nothing in this repository can enlarge it.
+
+Two things follow, and they are separate.
+
+**The contact gate stays shut.** Not softened, not reinterpreted, not satisfied
+by the author using the API and reporting that it felt fine. `0.x` forever is an
+honest resting state and this project loses nothing by occupying it. A version
+number is not a reward for effort.
+
+**The cycles do not stop.** 0.7.0 closes and ships like any other, with its
+finding recorded as *no contact yet*; the gate is a condition on **1.0**, not on
+releasing. Holding the branch open until a stranger arrives would make the
+repository look abandoned to exactly the stranger it is waiting for, which is
+the one outcome that makes the wait self-defeating. 0.8.0 and 0.9.0 can run on
+their own merits — there is always a defect to fix and a document to correct,
+and this cycle found several without any help.
+
+So: releases continue, the 1.0 gate holds, and if contact arrives in 0.9.0 or in
+five years, 0.8.0's breaking window reopens then. Nothing about that ordering
+expires.
 
 **A 1.0 that freezes the specification.** UCAL-1 is superseded, not finished.
 `spec/SPEC-DELTAS.md` has sixteen entries and D-A16 was written this cycle. 1.0

@@ -133,3 +133,38 @@ and they cannot learn it from anything in this repository.
 The offline backup exists so that losing the laptop does not silently end the
 signing line — which would otherwise be discovered at the next release, by which
 time re-establishing trust in a new key costs more than keeping a copy did.
+
+### Where the key is published, and what that does not establish
+
+```
+RWTMVJ5DqeXk0HgeN+BIdnQaamRTdzkjITkdprOPLVsGWP8R/2HYIj0r
+```
+
+It appears in `fixtures/ucal.pub`, in this file, in the repository's README, in
+[`Documentation/CONTACT.md`](../Documentation/CONTACT.md), and in the READMEs of
+the `ucal` and `ucal-core` crates — which means it is also rendered on
+**crates.io** and on **docs.rs**, from a package tarball that cannot be changed
+once a version is published.
+
+**That is not five independent trust paths.** One person placed all five, and a
+reader who does not already know that person is no better off against a forgery
+than with one copy. Multiplying copies under one authority multiplies nothing.
+
+What it does establish is narrower and worth having. Two of the copies are
+beyond the author's own reach once released: the crates.io tarball for a
+published version cannot be edited, only yanked. So a repository whose key was
+**changed** — by a compromise, by a rewrite of history, by coercion — can be
+contradicted by an artefact nobody involved can quietly edit. That is
+tamper-evidence after the fact, not authentication on first contact.
+
+**First contact remains trust on first use**, and no number of copies fixes it.
+Fixing it needs an authority that is not this project: a DNS record under a
+domain with its own registrar, a third party who signs this key with theirs, or
+publication somewhere with an editorial record. None of those exists yet, and
+this section says so rather than letting five copies look like five reasons.
+
+*Enforced by* the `signing-key` check in `cargo run -p xtask -- check-docs`,
+which fails if any declared publication has dropped the key, and if any document
+in the tree carries a key that is not this one — a truncated paste or a
+transposed character being the realistic failure rather than a forgery. A reader
+who checks a mistyped key learns nothing and believes they learned something.
