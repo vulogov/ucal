@@ -497,3 +497,67 @@ fn cargo_commands(text: &str) -> Vec<String> {
     }
     out
 }
+
+/// Constants quoted in the contact materials must match `fixtures/vectors.json`.
+///
+/// `Documentation/CONTACT.md` and the C1 issue template embed `BEAT`, `SECOND`
+/// and `ORIGIN_OFFSET` so a stranger can check three numbers in thirty minutes
+/// without reading the vector file first. That convenience is a copy, and a copy
+/// is a thing that drifts — and this one drifts into *asking someone to
+/// reproduce the wrong number*, which would waste the scarcest resource this
+/// project has.
+pub fn check_contact_constants(root: &Path) -> Result<usize, Vec<String>> {
+    let vectors = root.join("fixtures/vectors.json");
+    let Ok(json) = std::fs::read_to_string(&vectors) else {
+        return Err(alloc_vec("fixtures/vectors.json is unreadable".into()));
+    };
+    // Not a JSON parser: the three values are long decimal runs and the file is
+    // generated, so finding them by name is enough and adds no dependency.
+    let mut want = Vec::new();
+    for name in ["BEAT", "SECOND", "ORIGIN_OFFSET"] {
+        let key = format!("\"{name}\"");
+        let Some(at) = json.find(&key) else {
+            return Err(alloc_vec(format!("{name} is not in vectors.json")));
+        };
+        let tail = &json[at + key.len()..];
+        let digits: String = tail
+            .chars()
+            .skip_while(|c| !c.is_ascii_digit())
+            .take_while(|c| c.is_ascii_digit())
+            .collect();
+        if digits.len() < 20 {
+            return Err(alloc_vec(format!("{name} in vectors.json is not a long integer")));
+        }
+        want.push((name, digits));
+    }
+
+    let files = [
+        "Documentation/CONTACT.md",
+        ".github/ISSUE_TEMPLATE/c1-reproduce-vectors.md",
+    ];
+    let mut bad = Vec::new();
+    let mut checked = 0;
+    for f in files {
+        let path = root.join(f);
+        let Ok(text) = std::fs::read_to_string(&path) else {
+            bad.push(format!("{f} is missing"));
+            continue;
+        };
+        for (name, value) in &want {
+            if !text.contains(name.to_owned()) {
+                continue;
+            }
+            checked += 1;
+            if !text.contains(value.as_str()) {
+                bad.push(format!(
+                    "{f} names {name} but does not quote the value in vectors.json"
+                ));
+            }
+        }
+    }
+    if bad.is_empty() {
+        Ok(checked)
+    } else {
+        Err(bad)
+    }
+}

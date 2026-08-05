@@ -11,7 +11,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.6.0"
+version = "0.7.0"
 edition = "2021"
 # Set by the default backend: bnum 0.14 requires 1.87, and `u512` is the
 # default. Verified by CI at exactly this version -- it read 1.85 until 0.6.0
@@ -28,11 +28,11 @@ description = "Universe Calendar: absolute time in Planck ticks with a base-5 ti
 # is silent — a 0.3.0 facade resolving against a 0.2.x core still builds.
 # `xtask -- lint` now asserts that every one of these equals the workspace
 # package version, so the drift is caught rather than published.
-ucal-core = { version = "0.6.0", path = "crates/ucal-core", default-features = false }
-ucal-civil = { version = "0.6.0", path = "crates/ucal-civil", default-features = false }
-ucal-body = { version = "0.6.0", path = "crates/ucal-body", default-features = false }
-ucal-events = { version = "0.6.0", path = "crates/ucal-events", default-features = false }
-ucal-cosmo = { version = "0.6.0", path = "crates/ucal-cosmo", default-features = false }
+ucal-core = { version = "0.7.0", path = "crates/ucal-core", default-features = false }
+ucal-civil = { version = "0.7.0", path = "crates/ucal-civil", default-features = false }
+ucal-body = { version = "0.7.0", path = "crates/ucal-body", default-features = false }
+ucal-events = { version = "0.7.0", path = "crates/ucal-events", default-features = false }
+ucal-cosmo = { version = "0.7.0", path = "crates/ucal-cosmo", default-features = false }
 
 # Default backend (RFC §3.1, D-4). NOTE: bnum 0.14 restructured its type surface
 # and renamed `parse_str_radix` -> `from_str_radix`; `ZERO`/`ONE` became private.

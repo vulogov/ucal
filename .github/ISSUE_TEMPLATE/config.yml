@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: What this project needs from someone who is not its author
+    url: https://github.com/vulogov/ucal/blob/main/Documentation/CONTACT.md
+    about: "Three specific asks, each with what to do and what to report."
+  - name: Reproduce the conformance vectors in your own implementation
+    url: https://github.com/vulogov/ucal/blob/main/spec/CONFORMANCE.md
+    about: "The vector file's shape, and how to check a signature."
