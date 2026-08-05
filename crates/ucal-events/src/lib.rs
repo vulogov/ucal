@@ -52,6 +52,7 @@ pub const CITATION_SET: &str = "ucal-events/2026-07 (Planck 2018; IUGS 2023; \
 /// it is how the *sources* state them, and Rule Y's principle — keep the
 /// published form — applies to a catalogue as much as to a parameter.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub enum StatedAs {
     /// Published as a time *after* the FLRW t→0 limit, e.g. "380 000 years".
     AfterDatum,
@@ -63,6 +64,7 @@ pub enum StatedAs {
 
 /// One catalogued milestone (§17).
 #[derive(Clone, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct Event {
     /// Stable id, e.g. `"recombination"`.
     pub id: &'static str,
@@ -120,37 +122,37 @@ fn window(lo: &str, hi: &str) -> Window<UC1> {
     Window::new(at(lo), at(hi)).expect("catalogue windows are ordered")
 }
 
-const PLANCK_2018: Citation = Citation {
-    source: "Planck 2018 results VI: Cosmological parameters, A&A 641, A6 (2020)",
-    locator: Some("doi:10.1051/0004-6361/201833910"),
-};
-const GUTH_1981: Citation = Citation {
-    source: "Guth, A. (1981), Inflationary universe: a possible solution to the \
+const PLANCK_2018: Citation = Citation::new(
+        "Planck 2018 results VI: Cosmological parameters, A&A 641, A6 (2020)",
+        Some("doi:10.1051/0004-6361/201833910"),
+    );
+const GUTH_1981: Citation = Citation::new(
+        "Guth, A. (1981), Inflationary universe: a possible solution to the \
              horizon and flatness problems, Phys. Rev. D 23, 347",
-    locator: Some("doi:10.1103/PhysRevD.23.347"),
-};
-const BROMM_2011: Citation = Citation {
-    source: "Bromm, V. and Yoshida, N. (2011), The first galaxies, \
+        Some("doi:10.1103/PhysRevD.23.347"),
+    );
+const BROMM_2011: Citation = Citation::new(
+        "Bromm, V. and Yoshida, N. (2011), The first galaxies, \
              Ann. Rev. Astron. Astrophys. 49, 373",
-    locator: Some("doi:10.1146/annurev-astro-081710-102608"),
-};
-const BOUVIER_2010: Citation = Citation {
-    source: "Bouvier, A. and Wadhwa, M. (2010), The age of the Solar System \
+        Some("doi:10.1146/annurev-astro-081710-102608"),
+    );
+const BOUVIER_2010: Citation = Citation::new(
+        "Bouvier, A. and Wadhwa, M. (2010), The age of the Solar System \
              redefined by the oldest Pb-Pb age of a meteoritic inclusion, \
              Nature Geoscience 3, 637",
-    locator: Some("doi:10.1038/ngeo941"),
-};
-const BETTS_2018: Citation = Citation {
-    source: "Betts, H. C. et al. (2018), Integrated genomic and fossil evidence \
+        Some("doi:10.1038/ngeo941"),
+    );
+const BETTS_2018: Citation = Citation::new(
+        "Betts, H. C. et al. (2018), Integrated genomic and fossil evidence \
              illuminates life's early evolution and eukaryote origin, \
              Nature Ecology & Evolution 2, 1556",
-    locator: Some("doi:10.1038/s41559-018-0644-x"),
-};
-const IUGS: Citation = Citation {
-    source: "International Commission on Stratigraphy, International \
+        Some("doi:10.1038/s41559-018-0644-x"),
+    );
+const IUGS: Citation = Citation::new(
+        "International Commission on Stratigraphy, International \
              Chronostratigraphic Chart v2023/09",
-    locator: Some("https://stratigraphy.org/chart"),
-};
+        Some("https://stratigraphy.org/chart"),
+    );
 
 /// The catalogue (§17).
 pub fn all() -> Vec<Event> {

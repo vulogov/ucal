@@ -176,10 +176,12 @@ type Result<T> = core::result::Result<T, CosmoError>;
 
 /// A model identifier, carried on every result (Rule X).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct ModelId(pub &'static str);
 
 /// A measured cosmological parameter, recorded as published (Rule Y.1).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct MeasuredParam {
     /// The parameter's name.
     pub name: &'static str,
@@ -193,6 +195,7 @@ pub struct MeasuredParam {
 /// uncertainties as the bounds, so a result's `parameter_width` is the propagated
 /// consequence of what was actually measured rather than a guess at it.
 #[derive(Clone, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct LambdaCdm {
     /// Matter density.
     pub omega_m: RatInterval,
@@ -211,11 +214,11 @@ pub struct LambdaCdm {
     pub model: ModelId,
 }
 
-const PLANCK_2018: Citation = Citation {
-    source: "Planck 2018 results VI: Cosmological parameters, A&A 641, A6 (2020), \
+const PLANCK_2018: Citation = Citation::new(
+        "Planck 2018 results VI: Cosmological parameters, A&A 641, A6 (2020), \
              TT,TE,EE+lowE+lensing+BAO",
-    locator: Some("doi:10.1051/0004-6361/201833910"),
-};
+        Some("doi:10.1051/0004-6361/201833910"),
+    );
 
 fn r(decimal: &str) -> Ratio {
     Ratio::from_decimal_str(decimal).expect("model constant is an exact decimal")

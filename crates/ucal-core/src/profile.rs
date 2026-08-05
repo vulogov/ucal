@@ -55,11 +55,25 @@ impl Frame {
 
 /// A literature citation.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct Citation {
     /// Full source reference.
     pub source: &'static str,
     /// DOI, bibcode or URL, where one exists.
     pub locator: Option<&'static str>,
+}
+
+impl Citation {
+    /// Declare a citation.
+    ///
+    /// `const`, because every citation in this workspace is declared in a
+    /// `const` item and a third-party body, profile or event set must be able to
+    /// do the same. `Citation` is `#[non_exhaustive]` so that it can gain a
+    /// field — an access date, a second identifier — without that being a
+    /// breaking change; this is what keeps it constructible anyway.
+    pub const fn new(source: &'static str, locator: Option<&'static str>) -> Citation {
+        Citation { source, locator }
+    }
 }
 
 /// A foreign-unit value recorded verbatim with its unit (Rule Y.1).
@@ -68,6 +82,7 @@ pub struct Citation {
 /// units because that is how measurement works, but the *declared constant* — the
 /// value the specification and the code use — is always the tick value.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct MeasuredValue {
     /// The value exactly as published, as a string. Never parsed into a float.
     pub verbatim: &'static str,
@@ -84,6 +99,7 @@ pub struct MeasuredValue {
 /// The rounding applied when converting an empirical input into a declared
 /// constant (Rule Q.4).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct RoundingRecord {
     /// What the value was rounded to, e.g. `"BEAT"`.
     pub to: &'static str,
@@ -102,6 +118,7 @@ pub struct RoundingRecord {
 /// Provenance is **data, not prose** — auditable, re-executable, and replaceable
 /// without editing specification text. Absence is `UCAL-E0013`.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct Provenance {
     /// The empirical input, verbatim, with unit and citation.
     pub input: MeasuredValue,
@@ -127,6 +144,7 @@ pub struct Provenance {
 /// integer number of ticks, so conversion *into* absolute time is multiplication
 /// and never requires rounding (Rule A.4).
 #[derive(Clone, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct Bridge {
     /// The foreign unit's name, e.g. `"second"`.
     pub name: &'static str,

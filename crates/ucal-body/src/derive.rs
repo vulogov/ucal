@@ -54,6 +54,7 @@ type Result<T> = core::result::Result<T, TimeError>;
 /// duration, and a drift bound is a rate, so the two cannot be the same type; see
 /// `spec/SPEC-DELTAS.md` D-A13.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct DriftBound {
     /// Local days of drift permitted.
     pub days: u64,
@@ -85,6 +86,7 @@ impl Default for DriftBound {
 
 /// One convergent of a continued fraction, with its exact error.
 #[derive(Clone, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct Convergent {
     /// The approximating fraction.
     pub value: Ratio,
@@ -102,6 +104,7 @@ pub struct Convergent {
 /// Carries the whole sequence walked, not merely the answer, so the choice can be
 /// audited (§15.2).
 #[derive(Clone, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct LeapRule {
     /// `orbital_period / solar_day`, exactly.
     pub ratio: Ratio,
@@ -215,6 +218,7 @@ pub fn derive_leap_rule(
 
 /// A derived grouping cycle (§9.6, Rule K.3 as amended by D-A5).
 #[derive(Clone, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct Cycle {
     /// Which satellite the calendar named.
     pub satellite: &'static str,

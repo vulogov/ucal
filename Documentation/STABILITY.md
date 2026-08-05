@@ -92,6 +92,68 @@ is worth more than one silently omitted.
 
 ---
 
+## The public surface, and why it is shaped as it is
+
+Thirty-nine public types carried public fields or variants and no
+`#[non_exhaustive]` when 0.6.0 opened. Each is now a recorded decision, and the
+`public-type-is-classified` lint refuses to let a new one arrive undecided.
+
+**Twenty-eight record types are `#[non_exhaustive]`.** The crates construct
+them, callers read them, and they will gain fields — an anchor gains a
+determination detail, an event gains a citation field, a model gains a
+parameter. Marking them means that costs nobody a major version.
+
+**Eleven vocabularies stay open**, because an exhaustive match on them is a
+*feature* rather than an oversight:
+
+| type | why closed |
+|---|---|
+| `Rounding` | a caller must handle every mode; a fifth changes what correct rounding means |
+| `Form` | §6 names exactly these text forms; another is a specification change |
+| `Scale` | §8.1 names exactly three time scales |
+| `CivilCalendar` | §8.5 names exactly two, and both are legacy (§8.6) |
+| `Kind` | §19.4's binary distinction: derived, or declared tables |
+| `Precision` | the complete disjunction of Rule T |
+| `Sign` | closed by arithmetic |
+| `IntervalOrdering` | the complete lattice of interval comparison, including indeterminate |
+| `Provenance` (body) | Rule C's binary: measured, or derived from something measured |
+| `ColorChoice` | auto, always, never |
+| `Frame` | already `#[non_exhaustive]`; a second profile may declare a different frame, which is the point of declaring it (Rule F) |
+
+The list lives in `xtask/src/lint.rs` as `CLOSED_VOCABULARIES`, with these
+reasons, so the record and the check are the same object.
+
+### Two types callers construct
+
+`#[non_exhaustive]` forbids a struct literal, so a type a caller must *build*
+needs another way in. Two did, and the empirical test was simply marking
+everything and seeing what stopped compiling.
+
+**`Citation`** gained a `const fn new`. Every citation in this workspace is
+declared in a `const` item and a third-party body, profile or event set must be
+able to do the same.
+
+**`Fmt`** gained a builder — `Fmt::default().with_form(…).with_precision(…)`.
+The alternative was leaving it open and accepting that any new rendering option
+is a breaking change. A caller writing `Fmt { .., ..Fmt::default() }` would have
+survived that; one writing the exhaustive literal would not, and which of the two
+a caller writes is not something this crate can influence. The builder makes the
+safe form the only form.
+
+### One decision that cost something immediately
+
+`StatedAs` describes how a *source* states an event — after the datum, or before
+the bridge epoch. A source could state one a third way, by redshift for
+instance, so it is `#[non_exhaustive]`.
+
+That broke a match in the CLI on the same commit, which is the decision working.
+The fallback says the form is unrecognised and points at `as_published` for the
+source's own words, rather than guessing a label — putting a wrong description of
+a source's words into the output is the one thing `as_published` exists to
+prevent.
+
+---
+
 ## What 1.0 does *not* promise
 
 ### The specification is not frozen

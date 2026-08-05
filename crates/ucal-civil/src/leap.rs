@@ -47,6 +47,7 @@ pub const TABLE_COMPLETE_THROUGH: (i64, u8, u8) = (2026, 6, 30);
 /// A leap second is inserted at `23:59:60` of the day *before* the effective
 /// date, which is why the entry dates are all the first of a month.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct LeapEntry {
     /// Effective from this proleptic Gregorian date, at 00:00:00 UTC.
     pub year: i64,
@@ -190,6 +191,7 @@ pub fn has_leap_second(year: i64, month: u8, day: u8) -> bool {
 
 /// The result of resolving a TAI instant back to a UTC label.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct UtcResolution {
     /// Label-linear UTC seconds since `0000-01-01T00:00:00`.
     pub linear_seconds: i64,

@@ -48,6 +48,7 @@ type Result<T> = core::result::Result<T, TimeError>;
 
 /// Where an instant falls within a derived grouping cycle (§9.6).
 #[derive(Clone, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct CyclePosition {
     /// Which satellite the cycle comes from.
     pub satellite: &'static str,
@@ -64,6 +65,7 @@ pub struct CyclePosition {
 /// appears as [`CyclePosition`] rather than as a month number that could be
 /// mistaken for a table lookup.
 #[derive(Clone, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct DerivedFields {
     /// Local years since the anchor, 1-based: the anchor instant is year 1.
     pub year: i64,

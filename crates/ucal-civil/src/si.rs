@@ -472,6 +472,7 @@ pub const CIVIL_YEAR_MAX: i64 = 100_000_000_000;
 
 /// A civil label, with everything needed to interpret it.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct CivilFields {
     /// Astronomical year numbering: `0` is 1 BC (§2.5).
     pub year: i64,

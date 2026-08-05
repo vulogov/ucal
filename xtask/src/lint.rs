@@ -13,6 +13,7 @@
 //! | internal version requirements track the workspace version | — | — |
 //! | no string literal carries a run of source indentation | — | — |
 //! | every rounding in a shipped crate is declared | Rule R | — |
+//! | every public type is classified for 1.0 | — | — |
 //!
 //! The last has no failure-mode number because it guards a packaging defect
 //! rather than a specification one: a stale internal requirement resolves,
@@ -435,6 +436,7 @@ pub const LINT_NAMES: &[&str] = &[
     "core-names-no-foreign-unit",
     "datum-no-overclaim",
     "rounding-is-declared",
+    "public-type-is-classified",
     "no-indent-in-literal",
     "version-lockstep",
 ];
@@ -713,6 +715,7 @@ pub fn run(workspace_root: &Path) -> Vec<Violation> {
     }
 
     v.extend(version_lockstep(workspace_root));
+    v.extend(public_types_are_classified(&crates_dir));
 
     v
 }
@@ -740,6 +743,30 @@ fn shipped_extent(code: &str, file: &Path) -> usize {
     }
     at
 }
+
+/// Public types whose variants or fields are deliberately **closed**, with the
+/// reason, checked by the `public-type-is-classified` lint.
+///
+/// A closed type is one where an exhaustive match is a *feature*: a caller
+/// should be forced to handle every case, and adding a case should be a breaking
+/// change because it changes what correct handling means. `#[non_exhaustive]`
+/// would take that away.
+///
+/// Everything else public with fields or variants must be `#[non_exhaustive]`,
+/// because 1.0 makes the choice permanent in whichever direction it is left.
+const CLOSED_VOCABULARIES: &[(&str, &str)] = &[
+    ("Rounding", "a caller must handle every mode; a fifth changes what correct rounding means"),
+    ("Form", "§6 names exactly these text forms; another is a specification change"),
+    ("Scale", "§8.1 names exactly three time scales"),
+    ("CivilCalendar", "§8.5 names exactly two, and both are legacy (§8.6)"),
+    ("Kind", "§19.4's binary distinction: derived, or declared tables"),
+    ("Precision", "the complete disjunction of Rule T: tick-exact, or stated to a tier"),
+    ("Sign", "closed by arithmetic"),
+    ("IntervalOrdering", "the complete lattice of interval comparison, including indeterminate"),
+    ("Provenance", "Rule C's binary: measured, or derived from something measured"),
+    ("ColorChoice", "auto, always, never — the universal triple"),
+    ("Frame", "already #[non_exhaustive]; listed so the pair with Rule F is visible"),
+];
 
 /// The two operations that can discard information in this tree.
 ///
@@ -876,6 +903,85 @@ fn version_lockstep(workspace_root: &Path) -> Vec<Violation> {
                 line: n + 1,
                 text: l.to_string(),
                 rule: "internal version requirements must equal the workspace package version",
+            });
+        }
+    }
+    v
+}
+
+/// Every public type with public fields or variants must be either
+/// `#[non_exhaustive]` or listed in [`CLOSED_VOCABULARIES`] with a reason.
+///
+/// 1.0 makes the choice permanent in whichever direction it is left: marking a
+/// type afterwards is a breaking change, and leaving it unmarked makes any
+/// future field one. Shipping without deciding *is* deciding, so this refuses to
+/// let a new public type arrive undecided.
+fn public_types_are_classified(crates_dir: &Path) -> Vec<Violation> {
+    let mut v = Vec::new();
+    for file in rust_files(crates_dir) {
+        let Ok(src) = std::fs::read_to_string(&file) else {
+            continue;
+        };
+        if file.file_name().is_some_and(|n| n == "tests.rs") {
+            continue;
+        }
+        let lines: Vec<&str> = src.lines().collect();
+        let ships_to = lines
+            .iter()
+            .position(|l| l.trim_start().starts_with("#[cfg(test)]"))
+            .unwrap_or(lines.len());
+        for (i, l) in lines.iter().enumerate().take(ships_to) {
+            let Some(rest) = l
+                .strip_prefix("pub struct ")
+                .or_else(|| l.strip_prefix("pub enum "))
+            else {
+                continue;
+            };
+            let name = rest
+                .split(|c: char| !c.is_ascii_alphanumeric() && c != '_')
+                .next()
+                .unwrap_or("");
+            if name.is_empty() {
+                continue;
+            }
+            let attrs = lines[i.saturating_sub(8)..i].join("\n");
+            if attrs.contains("non_exhaustive") {
+                continue;
+            }
+            if CLOSED_VOCABULARIES.iter().any(|(n, _)| *n == name) {
+                continue;
+            }
+            // A type with no public shape cannot break on a new field.
+            //
+            // The declaration's own line decides which kind it is. A unit struct
+            // (`pub struct UC1;`) and a tuple struct with a private field
+            // (`pub struct Tier(i8);`) have no public shape at all — and reading
+            // sixty lines past them picks up the *next* item's fields, which is
+            // how the first version of this lint reported three types that have
+            // nothing to freeze.
+            let is_enum = l.starts_with("pub enum ");
+            let has_public_shape = if l.contains('{') || is_enum {
+                let body: String = lines[i..(i + 60).min(lines.len())].join("\n");
+                let body = body.split("\n}").next().unwrap_or(&body).to_string();
+                is_enum
+                    || body
+                        .lines()
+                        .any(|b| b.starts_with("    pub ") && b.contains(':'))
+            } else {
+                // Tuple or unit struct: only this line can declare a field.
+                l.contains("(pub ") || l.contains(", pub ")
+            };
+            if !has_public_shape {
+                continue;
+            }
+            v.push(Violation {
+                lint: "public-type-is-classified",
+                file: file.clone(),
+                line: i + 1,
+                text: l.to_string(),
+                rule: "1.0 freezes this either way: mark it #[non_exhaustive], or add it \
+                       to CLOSED_VOCABULARIES with the reason an exhaustive match is a \
+                       feature",
             });
         }
     }

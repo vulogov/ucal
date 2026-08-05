@@ -64,6 +64,7 @@ const SECONDS_PER_DAY: i64 = 86_400;
 /// `TAI - UTC = (a + (mjd - b) x c) / 10^7` seconds, with `a` and `c` held as
 /// integers at `10^-7` precision so that nothing is stored as a decimal.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct RateSegment {
     /// First MJD this segment applies to.
     pub from_mjd: i64,

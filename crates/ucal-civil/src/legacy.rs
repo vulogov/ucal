@@ -44,6 +44,7 @@ type Result<T> = core::result::Result<T, TimeError>;
 /// rule is a convergent of `orbital_period / solar_day` and carries the depth it
 /// was taken at; this carries only a fraction someone chose.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct DeclaredLeapRule {
     /// Leap days per cycle.
     pub numerator: u32,
@@ -56,6 +57,7 @@ pub struct DeclaredLeapRule {
 
 /// A discontinuity in a legacy calendar's history.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct Discontinuity {
     /// What happened, in one line.
     pub description: &'static str,
@@ -69,6 +71,7 @@ pub struct Discontinuity {
 
 /// The declared table content of a legacy calendar (§8.6).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct DeclaredTables {
     /// Month lengths in a common year. Irregular, for historical reasons.
     pub month_lengths: [u8; 12],
@@ -88,6 +91,7 @@ pub struct DeclaredTables {
 /// rendering to carry its id and kind, so the only way to a string is
 /// [`LegacyCalendar::render`], which returns a [`Qualified`].
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct LegacyFields {
     /// Astronomical year numbering: `0` is 1 BC (§2.5).
     pub year: i64,
@@ -244,10 +248,10 @@ impl LegacyCalendar for Gregorian {
         &GREGORIAN_TABLES
     }
     fn citation(&self) -> Citation {
-        Citation {
-            source: "Inter gravissimas (1582); ISO 8601 for the proleptic extension",
-            locator: None,
-        }
+        Citation::new(
+        "Inter gravissimas (1582); ISO 8601 for the proleptic extension",
+        None,
+    )
     }
     fn civil(&self) -> CivilCalendar {
         CivilCalendar::Gregorian
@@ -311,10 +315,10 @@ impl LegacyCalendar for Julian {
         &JULIAN_TABLES
     }
     fn citation(&self) -> Citation {
-        Citation {
-            source: "the Julian reform of 46 BC; proleptic extension by convention",
-            locator: None,
-        }
+        Citation::new(
+        "the Julian reform of 46 BC; proleptic extension by convention",
+        None,
+    )
     }
     fn civil(&self) -> CivilCalendar {
         CivilCalendar::Julian
