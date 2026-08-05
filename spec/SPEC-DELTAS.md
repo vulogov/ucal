@@ -718,3 +718,56 @@ is rigorous precisely because it refuses to assume any.
 scalar. The derivation remains available — `ucal cosmo age --z 0` prints it —
 as a cross-check that the declared datum lies inside what the model implies,
 which it does.
+
+---
+
+## D-A16 — §4.3's SI equivalent is printed on request, not always  (AMENDMENT)
+
+**§4.3 says:** "`ucal explain` always prints the SI equivalent alongside."
+
+**Amended to:** a foreign-unit conversion is printed when the caller asks for
+one, with `--bridge`. It is not printed unasked, in `explain` or anywhere else.
+
+### Why
+
+§4.3's sentence is a concession, and the paragraph around it says so: "Nothing
+on the ladder is near a second or an hour. That is the accepted cost of leaving
+the Earth paradigm (D-2 rationale)." The concession was made so a reader would
+have some purchase on an unfamiliar ladder.
+
+Implementing 0.4.0 showed what the concession had grown into. `ucal cosmo age`
+reported its three enclosure widths in Julian years **and nothing else** — a
+Julian year being 365.25 of Earth's rotations, used as the sole measure of an
+epoch some 13.4 billion years before Earth existed. §4.3 permits the bridge
+*alongside*; that was the bridge *instead*, in the one program written to object
+to precisely that substitution.
+
+The narrow fix was to add tick and drift columns beside the years, and that was
+done. But the general form of the defect is that a foreign unit appeared without
+being asked for, and could therefore become the only unit again anywhere a
+future field forgot its body-independent twin.
+
+### What changes
+
+`--bridge` is the request. Without it, output uses ticks and the tier ladder,
+which are body-independent by construction. With it, the SI second, the Julian
+year and Gyr appear as before.
+
+Two contexts keep foreign units unconditionally, and the list is short on
+purpose:
+
+- **`ucal to-civil` and `ucal from-civil`.** A civil label *is* an Earth label
+  and rendering one is the entire request. Gating it would gate the command.
+- **`ucal datum`'s provenance chain and rounding residual.** §19.2 requires
+  them, and they record where an Earth-sourced measurement entered — the point
+  being that it entered there and nowhere else (Rule Y). Hiding the audit trail
+  to avoid naming a second would defeat what the trail is for.
+
+### Enforcement
+
+`Value::Bridge` makes "this is a foreign unit" a property of the value rather
+than a bool threaded through five signatures, so omitting it is the default
+rather than something a call site must remember.
+`crates/ucal/tests/no_earth_units.rs` asserts that no non-Earth command prints
+a foreign unit by default, that `--bridge` brings them back, and that the Earth
+commands above keep theirs.

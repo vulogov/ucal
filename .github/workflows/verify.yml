@@ -1,0 +1,96 @@
+# The verification block from Documentation/Release_Notes/README.md, run on
+# every push instead of when someone remembers.
+#
+# What this protects against, stated at its real size: this repository has one
+# contributor, so CI mostly protects that contributor from themselves. That is
+# not nothing — several defects in 0.3.0 and 0.4.0 were found by running
+# something rather than by reading it — but it is not the usual claim for CI and
+# should not be made to sound like it.
+#
+# The job list is deliberately the same list as the release procedure. If the
+# two drift, the procedure is the one that is right, and this file is wrong.
+
+name: verify
+
+on:
+  push:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  # Rule O: never wrap, even in release. The profile sets this too; setting it
+  # here as well means a job that somehow bypasses the profile still gets it.
+  RUSTFLAGS: -D warnings
+
+jobs:
+  tests:
+    name: tests, both integer backends
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      # The default backend: bnum's stack-allocated u512.
+      - name: default backend
+        run: cargo test --workspace --release
+
+      # Rule W: the two backends must agree byte for byte. Nothing checks that
+      # at runtime -- backend.rs refuses to compile both at once -- so this job
+      # is the only place the claim is tested.
+      - name: bigint backend
+        run: |
+          cargo test --workspace --exclude xtask --release \
+            --no-default-features \
+            --features bigint,std,ucal-civil/hifitime,ucal/civil,ucal/body,ucal/events,ucal/cosmo
+
+  build:
+    name: warnings, and the no-alloc target
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+
+      # --all-targets, so test and example files are compiled under -D warnings
+      # too. Without it `cargo build` never touches a test file, and the first
+      # CI run failed on three unused imports that the local gate could not see.
+      - name: workspace builds clean
+        run: cargo build --workspace --all-targets --release
+
+      # GE-5: ucal-core with no allocator. `bigint` implies `alloc`, so a
+      # no-alloc build is a u512 build by construction.
+      - name: ucal-core on wasm, no_std, no allocator
+        run: |
+          cargo build -p ucal-core --target wasm32-unknown-unknown \
+            --no-default-features --features u512
+
+  checks:
+    name: harness, lints, docs, vectors
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      # UC-P0: two independent exact-integer derivations of every constant.
+      - name: constants harness
+        run: cargo run -p xtask
+
+      # Rules E, O, A.2/Y, Q.1, §12, version lockstep, indented literals.
+      # Exemptions are printed, so one is a visible cost rather than a silence.
+      - name: workspace lints
+        run: cargo run -p xtask -- lint
+
+      # §13.5's single source of truth, every citation resolving against spec/,
+      # and Documentation/CLI.md covering the command surface.
+      - name: generated docs and citations
+        run: cargo run -p xtask -- check-docs
+
+      # Re-derives the conformance vectors along both integer routes and checks
+      # them against the committed digest. Reports UNSIGNED rather than ok when
+      # no signature is present: a digest proves integrity, not provenance.
+      - name: conformance vectors
+        run: cargo run -p xtask -- verify-vectors

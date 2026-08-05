@@ -7,6 +7,7 @@ use std::io::IsTerminal as _;
 
 use clap::{Parser, Subcommand};
 use ucal::style::{parse_group_sep, resolve_for_output, ColorChoice, Render, Role, Style};
+use ucal_core::Rounding;
 use ucal::{
     cmd_datum, cmd_doctor, cmd_explain, cmd_ladder, exit_code, parse_rounding, parse_tier_in,
 };
@@ -55,6 +56,29 @@ struct Cli {
     /// Never colour. An alias for `--color never`, and it wins over `--color`.
     #[arg(long, global = true)]
     no_color: bool,
+
+    /// Fractional digits for rendered rationals, overriding each field's own
+    /// default. Without it every field keeps the precision it was written with.
+    #[arg(long, global = true, value_name = "N")]
+    decimals: Option<u32>,
+
+    /// Rounding mode for rendered values: trunc, ceil, half-even or half-up.
+    ///
+    /// Rule R makes rendering the only place a value may be rounded, so the
+    /// mode is a declared choice rather than a constant. Without it each field
+    /// keeps its own.
+    #[arg(long, global = true, value_name = "MODE",
+          value_parser = ["trunc", "ceil", "half-even", "half-up"])]
+    round: Option<String>,
+
+    /// Also show foreign-unit conversions: SI seconds, Julian years, Gyr.
+    ///
+    /// Off by default. A Julian year is 365.25 of Earth's rotations and an SI
+    /// second is an Earth unit; using either to describe something that is not
+    /// of Earth is the substitution this program exists to object to. The
+    /// conversion is available on request and is not performed unasked.
+    #[arg(long, global = true)]
+    bridge: bool,
 
     /// Columns to render tables at. Never below 80; defaults to the terminal
     /// width when there is one, and to 80 when output is redirected.
@@ -108,8 +132,6 @@ enum Command {
         /// Fractional-second digits, up to 30.
         #[arg(long, default_value_t = 0)]
         digits: u8,
-        #[arg(long, default_value = "half-even")]
-        round: String,
         #[arg(long, default_value = "gregorian")]
         calendar: String,
     },
@@ -190,6 +212,10 @@ enum CosmoCommand {
         /// Decimal digits for the directed square roots (D-6).
         #[arg(long, default_value_t = ucal_cosmo::DEFAULT_SCALE)]
         scale: u32,
+        /// Also print how the enclosure was reached, and which direction each
+        /// rounding in the chain moved.
+        #[arg(long)]
+        audit: bool,
     },
     /// The redshift at an absolute time, by bisection.
     Z {
@@ -296,12 +322,27 @@ fn main() {
         std::process::exit(5);
     }
 
+    // Parsed before dispatch: `--round` reaches both the rendering and
+    // `to-civil`'s sub-second field, so it has to exist before either runs.
+    let round = match cli.round.as_deref().map(parse_rounding).transpose() {
+        Ok(m) => m,
+        Err(e) => {
+            eprintln!("{e}");
+            std::process::exit(exit_code(&e));
+        }
+    };
+
     let result = match &cli.command {
         Command::Datum => cmd_datum(),
         Command::Doctor => cmd_doctor(),
         #[cfg(feature = "cosmo")]
         Command::Cosmo { what } => match what {
-            CosmoCommand::Age { z, depth, scale } => ucal::cmd_cosmo_age(z, *depth, *scale),
+            CosmoCommand::Age {
+                z,
+                depth,
+                scale,
+                audit,
+            } => ucal::cmd_cosmo_age_audited(z, *depth, *scale, *audit),
             CosmoCommand::Z {
                 at,
                 tolerance_years,
@@ -356,12 +397,15 @@ fn main() {
             instant,
             scale,
             digits,
-            round,
             calendar,
         } => parse_scale(scale)
-            .and_then(|s| parse_rounding(round).map(|r| (s, r)))
-            .and_then(|(s, r)| parse_calendar(calendar).map(|c| (s, r, c)))
-            .and_then(|(s, r, c)| cmd_to_civil(instant, s, *digits, r, c)),
+            // `--round` is global now: a civil label's sub-second field and a
+            // rendered rational are rounded by the same declared choice, and
+            // half-even is still the default for both.
+            .and_then(|s| parse_calendar(calendar).map(|c| (s, c)))
+            .and_then(|(s, c)| {
+                cmd_to_civil(instant, s, *digits, round.unwrap_or(Rounding::HalfEven), c)
+            }),
     };
 
     // --no-color beats --color, because it is the flag a script sets when it
@@ -395,6 +439,9 @@ fn main() {
     };
     let render = Render::styled(style)
         .group(sep)
+        .decimals(cli.decimals)
+        .round(round)
+        .bridge(cli.bridge)
         .width(Render::resolve_width(cli.width, terminal));
 
     match result {
@@ -402,7 +449,7 @@ fn main() {
             print!(
                 "{}",
                 if cli.json {
-                    doc.to_json()
+                    doc.to_json_with(&render)
                 } else {
                     doc.render(&render)
                 }

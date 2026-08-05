@@ -11,6 +11,9 @@
 
 use std::fmt::Write as _;
 
+use ucal_core::{Ratio, Rounding};
+
+use crate::cert::Certification;
 use crate::style::{group_decimal, paint_form, Render, Role, Style};
 
 /// The `--json` schema version (§19.1).
@@ -49,6 +52,37 @@ pub enum Value {
         /// The rows, in order.
         rows: Vec<(String, Value)>,
     },
+    /// A rational, rendered late.
+    ///
+    /// Holds the **value**, not a string. Rule R makes rendering the only site
+    /// at which a quantity may lose information, so that site is the last
+    /// possible moment — which is what lets `--decimals` and `--round` reach it.
+    /// A `Doc` built by a command carries exact rationals until something asks
+    /// to see them.
+    ///
+    /// `digits` and `mode` are the field's own defaults, used unless the caller
+    /// overrides them. See [`crate::cert`].
+    Quantity {
+        /// The exact value.
+        value: Ratio,
+        /// Fractional digits this field renders to unless told otherwise.
+        digits: u32,
+        /// The mode this field rounds with unless told otherwise.
+        mode: Rounding,
+    },
+    /// A value in a **foreign unit**, shown only when the caller asks.
+    ///
+    /// Rule A.3 admits foreign units at three declared points; Rule A.5 makes
+    /// them informative. §4.3 requires one place to print the SI equivalent
+    /// always — `ucal explain` — and requires it nowhere else.
+    ///
+    /// Everywhere else a Julian year or an SI second is a courtesy, and a
+    /// courtesy that had become the *only* rendering in places: `cosmo age`
+    /// reported its widths in Earth years and nothing else, for epochs before
+    /// Earth existed. Wrapping the field makes "this is a foreign unit" a fact
+    /// about the value rather than a bool threaded through five signatures, and
+    /// makes omitting it the default rather than something to remember.
+    Bridge(Box<Value>),
     /// A rendered timestamp form: a `UC1` text form, a `UC1/5` form, or a UCID.
     ///
     /// Distinguished from [`Value::Text`] only so the renderer can tell the
@@ -59,6 +93,74 @@ pub enum Value {
 }
 
 impl Value {
+    /// The text and certification this value renders to under `r`.
+    ///
+    /// Returns `None` for anything that is not a rational. For a
+    /// [`Value::Quantity`] the caller's `--decimals` and `--round` win over the
+    /// field's own defaults, which is the whole reason the value is carried
+    /// rather than a string.
+    pub fn rendered_opt(&self, r: &Render) -> Option<(String, Certification)> {
+        let Value::Quantity {
+            value,
+            digits,
+            mode,
+        } = self
+        else {
+            return None;
+        };
+        let d = r.decimals.unwrap_or(*digits);
+        let m = r.round.unwrap_or(*mode);
+        let cert = Certification::of_ratio(value, d, m);
+        let text = value
+            .to_decimal_string(d, m)
+            .unwrap_or_else(|_| value.to_ratio_string());
+        Some((text, cert))
+    }
+
+    /// Every rendered scalar under this value, joined — for tests that need to
+    /// look at what a reader sees rather than at the tree that produced it.
+    pub fn rendered_text(&self) -> String {
+        let mut out = String::new();
+        fn walk(v: &Value, out: &mut String) {
+            match v {
+                Value::Section(f) | Value::Rows { rows: f, .. } => {
+                    for (k, iv) in f {
+                        out.push_str(k);
+                        out.push(' ');
+                        walk(iv, out);
+                    }
+                }
+                Value::List(items) => {
+                    for i in items {
+                        out.push_str(i);
+                        out.push(' ');
+                    }
+                }
+                Value::Quantity { .. } => {
+                    out.push_str(&v.rendered(&Render::PLAIN).0);
+                    out.push(' ');
+                }
+                Value::Text(t) | Value::Form(t) => {
+                    out.push_str(t);
+                    out.push(' ');
+                }
+                Value::Number(n) => {
+                    out.push_str(n);
+                    out.push(' ');
+                }
+                _ => {}
+            }
+        }
+        walk(self, &mut out);
+        out
+    }
+
+    /// As [`rendered_opt`](Value::rendered_opt), for a value known to be one.
+    pub(crate) fn rendered(&self, r: &Render) -> (String, Certification) {
+        self.rendered_opt(r)
+            .unwrap_or_else(|| (String::new(), Certification::Exact))
+    }
+
     /// A string value.
     pub fn text(s: impl Into<String>) -> Value {
         Value::Text(s.into())
@@ -70,6 +172,24 @@ impl Value {
     /// A rendered timestamp form.
     pub fn form(s: impl Into<String>) -> Value {
         Value::Form(s.into())
+    }
+
+    /// Mark a value as a foreign unit, shown only under `--bridge`.
+    pub fn bridge(v: Value) -> Value {
+        Value::Bridge(Box::new(v))
+    }
+
+    /// A rational, to be rendered at `digits` under `mode` unless overridden.
+    ///
+    /// The one constructor for a rendered decimal in this crate. Going through
+    /// it is what makes the certification unavoidable rather than something a
+    /// call site could forget.
+    pub fn quantity(r: &Ratio, digits: u32, mode: Rounding) -> Value {
+        Value::Quantity {
+            value: r.clone(),
+            digits,
+            mode,
+        }
     }
     /// The rows of a section or a table, whichever this is.
     pub fn as_rows(&self) -> Option<&[(String, Value)]> {
@@ -164,6 +284,17 @@ impl Doc {
         self.fields.iter().find(|(k, _)| k == key).map(|(_, v)| v)
     }
 
+    /// Every non-exact rendered number in this document, with its dotted path.
+    ///
+    /// Only the exceptions. Exactness is the expectation, so a field absent from
+    /// this list is being told it is exact — which is a claim, and
+    /// `tests/certification.rs` is what makes it one.
+    pub fn certifications(&self, r: &Render) -> Vec<(String, Certification)> {
+        let mut out = Vec::new();
+        collect_certs(&self.fields, "", r, &mut out);
+        out
+    }
+
     /// Render for a person, without colour.
     ///
     /// Defined as [`to_ansi`](Doc::to_ansi) against [`Style::PLAIN`] rather than
@@ -201,8 +332,53 @@ impl Doc {
             .max()
             .unwrap_or(0);
         for (k, v) in &self.fields {
+            if matches!(v, Value::Bridge(_)) && !r.bridge {
+                continue;
+            }
             render_field_text(&mut s, k, v, width, 0, r);
         }
+        let certs = self.certifications(r);
+        if !certs.is_empty() {
+            // Grouped by what was done rather than listed per path: a ladder has
+            // forty-five rows carrying the same rounding, and forty-five
+            // identical lines would bury the one that differs.
+            let mut groups: Vec<(Certification, Vec<String>)> = Vec::new();
+            for (path, c) in &certs {
+                let leaf = path.rsplit('.').next().unwrap_or(path).to_string();
+                match groups.iter_mut().find(|(g, _)| g == c) {
+                    Some((_, names)) => {
+                        if !names.contains(&leaf) {
+                            names.push(leaf);
+                        }
+                    }
+                    None => groups.push((*c, alloc_vec(leaf))),
+                }
+            }
+            let _ = writeln!(s, "{}:", style.paint(Role::Key, "certification"));
+            let w = groups
+                .iter()
+                .map(|(c, _)| c.to_string().chars().count())
+                .max()
+                .unwrap_or(0);
+            for (c, names) in &groups {
+                let label = c.to_string();
+                let _ = writeln!(
+                    s,
+                    "  {}  {}",
+                    padded(style, Role::Warning, &label, w),
+                    style.paint(Role::Value, &names.join(", "))
+                );
+            }
+            let _ = writeln!(
+                s,
+                "  {}",
+                style.paint(
+                    Role::Note,
+                    "every other number above is exact: the digits shown are the value"
+                )
+            );
+        }
+
         for n in &self.notes {
             // A trailing note hangs at column zero, so it wraps to the margin
             // rather than to a field's value column.
@@ -217,28 +393,88 @@ impl Doc {
         s
     }
 
-    /// Render for a program (§19.1).
+    /// Render for a program (§19.1), at the field defaults.
     pub fn to_json(&self) -> String {
+        self.to_json_with(&Render::PLAIN)
+    }
+
+    /// Render for a program, honouring `--decimals` and `--round`.
+    pub fn to_json_with(&self, r: &Render) -> String {
+        let certs = self.certifications(r);
         let mut s = String::new();
         let _ = writeln!(s, "{{");
         let _ = writeln!(s, "  \"format\": \"{JSON_FORMAT}\",");
-        for (i, (k, v)) in self.fields.iter().enumerate() {
-            let comma = if i + 1 == self.fields.len() && self.notes.is_empty() {
-                ""
-            } else {
-                ","
-            };
+        // A trailing object follows the fields when there is one, so the last
+        // field's comma depends on both of them, not only on `notes`.
+        let more = !self.notes.is_empty() || !certs.is_empty();
+        let shown: Vec<&(String, Value)> = self
+            .fields
+            .iter()
+            .filter(|(_, v)| r.bridge || !matches!(v, Value::Bridge(_)))
+            .collect();
+        for (i, (k, v)) in shown.iter().enumerate() {
+            let comma = if i + 1 == shown.len() && !more { "" } else { "," };
             let _ = write!(s, "  \"{}\": ", escape(k));
-            render_value_json(&mut s, v, 1);
+            render_value_json(&mut s, v, 1, r);
             let _ = writeln!(s, "{comma}");
+        }
+        if !certs.is_empty() {
+            let _ = writeln!(s, "  \"certification\": {{");
+            for (i, (path, c)) in certs.iter().enumerate() {
+                let comma = if i + 1 == certs.len() { "" } else { "," };
+                let _ = writeln!(
+                    s,
+                    "    \"{}\": \"{}\"{comma}",
+                    escape(path),
+                    escape(&c.to_string())
+                );
+            }
+            let _ = writeln!(s, "  }}{}", if self.notes.is_empty() { "" } else { "," });
         }
         if !self.notes.is_empty() {
             let _ = write!(s, "  \"notes\": ");
-            render_value_json(&mut s, &Value::List(self.notes.clone()), 1);
+            render_value_json(&mut s, &Value::List(self.notes.clone()), 1, r);
             let _ = writeln!(s);
         }
         let _ = writeln!(s, "}}");
         s
+    }
+}
+
+fn alloc_vec(s: String) -> Vec<String> {
+    vec![s]
+}
+
+/// Walk a field tree, collecting every non-exact quantity by dotted path.
+fn collect_certs(
+    fields: &[(String, Value)],
+    prefix: &str,
+    r: &Render,
+    out: &mut Vec<(String, Certification)>,
+) {
+    for (k, v) in fields {
+        let path = if prefix.is_empty() {
+            k.clone()
+        } else {
+            format!("{prefix}.{k}")
+        };
+        match v {
+            Value::Quantity { .. } => {
+                let (_, cert) = v.rendered(r);
+                if !cert.is_exact() {
+                    out.push((path, cert));
+                }
+            }
+            Value::Section(inner) => collect_certs(inner, &path, r, out),
+            Value::Rows { rows, .. } => collect_certs(rows, &path, r, out),
+            // A foreign-unit field is still a rendered number when it is shown,
+            // and needs its certification like any other. Missing this made the
+            // ladder's bridge column silently uncertified under `--bridge`.
+            Value::Bridge(inner) if r.bridge => {
+                collect_certs(core::slice::from_ref(&(path.clone(), (**inner).clone())), "", r, out)
+            }
+            _ => {}
+        }
     }
 }
 
@@ -268,7 +504,17 @@ pub(crate) fn render_scalar(r: &Render, v: &Value) -> String {
         Value::Text(t) => r.style.paint(role_of_prose(t), t),
         Value::Number(n) => group_decimal(r, n),
         Value::Form(f) => paint_form(r, f),
+        Value::Quantity { .. } => group_decimal(r, &v.rendered(r).0),
         Value::Bool(b) => r.style.paint(Role::Value, &b.to_string()),
+        // A foreign unit renders as its inner value when asked for, and as
+        // nothing when not.
+        Value::Bridge(inner) => {
+            if r.bridge {
+                render_scalar(r, inner)
+            } else {
+                String::new()
+            }
+        }
         // Not scalars; `crate::table::render` refuses rows containing them, and
         // the field renderer handles them before reaching here.
         Value::Section(_) | Value::List(_) | Value::Rows { .. } => String::new(),
@@ -320,10 +566,14 @@ fn render_field_text(s: &mut String, k: &str, v: &Value, width: usize, depth: us
             let inner = fields
                 .iter()
                 .filter(|(_, v)| !matches!(v, Value::Section(_) | Value::List(_) | Value::Rows { .. }))
+                .filter(|(_, v)| r.bridge || !matches!(v, Value::Bridge(_)))
                 .map(|(k, _)| k.chars().count())
                 .max()
                 .unwrap_or(0);
             for (ik, iv) in fields {
+                if matches!(iv, Value::Bridge(_)) && !r.bridge {
+                    continue;
+                }
                 render_field_text(s, ik, iv, inner, depth + 1, r);
             }
         }
@@ -363,19 +613,35 @@ fn render_field_text(s: &mut String, k: &str, v: &Value, width: usize, depth: us
         Value::Form(f) => {
             write_field(s, r, &pad, k, width, &paint_form(r, f));
         }
+        Value::Quantity { .. } => {
+            write_field(s, r, &pad, k, width, &group_decimal(r, &v.rendered(r).0));
+        }
+        Value::Bridge(inner) => {
+            if r.bridge {
+                render_field_text(s, k, inner, width, depth, r);
+            }
+        }
         Value::Bool(b) => {
             write_field(s, r, &pad, k, width, &style.paint(Role::Value, &b.to_string()));
         }
     }
 }
 
-fn render_value_json(s: &mut String, v: &Value, depth: usize) {
+fn render_value_json(s: &mut String, v: &Value, depth: usize, r: &Render) {
     let pad = "  ".repeat(depth);
     match v {
         // A Form is a string in JSON, byte-identical to what Text emits. That
         // is the whole reason the variant does not bump `ucal-json/1`.
+        // A Quantity is its digits in JSON, byte-identical to what Text emits.
+        // The certification travels in the document's `certification` map rather
+        // than wrapping every number in an object — which would change the shape
+        // of every numeric field and break every consumer, to say something that
+        // is only interesting for the minority of fields that are not exact.
         Value::Text(t) | Value::Form(t) => {
             let _ = write!(s, "\"{}\"", escape(t));
+        }
+        Value::Quantity { .. } => {
+            let _ = write!(s, "\"{}\"", escape(&v.rendered(r).0));
         }
         // Tick counts exceed every JSON number implementation in practice, and a
         // consumer that silently converted one to a double would lose the
@@ -401,8 +667,19 @@ fn render_value_json(s: &mut String, v: &Value, depth: usize) {
         }
         // Rows is Section with a rendering hint. Emitting it through the same
         // arm is what keeps `ucal-json/1` fixed.
-        Value::Rows { rows, .. } => render_value_json(s, &Value::Section(rows.clone()), depth),
+        Value::Rows { rows, .. } => render_value_json(s, &Value::Section(rows.clone()), depth, r),
+        Value::Bridge(inner) => {
+            if r.bridge {
+                render_value_json(s, inner, depth, r);
+            } else {
+                let _ = write!(s, "null");
+            }
+        }
         Value::Section(fields) => {
+            let fields: Vec<&(String, Value)> = fields
+                .iter()
+                .filter(|(_, v)| r.bridge || !matches!(v, Value::Bridge(_)))
+                .collect();
             if fields.is_empty() {
                 let _ = write!(s, "{{}}");
                 return;
@@ -411,7 +688,7 @@ fn render_value_json(s: &mut String, v: &Value, depth: usize) {
             for (i, (k, val)) in fields.iter().enumerate() {
                 let comma = if i + 1 == fields.len() { "" } else { "," };
                 let _ = write!(s, "{pad}  \"{}\": ", escape(k));
-                render_value_json(s, val, depth + 1);
+                render_value_json(s, val, depth + 1, r);
                 let _ = writeln!(s, "{comma}");
             }
             let _ = write!(s, "{pad}}}");

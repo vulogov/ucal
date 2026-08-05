@@ -89,7 +89,12 @@ pub enum Role {
 /// Held as [`anstyle::Style`] values, which render to SGR sequences and to
 /// nothing at all when empty. `anstyle` arrives with clap and is not a new
 /// dependency.
+/// `#[non_exhaustive]`: construct through [`Style::PLAIN`] or
+/// [`Style::colored`]. Its fields are private, so this only forbids a
+/// functional-update literal — and a new role must not silently inherit an
+/// appearance from whichever role a caller happened to copy.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Style {
     title: anstyle::Style,
     key: anstyle::Style,
@@ -289,7 +294,12 @@ pub fn resolve_for_output(choice: ColorChoice, json: bool) -> Style {
 /// changes the characters, so it is not covered by the strip invariant and must
 /// not be — the invariant is a claim about *colour*, and quietly widening it to
 /// cover a flag that inserts characters would make it vacuous.
+/// `#[non_exhaustive]`: build one through [`Render::PLAIN`] and its builders
+/// rather than with a struct literal. Added in 0.4.0, which broke literals
+/// anyway by introducing three fields — so the marker costs nothing now and
+/// would cost a second break later.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Render {
     /// The role-to-appearance table.
     pub style: Style,
@@ -305,6 +315,23 @@ pub struct Render {
     pub group: Option<char>,
     /// Available columns. See [`crate::table`] for why the floor is fixed.
     pub cols: usize,
+    /// Fractional digits to render rationals at, overriding each field's own
+    /// default.
+    ///
+    /// `None` means every field keeps the precision it was written with, which
+    /// is why turning this on changes nothing for a caller who does not ask.
+    /// Rule R makes rendering the only place a value may be rounded; this is
+    /// what makes that place answerable to the caller rather than to a constant.
+    pub decimals: Option<u32>,
+    /// Rounding mode, overriding each field's own default. `None` keeps them.
+    pub round: Option<ucal_core::Rounding>,
+    /// Show foreign-unit renderings — SI seconds, Julian years, Gyr.
+    ///
+    /// Off by default, and that default is the project. A Julian year is 365.25
+    /// of Earth's rotations; using it to describe an epoch before Earth existed
+    /// is the substitution this whole program was written to object to. The
+    /// conversion is available on request and is not performed unasked.
+    pub bridge: bool,
 }
 
 impl Render {
@@ -314,6 +341,9 @@ impl Render {
         style: Style::PLAIN,
         group: None,
         cols: crate::table::BASELINE_WIDTH,
+        decimals: None,
+        round: None,
+        bridge: false,
     };
 
     /// A style with no separator, at the baseline width.
@@ -349,6 +379,24 @@ impl Render {
     /// Set the digit-group separator.
     pub fn group(mut self, sep: Option<char>) -> Render {
         self.group = sep;
+        self
+    }
+
+    /// Override every field's fractional-digit count.
+    pub fn decimals(mut self, d: Option<u32>) -> Render {
+        self.decimals = d;
+        self
+    }
+
+    /// Override every field's rounding mode.
+    pub fn round(mut self, m: Option<ucal_core::Rounding>) -> Render {
+        self.round = m;
+        self
+    }
+
+    /// Show foreign-unit renderings.
+    pub fn bridge(mut self, on: bool) -> Render {
+        self.bridge = on;
         self
     }
 }

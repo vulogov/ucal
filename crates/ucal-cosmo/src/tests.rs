@@ -484,7 +484,7 @@ fn ge1_and_ge2_measured() {
     );
 
     println!(
-        "\n depth   panels        wall   arith width (ticks)  ~yr   ticks/enclosure"
+        "\n depth   panels        wall   arith width (ticks)  ~yr   ticks/enclosure"  // ucal-lint-allow(no-indent-in-literal): a column header, aligned on purpose
     );
     for depth in [4u32, 8, 12, 14, 16, 18, 20] {
         let t0 = Clock::now();
@@ -535,4 +535,128 @@ fn ge1_and_ge2_measured() {
         years(out.value.lo().ticks()),
         years(out.value.hi().ticks())
     );
+}
+
+// ---------------------------------------------------------------------------
+// The tick quantisation, which is the last rounding in the chain
+// ---------------------------------------------------------------------------
+
+#[test]
+fn quantising_to_ticks_rounds_outward_on_both_ends() {
+    // Every rounding in this computation widens: the densities are taken at
+    // opposite ends, the roots are directed apart, the accumulator snaps outward
+    // and the two sums multiply by opposite ends of 1/H0. The last step turns
+    // two rationals into two tick counts, and it has to widen too.
+    //
+    // It did not. Both ends were floored, and flooring the *upper* bound moves
+    // it down — inward — so the enclosure could exclude a true value lying in
+    // the fraction that was discarded. Found by writing V4's audit and asking
+    // what direction each step rounds in.
+    let m = model();
+    let z = Ratio::from_u64(1100);
+    let u0 = Ratio::one().add(&z).unwrap().recip().unwrap();
+    let full = super::integral_enclosure(&m, &u0, 6, S).unwrap();
+
+    let t_lo = full.lo().mul(m.hubble_time.lo()).unwrap();
+    let t_hi = full.hi().mul(m.hubble_time.hi()).unwrap();
+    // Neither bound lands on an integer, so the direction is not academic.
+    assert!(!t_lo.frac().is_zero(), "t_lo happens to be integral; pick another z");
+    assert!(!t_hi.frac().is_zero(), "t_hi happens to be integral; pick another z");
+
+    let out = m.t_of_z(&z, 6, S).unwrap().value;
+    let lo_q = Ratio::from_int(out.lo().ticks().clone());
+    let hi_q = Ratio::from_int(out.hi().ticks().clone());
+
+    assert!(
+        lo_q <= t_lo,
+        "the quantised lower bound rose above the computed one"
+    );
+    assert!(
+        hi_q >= t_hi,
+        "the quantised upper bound fell below the computed one: the enclosure \
+         no longer provably contains what the quadrature bounded"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// V5 — interval inputs
+// ---------------------------------------------------------------------------
+
+#[test]
+fn an_interval_input_encloses_both_of_its_ends() {
+    // The property that makes the hull an enclosure rather than a guess.
+    let m = model();
+    let (lo, hi) = (Ratio::from_u64(1090), Ratio::from_u64(1110));
+    let over = m
+        .t_of_z_interval(&RatInterval::new(lo.clone(), hi.clone()).unwrap(), 4, S)
+        .unwrap()
+        .value;
+    for z in [&lo, &hi] {
+        let at = m.t_of_z(z, 4, S).unwrap().value;
+        assert!(
+            over.lo() <= at.lo() && over.hi() >= at.hi(),
+            "the hull does not contain the enclosure at z = {}",
+            z.to_decimal_string(0, Rounding::Trunc).unwrap()
+        );
+    }
+}
+
+#[test]
+fn a_point_interval_is_the_point() {
+    // A degenerate interval must not widen anything, or every caller pays for a
+    // feature they did not use.
+    let m = model();
+    let z = Ratio::from_u64(1100);
+    let point = m.t_of_z(&z, 4, S).unwrap();
+    let degenerate = m
+        .t_of_z_interval(&RatInterval::exact(z), 4, S)
+        .unwrap();
+    assert_eq!(point.value, degenerate.value);
+    assert!(degenerate.input_width.ticks().is_zero_ticks());
+}
+
+#[test]
+fn the_input_width_is_reported_apart_from_the_other_two() {
+    // Rule X separates arithmetic from parameter error because merging them
+    // hides which is doing the work. A caller's own uncertainty is a third
+    // thing, and folding it into either would be the same mistake.
+    let m = model();
+    let wide = m
+        .t_of_z_interval(
+            &RatInterval::new(Ratio::from_u64(1000), Ratio::from_u64(1200)).unwrap(),
+            4,
+            S,
+        )
+        .unwrap();
+    assert!(!wide.input_width.ticks().is_zero_ticks(), "a wide input cost nothing?");
+    // And the three account for the total.
+    let sum = wide
+        .arithmetic_width
+        .checked_add(&wide.parameter_width)
+        .and_then(|d| d.checked_add(&wide.input_width))
+        .unwrap();
+    assert_eq!(
+        sum.ticks(),
+        wide.value.width().ticks(),
+        "the three widths must add up to the enclosure"
+    );
+}
+
+#[test]
+fn a_wider_input_gives_a_wider_answer() {
+    let m = model();
+    let w = |lo: u64, hi: u64| {
+        m.t_of_z_interval(
+            &RatInterval::new(Ratio::from_u64(lo), Ratio::from_u64(hi)).unwrap(),
+            4,
+            S,
+        )
+        .unwrap()
+        .value
+        .width()
+        .ticks()
+        .clone()
+    };
+    assert!(w(1000, 1200) > w(1090, 1110));
+    assert!(w(1090, 1110) > w(1100, 1100));
 }

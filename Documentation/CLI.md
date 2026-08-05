@@ -8,10 +8,19 @@ commands. This file is the manual, and the fields are its point — a reader
 looking at `remainder_ticks` or `window_ticks` should not have to read `lib.rs`
 to find out what they are.
 
-**Scope note.** Command names, subcommands and global options are checked
-against the source by `cargo run -p xtask -- check-docs`, which fails when this
-file and the CLI disagree. The prose is not generated and can still go stale;
-where it does, the source is right.
+**What is checked, and what is not.**
+
+Two things are mechanical. `cargo run -p xtask -- check-docs` fails when a
+command or global option exists and is undocumented, or is documented and no
+longer exists. `crates/ucal/tests/manual_fields.rs` fails when a **field** this
+file documents is emitted by no command, or a field a command emits is
+documented nowhere.
+
+So this file is verified **complete and current**. It is *not* verified
+**correct**: whether a description says something true about the field it names
+is not mechanically checkable, and claiming otherwise would be the kind of
+overclaim the rest of the project exists to prevent. Where prose and source
+disagree, the source is right.
 
 ---
 
@@ -44,6 +53,9 @@ Accepted by every command (§19.1).
 | `--no-color` | off | Alias for `--color never`, and it wins over `--color`. |
 | `--width <N>` | terminal, else 80 | Columns to lay out at. Never below 80. |
 | `--tick-sep <CHAR>` | none | Separator between three-digit groups in decimal counts. Off by default so a copied tick count is still an integer. |
+| `--decimals <N>` | each field's own | Fractional digits for every rendered rational. Without it each field keeps the precision it was written with, so the default output is unchanged. |
+| `--round <MODE>` | each field's own | `trunc`, `ceil`, `half-even` or `half-up`, for every rendered value including `to-civil`'s sub-second field. |
+| `--bridge` | off | Also show foreign-unit conversions: SI seconds, Julian years, Gyr. Off by default — see below. |
 
 ### Colour, and what it is allowed to mean
 
@@ -151,6 +163,7 @@ ucal datum
 | `rounding.residual_rendered` | The same residual in seconds: `−0.017190364 s`. |
 | `rounding.rationale` | Why a whole-beat datum was chosen. |
 | `earth_dependency` | A plain statement of where Earth enters: the input arrives in Julian years and the bridge anchor is an Earth date. Both are metrology (Rule Y); neither enters a computation. |
+| `implied_age.seconds` | Under `--bridge`: the implied age in SI seconds. |
 | `implied_age` | A *consequence* of the declared datum, not a measurement. The measurement is `datum_provenance.input`. §19.2 forbids presenting this as an age of the universe, and a lint enforces the wording. |
 
 ---
@@ -179,6 +192,7 @@ ucal explain <INSTANT> [--claim]
 | `si_bridge.unit` | The declared foreign unit: the SI second. |
 | `si_bridge.epoch` | The civil instant the bridge is anchored to. |
 | `si_bridge.seconds_from_epoch` | The instant expressed through the bridge. Informative (Rule A.5) — this is the *only* place Earth enters, and it is division, so it is the only place a rounding mode is chosen. |
+| `claim` | Present with `--claim`: `BIG_BANG_CLAIM`, verbatim. Metadata, never an operand (Rule Q.3). |
 | `warning` | Present when the instant lies inside the claim's half-width (`UCAL-W0006`). |
 
 ---
@@ -214,21 +228,24 @@ ucal from-civil <DATE> [--scale tt|tai|utc] [--calendar gregorian|julian]
 Absolute time to a civil label. **The only place this program rounds** (Rule R).
 
 ```
-ucal to-civil <INSTANT> [--scale tt|tai|utc] [--digits N]
-              [--round half-even|trunc|ceil|half-up] [--calendar gregorian|julian]
+ucal to-civil <INSTANT> [--scale tt|tai|utc] [--digits N] [--calendar gregorian|julian]
 ```
 
 | option | default | notes |
 |---|---|---|
-| `--digits` | `0` | Fractional-second digits, up to 30. |
-| `--round` | `half-even` | The mode. Named because rounding is a choice, and an unnamed choice is a hidden one. |
+| `--digits` | `0` | Fractional-second digits of the civil label, up to 30. Distinct from the global `--decimals`, which governs rendered rationals. |
+
+`--round` is global. A civil label's sub-second field and a rendered rational
+are rounded by the same declared choice, and `half-even` remains the default for
+both.
+
 
 | field | meaning |
 |---|---|
 | `ticks` | The instant that was converted. |
 | `qualified` | The rendered label with its calendar qualifier attached, so a bare date can never circulate without saying which calendar it is in. |
 | `calendar_id` / `kind` | Which calendar, and whether it is `derived` or `legacy` (§19.4 requires `kind` on every rendering). |
-| `fields.*` | `year`, `month`, `day`, `hour`, `minute`, `second`, `weekday`. |
+| `fields.year`, `fields.month`, `fields.day`, `fields.hour`, `fields.minute`, `fields.second`, `fields.weekday` | The civil label's parts. |
 | `rounding` | The mode actually applied. |
 | `lossy` | Whether digits were discarded. `false` means the label denotes the exact tick. |
 | `warning` | Any `UCAL-W####` raised by the conversion. |
@@ -255,7 +272,7 @@ ucal ladder [--named-only]
 | `tiers.T<k>.exponent` | The tier's **canonical identity**. The name is an alias; nothing decides behaviour from one (Rule N). |
 | `tiers.T<k>.name` | Singular and plural in the chosen locale, or `—` for an unnamed tier. |
 | `tiers.T<k>.beats` | The tier in universe seconds. Exact by construction — every tier is a whole power of five of the beat. |
-| `tiers.T<k>.seconds (bridge)` | The same span in SI seconds. **Informative** (Rule A.5), shown alongside and never instead. |
+| `tiers.T<k>.seconds (bridge)` | The same span in SI seconds. **Informative** (Rule A.5) and shown only under `--bridge`. |
 | `tiers.T<k>.ticks` | The tier as an exact integer count of ticks. |
 
 The two seconds are incommensurable above T-6: one bridge second is
@@ -290,10 +307,17 @@ ucal cal anchor <ID>
 | field | meaning |
 |---|---|
 | `calendar` / `kind` / `body` | Which calendar this is. |
-| `anchor` | The anchor instant, its revision, and its uncertainty window. |
-| `intercalation` | The derived leap rule and the continued-fraction expansion behind it. |
-| `fields` | The instant rendered in this calendar's local fields. |
-| `cycles` | The derived grouping cycles, if the body has any. |
+| `anchor.method` | How the anchor was determined, cited. |
+| `anchor.uncertainty` | The observation's stated uncertainty. |
+| `intercalation.rule` | The derived leap rule, as a fraction. |
+| `intercalation.whole_days_per_year` | The integer part: how many whole days a year holds before intercalation. |
+| `intercalation.bound` | The drift bound the rule was derived against — a **rate** in local units, not a duration (D-A13). |
+| `intercalation.walked` | How many continued-fraction steps were taken to reach it. |
+| `fields.year`, `fields.month`, `fields.day`, `fields.hour`, `fields.minute`, `fields.second`, `fields.weekday` | The instant in this calendar's local fields. |
+| `fields.day_fraction` | How far through the local day the instant falls. |
+| `cycles.satellite` | Which satellite the grouping cycle is derived from, if any. |
+| `cycles.cycles_per_year` | The satellite's period as a fraction of the body's year. |
+| `cycles.convergents` | The continued-fraction convergents of that ratio — the candidate cycle lengths, with the chosen one marked. |
 
 ### `cal anchor`
 
@@ -329,6 +353,7 @@ ucal show <INSTANT> [--calendars <ID,ID,…>]
 | `calendars.<id>.window_ticks` | The uncertainty the anchor contributes, in ticks. A local date is only as sharp as the anchor behind it. |
 | `calendars.<id>.day_is_ambiguous` | Whether the instant falls close enough to a day boundary that the anchor's window straddles it. |
 | `calendars.<id>.error` | Present instead of fields when a calendar cannot render — a missing anchor is `UCAL-E0062`, not a guess. |
+| `calendars.<id>.arbitrary` | For a legacy calendar: which of its parameters are declared by convention rather than derived from a body. |
 
 ---
 
@@ -349,7 +374,11 @@ ucal events show <ID>
 | `events.<id>.window_ticks` | That figure converted to an interval of ticks. **Every entry is an interval**, because not one of these is known to a point. |
 | `events.<id>.citation` | The source. |
 | `events.<id>.warning` | `UCAL-W0006` where the event's window overlaps the claim's half-width — i.e. where the dating is not separable from the uncertainty in the datum itself. |
+| `description` (`show`) | What the event is, in a sentence. |
 | `stated_as` (`show`) | Whether the source gave a point, a range, or a bound. |
+| `window.lo` / `.hi` | The interval's ends, in ticks. |
+| `window.width_ticks` | Its width. |
+| `window.width_years` | The same width in Julian years, under `--bridge`. |
 | `midpoint` (`show`) | The window's midpoint. A *rendering choice*, not a claim: the window is the datum. |
 
 ---
@@ -370,7 +399,7 @@ ucal timeline [--tier <TIER>]
 |---|---|
 | `tier` | The tier positions are stated in. |
 | `events.<label>.at` | The event's position, rendered at that tier. |
-| `events.<label>.T<k>s since the datum` | The same position as a plain count of that tier. |
+| `events.<label>.tiers_since_datum` | The same position as a plain count of the stated tier. Which tier is in the document's `tier` field — it is not in this key, so a consumer's accessor survives `--tier`. |
 | `events.<label>.as_published` | The source's own figure, alongside. |
 | `events.<label>.warning` | As in `events list`. |
 
@@ -415,7 +444,9 @@ ucal cosmo z --at <INSTANT> [--tolerance-years N] [--depth N] [--scale N]
 | `model` | The model identifier, carried on every result (Rule X). |
 | `as_published.*` | `H0`, `Omega_m`, `Omega_Lambda`, `Omega_r`, each **verbatim as published**, uncertainty included. |
 | `citation` | Planck 2018. |
-| `hubble_time` | `1/H0` in ticks and in Gyr. |
+| `hubble_time.ticks_lo` | `1/H0`, the lower end, in ticks. |
+| `hubble_time.gyr` | The same in Gyr, under `--bridge`. |
+| `parameters` | The parameter set and its provenance, as one line (Rule X). |
 | `monotonicity.turns_at_u` | Where the integrand stops being monotone — `u ≈ 0.604`. Published because Appendix H.4 requires monotonicity to be *asserted, not assumed*, and here it fails, which is why the panels use an interval extension. |
 | `ge1` / `ge2` | The measured outcomes of two gated experiments, including the kill criteria that fired. |
 
@@ -425,16 +456,39 @@ ucal cosmo z --at <INSTANT> [--tolerance-years N] [--depth N] [--scale N]
 |---|---|---|
 | `--depth` | `12` | `2^depth` panels. Cost grows about 4× per step. |
 | `--scale` | `12` | Decimal digits for the directed square roots. |
+| `--audit` | off | Also print how the enclosure was reached, and which direction each rounding moved. |
+
+`--z` accepts a point or an **interval**: `--z 1100` or `--z 1090..1110`. The
+machinery is interval-valued end to end, so a caller carrying their own
+uncertainty can pass it through rather than picking a midpoint and losing it.
 
 | field | meaning |
 |---|---|
-| `z` | The redshift asked for. |
+| `z` | The redshift asked for, as a point or an interval. |
 | `enclosure.lo_ticks` / `.hi_ticks` | The age, as an interval of ticks. The answer is the *pair*. |
 | `enclosure.lo_years` / `.hi_years` | The same in years. |
 | `enclosure.at_drift` | The same on the ladder. |
-| `widths.arithmetic_years` | How much of the width comes from the quadrature. |
-| `widths.parameter_years` | How much comes from **Planck's own error bars**. |
+| `widths.arithmetic_ticks`, `widths.arithmetic_drifts`, `widths.arithmetic_years` | How much of the width comes from the quadrature. Ticks and drifts always; years under `--bridge`. |
+| `widths.parameter_ticks`, `widths.parameter_drifts`, `widths.parameter_years` | How much comes from **Planck's own error bars**. |
+| `audit` | Present with `--audit`: how the enclosure was reached, and the direction each rounding moved. |
 | `quadrature.depth` / `.panels` / `.sqrt_scale_digits` | What was actually computed. |
+| `input_width.ticks`, `input_width.drifts`, `input_width.years` | Present **only** for an interval input: what the caller's own uncertainty cost, over and above a point at the interval's lower end. Reported apart from the other two widths so none of the three can be mistaken for another. |
+
+For an interval, `t` is decreasing in `z` — `u₀ = 1/(1+z)` shrinks and the
+integrand is non-negative — so the hull runs from the age at the largest `z` to
+the age at the smallest. Appendix H.4 requires monotonicity to be *asserted, not
+assumed*, so that ordering is checked at runtime and a failure is `UCAL-E0070`
+rather than a hull that means nothing.
+
+`--audit` adds an `audit` section: the substitution, why the panels use an
+interval extension rather than endpoints, the panel count, and then **the
+direction each rounding moves** — densities, square roots, accumulation, the
+Hubble-time multiply, and the final quantisation to ticks. An enclosure's claim
+is that the true value provably lies inside it, and that rests on every step
+widening; two numbers cannot show it and the audit can.
+
+It is a summary, not a trace. A depth-12 run is 4096 panels doing the same four
+things, and those four things are what needs checking.
 
 The two widths are **never merged**, and the reason is visible in the numbers:
 at `z = 1100` the arithmetic width is 251 years against a parameter width of
@@ -502,10 +556,106 @@ Names that mean the same thing wherever they appear.
 | `citation` | Where a number came from. Every measured quantity in this program carries one. |
 | `notes[]` | Explanatory prose. Never load-bearing: nothing in the output depends on a note being read. |
 
+### Asking for more digits
+
+Rule R makes rendering the only place a value may be rounded, so that place
+answers to the caller rather than to a constant. A tick's length in beats is
+`1 / 5^60` — a finite expansion sixty places long — and the default six digits
+print it as zero:
+
+```
+$ ucal ladder --named-only | grep T-12
+T-12  0   tick / ticks   0.000000
+
+$ ucal ladder --named-only --decimals 60 --json | jq -r '.tiers["T-12"].beats'
+0.000000000000000000000000000000000000000001152921504606846976
+```
+
+At sixty digits that value is **exact**, and the `certification` map below drops
+it while keeping `seconds (bridge)`, which never terminates at any digit count.
+
+### Earth units, and `--bridge`
+
+**No Earth unit appears outside an Earth context unless you ask for one.**
+
+A Julian year is 365.25 of Earth's rotations. An SI second is an Earth unit.
+Using either to describe something that is not of Earth is the substitution this
+program was written to object to — and it had crept into the program itself:
+`cosmo age` reported its enclosure widths in Julian years *and nothing else*,
+for an epoch some 13.4 billion years before Earth existed.
+
+By default, output uses **ticks** and the **tier ladder** — beats, drifts,
+spans — which are body-independent by construction. `--bridge` adds the
+conversion. The conversion is available on request and is not performed unasked.
+
+```
+$ ucal cosmo age --z 1100 --json | jq -r '.enclosure | keys[]'
+lo_ticks   hi_ticks   at_drift
+
+$ ucal cosmo age --z 1100 --bridge --json | jq -r '.enclosure | keys[]'
+lo_ticks   hi_ticks   lo_years   hi_years   at_drift
+```
+
+This amends §4.3, which said `ucal explain` "always prints the SI equivalent
+alongside" — see `spec/SPEC-DELTAS.md` D-A16.
+
+**Two contexts keep foreign units unconditionally**, and the list is short on
+purpose. `to-civil` and `from-civil` *are* Earth calendar commands — a civil
+label is an Earth label and rendering it is the whole request. And `ucal datum`'s
+provenance chain and rounding residual, which §19.2 requires: they record where
+an Earth-sourced measurement entered, and the point is that it entered there and
+nowhere else (Rule Y).
+
+**Which year, when you do ask?** The Julian year, `31 557 600 s` exactly — the
+same definition `ucal datum` uses for `Gyr`. Stated in a `year` field alongside,
+because "years" is ambiguous by about `2 × 10^-5` and that is *not* below the
+precision reported: at the ages `cosmo age` gives, Julian and Gregorian differ
+by roughly **eight years on 371 600**, while `arithmetic_years` prints to one
+decimal.
+
+### `year`
+
+Present on any command that can print a year, and shown under `--bridge` with
+the year fields it explains: the Julian year's definition, and that it is an
+Earth unit shown alongside rather than instead of the tick counts.
+
+### `certification`
+
+Every document that rounds anything carries a `certification` object mapping a
+field's dotted path to what was done to it:
+
+```json
+"certification": {
+  "tiers.T5.beats": "rounded, half-even, 6 digits",
+  "tiers.T5.seconds (bridge)": "rounded, half-even, 6 digits"
+}
+```
+
+**Only the exceptions are listed.** Exactness is the expectation, so a numeric
+field *absent* from this map is being told its printed digits are the value —
+and that is a claim rather than a convention: `tests/certification.rs` checks
+that the map lists every non-exact quantity and nothing else, that anything
+called exact reparses to the value it prints, and that no rendered decimal
+reaches the output without going through the certified constructor at all.
+
+`exact` is a claim about *this rendering*, not about the number in the abstract.
+A tick in beats is `1 / 5^60` — a finite expansion sixty places long — so it is
+exact at sixty digits and a rounding at six, where it prints as `0.000000`.
+
+None of this is floating point. Rule E forbids a float token in any shipped
+crate; a decimal is produced by one integer multiply-divide,
+`mul_div_rounded(numerator, 10^digits, denominator, mode)`, with a decimal point
+inserted into the result's digits.
+
 ### The `--json` contract
 
 `--json` output is stable and versioned (§19.1). Every document carries
 `"format": "ucal-json/1"`, so a consumer can tell when it changes.
+
+Stability means **existing fields keep their names, shapes and meanings**. New
+fields may be added without a version bump — `certification` was added in 0.4.0
+this way — so a consumer should ignore keys it does not know rather than reject
+them.
 
 Numbers are emitted as **strings**, deliberately. A tick count exceeds every
 JSON number implementation in practice, and a consumer that silently converted

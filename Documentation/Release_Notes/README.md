@@ -12,6 +12,7 @@ knows only what it did.
 
 | version | date | state |
 |---|---|---|
+| [0.4.0](0.4.0.md) | 2026-08-04 | released — every number says what it is |
 | [0.3.0](0.3.0.md) | 2026-08-03 | released — legibility |
 | [0.2.0](0.2.0.md) | 2026-08-01 | released — supersede RFC UCAL-1 |
 | [0.1.1](0.1.1.md) | 2026-07-31 | released |
@@ -60,13 +61,23 @@ one-line version and links to it.
 ## Closing a cycle
 
 1. Replace **UNRELEASED** with the date, and check every entry still describes
-   what shipped.
+   what shipped — including **Breaking**. 0.3.0 opened with that section reading
+   "none yet" and closed with three entries, none of which had been noticed
+   until it was checked rather than assumed.
 2. Add the row to the table above.
-3. Bump the workspace version and the internal dependency requirements
-   together — they move in lockstep, so a `0.3.0` facade never resolves against
-   a `0.2.x` core.
+3. Bump the workspace version. Since 0.3.0 this is one edit to one file: the
+   five internal requirements live in `[workspace.dependencies]` and the members
+   inherit them, and `xtask -- lint`'s `version-lockstep` fails if they drift
+   apart.
 4. `cargo test --workspace --release`, both backends, plus
-   `cargo run -p xtask -- lint`, `check-docs` and `verify-vectors`.
+   `RUSTFLAGS="-D warnings" cargo build --workspace --all-targets --release`
+   and `cargo run -p xtask -- lint`, `check-docs`, `verify-vectors`.
+
+   **`--all-targets` matters.** Without it `cargo build` compiles the libraries
+   and binaries and never touches a test file, so an unused import in a test
+   passes locally and fails in CI — which is exactly what happened on the first
+   CI run, because the workflow sets `RUSTFLAGS` globally and `cargo test`
+   inherits it.
 5. `cargo run -p xtask -- publish` for the dry run, then
    `cargo run -p xtask -- publish --execute` for real.
 
