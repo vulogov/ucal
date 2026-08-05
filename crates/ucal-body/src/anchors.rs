@@ -26,11 +26,25 @@
 //! established meridian conventions with published constants, and both resolve
 //! four to eight orders of magnitude finer than one local day.
 //!
-//! **Titan has no anchor, and that is the honest output.** There is no
-//! established prime meridian convention with a published epoch for Titan
-//! comparable to UT1 or Mars24. An anchor could be invented — the mechanism would
-//! accept one — but inventing it would be exactly the "narrowing by assumption"
-//! GE-3 forbids. Appendix I.6 anticipates this state: a calendar complete in
+//! **Titan has no anchor, and that is the honest output** — though not for the
+//! reason this file gave until 0.7.0, when the literature was finally searched.
+//! Titan *does* have an established prime meridian convention with a published
+//! epoch: the IAU WGCCRE rotational elements, `W = 186.5855° + 22.5769768°/day`
+//! from J2000.0 TDB. What it has no counterpart for is the *second* half of what
+//! Earth's UT1 and Mars's Mars24 supply — a recipe for **mean solar time** at
+//! that meridian, which is what an anchor's phase is. Turning the one into the
+//! other needs the Sun's direction from Titan at the epoch, hence a planetary
+//! ephemeris this crate does not carry and should not become.
+//!
+//! The width is no longer the obstacle either: Titan's measured non-synchronous
+//! rotation bounds the disagreement between published models at about 3.4 hours
+//! at the present epoch, under one per cent of a Titan solar day. An anchor
+//! could be invented — the mechanism would accept one — but inventing it would
+//! be exactly the "narrowing by assumption" GE-3 forbids, and deriving it here
+//! would make this repository the publisher of Titan's solar-time convention
+//! rather than a citer of one. [`D5-titan-anchor.md`] records the search.
+//!
+//! [`D5-titan-anchor.md`]: https://github.com/vulogov/ucal/blob/main/Documentation/Proposals/D5-titan-anchor.md Appendix I.6 anticipates this state: a calendar complete in
 //! units, intercalation and cycles, and incomplete in phase, with the API saying
 //! so (`UCAL-E0062`) rather than defaulting it away.
 //!

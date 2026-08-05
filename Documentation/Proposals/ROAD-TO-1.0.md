@@ -109,8 +109,10 @@ Not a wish list. Each item answers "what would make the 1.0 promise honest".
 
 # The plan
 
-Five cycles. Each has one goal, in the shape that has worked: a stated aim every
-scope item serves, and a recorded outcome when something fails.
+Six cycles — five as first written, plus 0.9.0, added in 0.7.0 when the plan was
+found to contradict its own exit criteria. Each has one goal, in the shape that
+has worked: a stated aim every scope item serves, and a recorded outcome when
+something fails.
 
 ## 0.5.0 — finish the mechanism Rule R started
 
@@ -190,7 +192,36 @@ including "nothing changed", if that is the finding.
 Whatever contact found. Nothing new invented; this cycle exists so that the
 findings do not have to wait for 2.0.
 
-**Done when** the diff to 1.0 contains no `Breaking` section.
+**Done when** every finding from 0.7.0 that needs a breaking change has had one,
+and nothing is left waiting for the next window. 0.8.0 itself *has* a `Breaking`
+section — that is what it is for; the release that must not is 0.9.0.
+
+## 0.9.0 — hold still
+
+**Goal: one full cycle that breaks nothing, before the release that promises not
+to.**
+
+Added in 0.7.0 because the plan and its own exit criteria disagreed. The
+criteria ask for **two consecutive releases with no breaking change**; the four
+cycles above supply at most one, since 0.8.0 is defined as the cycle that
+*spends* 0.7.0's breaks. Reading "0.8.0 → 1.0.0" as satisfying it was an
+arithmetic error in the gate, and a gate that cannot be met is a gate that will
+be waived.
+
+There is nothing to build here, which is the point. A cycle whose diff contains
+no `Breaking` section is evidence that the surface has stopped moving, and that
+evidence cannot be manufactured faster by working harder — it is exactly the
+kind of claim this project insists must have a mechanism, and the mechanism is
+elapsed time with people using it.
+
+What may happen in 0.9.0: bug fixes, documentation, added fields, added
+commands, performance. What may not: anything that changes a name, a shape, a
+meaning, or a default.
+
+**Done when** 0.9.0 has shipped with an empty `Breaking` section, and nothing
+found since 0.8.0 is waiting for a breaking change to fix. If something is
+waiting, it is spent here and the counter restarts — which costs one cycle and
+is the whole reason the counter is two rather than one.
 
 ## 1.0.0 — the promise
 
@@ -204,10 +235,10 @@ Exit criteria, in the shape §20's phases use:
 | every promise 1.0 makes is written down | 0.6.0 |
 | the conformance apparatus has been used by someone else | 0.7.0 C1 |
 | the surface has survived contact | 0.7.0 |
-| two consecutive releases with no breaking change | 0.8.0 → 1.0.0 |
 | the specification and the source agree, checked | already: `check-docs`, 116 citations |
 | both backends byte-identical | already: Rule W, every release |
-| CI green on every push, with no known-failing job | 0.5.0 onward — the first run failed on three unused imports the local block could not see, and that is the class this criterion exists to keep out |
+| two consecutive releases with no breaking change | 0.9.0 → 1.0.0 |
+| CI green on every push, with no known-failing job | 0.7.0 — **not 0.5.0, as this table claimed until then.** The `features` workflow added in 0.6.0 failed on every push it ever ran, including the 0.6.0 release tag, because an assertion read colourised cargo output through an anchored `^error`. The criterion was written, nothing checked whether it held, and this document asserted it did — which is the failure this table exists to keep out, occurring in the table itself |
 
 ---
 
@@ -224,6 +255,31 @@ control, and therefore the only one that can be quietly dropped. If contact
 proves impossible, the honest outcome is **1.0 does not ship** and the crates
 stay `0.x` — which costs nothing, since `0.x` already permits everything 1.0
 would and promises less.
+
+### If contact never comes
+
+Recorded because "never" is a likely outcome for a project of this kind and an
+open-ended wait is not a plan. A specification for absolute time in Planck ticks
+has a small audience, and nothing in this repository can enlarge it.
+
+Two things follow, and they are separate.
+
+**The contact gate stays shut.** Not softened, not reinterpreted, not satisfied
+by the author using the API and reporting that it felt fine. `0.x` forever is an
+honest resting state and this project loses nothing by occupying it. A version
+number is not a reward for effort.
+
+**The cycles do not stop.** 0.7.0 closes and ships like any other, with its
+finding recorded as *no contact yet*; the gate is a condition on **1.0**, not on
+releasing. Holding the branch open until a stranger arrives would make the
+repository look abandoned to exactly the stranger it is waiting for, which is
+the one outcome that makes the wait self-defeating. 0.8.0 and 0.9.0 can run on
+their own merits — there is always a defect to fix and a document to correct,
+and this cycle found several without any help.
+
+So: releases continue, the 1.0 gate holds, and if contact arrives in 0.9.0 or in
+five years, 0.8.0's breaking window reopens then. Nothing about that ordering
+expires.
 
 **A 1.0 that freezes the specification.** UCAL-1 is superseded, not finished.
 `spec/SPEC-DELTAS.md` has sixteen entries and D-A16 was written this cycle. 1.0

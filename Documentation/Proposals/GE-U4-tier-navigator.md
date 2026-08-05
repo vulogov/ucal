@@ -1,6 +1,7 @@
 # GE-U4 — a tier-scale navigator
 
-**Status: proposed, not built. Kill criterion written first.**
+**Status: proposed, not built. Kill criterion written first. The cheapest test
+is built and unrun — see [the walk](#the-walk-built-in-070) below.**
 
 A gated experiment in the shape the RFC uses for GE-1…GE-6: a question, a
 measurement that answers it, and a condition under which the answer is *no* and
@@ -114,6 +115,33 @@ Recorded now, while it is cheap to say:
   never the load-bearing part.
 
 The third is the one I would test first if this were resumed.
+
+## The walk, built in 0.7.0
+
+[`GE-U4-walk.sh`](GE-U4-walk.sh). Forty-five frames, one per tier, stepping on
+Enter or playing on a timer — the ladder travelled instead of tabulated. About
+sixty lines of shell against `ratatui` and `crossterm`, which is the ratio the
+paragraph above was betting on.
+
+It computes nothing. Every frame is read out of `ucal ladder --json`, in one
+invocation, so the walk and the table it is being compared against are the same
+Doc at the same revision. The proposal's own constraint — *it renders `Doc`s,
+not its own data* — was written for the expensive version and applies to the
+cheap one unchanged.
+
+**What building it already found.** The first version walked the `beats` column,
+and the first twelve frames all read `0`: every tier below the beat is under one
+beat and six fractional digits cannot show it. The walk now counts ticks, where
+each tier is exactly `5^e` and the number grows from one digit to a hundred and
+fifty-four. That is a better frame than the one intended — the reader is
+watching a *shape* fill the screen rather than reading a value — and it is the
+kind of thing an afternoon of shell finds and a dependency tree hides.
+
+**It is not the experiment.** The kill criterion needs two readers who have not
+read this repository, one given `ucal ladder` and one given this, and the author
+is the one person who cannot be either. What was in the author's control was
+making it runnable, and that is now done: the test has no remaining cost except
+the two people, which is the same thing 0.7.0 is waiting on everywhere else.
 
 ## Prior art in this repository
 
