@@ -25,3 +25,10 @@ target
 # result belongs in the tree. Numbered drops and superseded assets do not.
 Documentation/LIFE_UNIVERSE_AND_GOD/assets/images/[0-9].png
 Documentation/LIFE_UNIVERSE_AND_GOD/assets/images/*-photo.png
+
+# A minisign secret key must never enter the repository. `minisign -G` writes it
+# to ~/.minisign/minisign.key by default, but an explicit `-s` can put it here,
+# and a signing key committed once is a signing key rotated forever.
+minisign.key
+*.key
+!fixtures/*.pub

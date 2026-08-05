@@ -58,8 +58,23 @@ step that diverged instead of reporting only that the final constant differs.
 sign; signing needs a key, which is a release-process step and deliberately not
 something the harness does.
 
-**Current status: unsigned.** The digest is self-consistent and nobody has
-vouched for it.
+**Current status: signed**, from 0.5.0.
+
+```
+key ID           D0E4E5A9439E54CC
+public key       RWTMVJ5DqeXk0HgeN+BIdnQaamRTdzkjITkdprOPLVsGWP8R/2HYIj0r
+signed digest    1f99cf6280f8b5dce88c6558e7c73769a40f93f7fcd3d3091f27c2658389f1f0
+```
+
+Verify:
+
+```
+minisign -Vm fixtures/SHA256SUMS \
+  -P RWTMVJ5DqeXk0HgeN+BIdnQaamRTdzkjITkdprOPLVsGWP8R/2HYIj0r
+```
+
+The trusted comment carries the digest and is signed along with the file, so a
+signature cannot later be presented as vouching for a different one.
 
 ### Procedure
 
@@ -97,3 +112,24 @@ signature can substitute for.
 
 Sign because it lets someone who does not trust the transport check that they
 have what was published. Not because it makes the numbers truer.
+
+### Key custody, stated so that nobody infers more than exists
+
+A signature invites an assumption about the infrastructure behind it. Here there
+is very little, and that is the honest description rather than an apology:
+
+- **One key, held by one maintainer**, on one machine, with an offline backup.
+- **No rotation procedure.** There is no schedule and no successor key.
+- **No revocation path.** If the key were compromised there is no mechanism to
+  announce it beyond amending this file and saying so in a release.
+- **No timestamping authority.** The signature says a key vouched for a digest;
+  nothing independent attests to *when*.
+
+What follows from that is narrow and worth stating plainly. A verifier who
+checks this signature learns that the holder of `D0E4E5A9439E54CC` vouched for
+this digest. They do not learn that the key is still under its holder's control,
+and they cannot learn it from anything in this repository.
+
+The offline backup exists so that losing the laptop does not silently end the
+signing line — which would otherwise be discovered at the next release, by which
+time re-establishing trust in a new key costs more than keeping a copy did.

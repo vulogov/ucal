@@ -78,9 +78,31 @@ This is the rule the project is *about*. Everything else is arithmetic.
 The reference frame is stated, not assumed: FLRW comoving, cosmological time,
 CMB rest frame.
 
-*Enforced by* **convention** — the profile carries `FRAME` and every `datum`
-rendering prints it. Nothing prevents a second profile from declaring a
-different frame; that is the point of declaring it.
+*Enforced by* **type system** — `Profile::FRAME` is a required associated
+constant with no default, so a profile that declares no frame does not exist:
+it fails to compile, and `profile_without_a_frame.rs` is the compile-fail case
+that says so. Every value is `Instant<P>`, parameterised by its profile, so
+values declared in different frames are different types and cannot be combined
+— Rule P's mechanism doing Rule F's work as well. Also **test** — `datum` and
+`doctor` both report the frame, and both renderings are checked, because a
+frame declared and never shown has been stated to nobody.
+
+Nothing prevents a second profile from declaring a different frame. That is the
+point of declaring it, and `Frame` is `#[non_exhaustive]` so that admitting one
+is not a breaking change.
+
+*What is left to convention, and why it stays there.* That the frame declared
+is the frame the numbers were computed in. No type can check that, and the rule
+does not ask for it: Rule F requires the frame to be **stated**, not to be
+true. A profile that declares `FlrwComoving` and computes something else is
+wrong in a way this project cannot detect and has never claimed to — the
+guarantee is that the claim is on the record, so that being wrong about it is
+visible rather than assumed.
+
+That is the whole of Rule F's convention, and it is irreducible. The previous
+entry described the *rest* of the rule as convention too, which understated it
+— a reader consulting this file to know what is guaranteed was being told less
+than the compiler actually enforces.
 
 ---
 
@@ -188,10 +210,36 @@ cannot become a silent retreat.
 Values round when displayed, never when constructed, and always under a mode
 the caller names.
 
-*Enforced by* **convention plus review** — `Ratio::to_decimal_string` is the
-single rounding path and takes an explicit mode. `Ratio::snap` is the one place
-a computation discards information; it is directed, documented, and used only
-to keep a certified sum's denominator bounded.
+*Enforced by* **type system** — `Value::Quantity` carries the exact rational
+and renders at the last possible moment, so the digit count and the mode belong
+to the caller (`--decimals`, `--round`) rather than to a constant at the call
+site. `Value::Bridge` does the same for foreign units: showing one is a request,
+not a default. Also **lint** — `rounding-is-declared` fails on any
+`to_decimal_string` or `snap` in a shipped library crate that does not carry a
+marker saying why its mode is forced. Also **test** — a property fails if any
+call site in `crates/ucal` formats a decimal itself instead of going through
+`Value::quantity`, and `no_earth_units.rs` fails if a non-Earth command prints
+a foreign unit unasked.
+
+`Ratio::to_decimal_string` remains the single rounding path. `Ratio::snap` is
+still the one place a *computation* discards information; it is directed,
+documented, and used only to keep a certified sum's denominator bounded, and
+`the_quadrature_snaps_outward` checks that its two uses widen rather than
+narrow.
+
+*History, because the enforcement line is the point of this file.* Until 0.5.0
+this rule read **convention plus review**, and it was one of only two that did.
+Every alignment defect found by a reader across 0.3.0 and 0.4.0 landed on it:
+twelve render sites with an undeclared mode, a year that never said which year,
+a tick's length printing as `0.000000`, and cosmological widths given in Earth
+years and nothing else. No type-enforced rule leaked once. That is the argument
+of §29 arriving from the inside, and it is why the line above now names
+mechanisms.
+
+*Not covered.* Four shipped sites round under a fixed mode and are exempt with
+a stated reason, listed by `xtask -- lint` on every run: a calendar label's
+day fraction, which must truncate or it names the following day; the two
+quadrature snaps; and the audit's own prose figures.
 
 ---
 

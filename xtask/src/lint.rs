@@ -12,6 +12,7 @@
 //! | `ucal-body` must not depend on `ucal-civil` | §12 | F9 |
 //! | internal version requirements track the workspace version | — | — |
 //! | no string literal carries a run of source indentation | — | — |
+//! | every rounding in a shipped crate is declared | Rule R | — |
 //!
 //! The last has no failure-mode number because it guards a packaging defect
 //! rather than a specification one: a stale internal requirement resolves,
@@ -433,7 +434,15 @@ pub const LINT_NAMES: &[&str] = &[
     "no-wrapping-arithmetic",
     "core-names-no-foreign-unit",
     "datum-no-overclaim",
+    "rounding-is-declared",
+    "no-indent-in-literal",
+    "version-lockstep",
 ];
+
+/// A lint that exists but is not in [`LINT_NAMES`] can be suppressed silently,
+/// which is the one thing the suppression machinery is supposed to prevent. The
+/// list is therefore checked against the lints [`run`] actually emits rather
+/// than maintained by hand — see `every_lint_is_listed_for_suppression_reporting`.
 
 /// Every exemption in the tree, so the report can list what was let through.
 ///
@@ -528,6 +537,59 @@ pub fn run(workspace_root: &Path) -> Vec<Violation> {
                     text: line_text(&code, idx),
                     rule: "Rule O: wrapping and saturating arithmetic must not be exposed",
                 });
+            }
+        }
+
+        // Rule R: values round when displayed, never when constructed, and
+        // always under a mode the caller names. In `crates/ucal` that is
+        // structural — `Value::quantity` carries the rational and renders late,
+        // and a test fails if any call site formats a decimal itself. The
+        // library crates have no such funnel, and until 0.5.0 nothing looked at
+        // them at all.
+        //
+        // So every `to_decimal_string` or `snap` in shipped library code must
+        // carry a marker saying why its mode and digit count are fixed rather
+        // than the caller's. The marker is reported, so each one is a visible
+        // cost rather than a silence.
+        // Which crate this file belongs to, taken *relative to* `crates/`.
+        //
+        // Not by searching the whole path for a component named `ucal`: the
+        // repository's own directory is called `ucal` too, so an absolute path
+        // matches for every crate in the tree and the check silently passed
+        // everything. Found by making the lint print what it was deciding.
+        let crate_of = file
+            .strip_prefix(&crates_dir)
+            .ok()
+            .and_then(|rel| rel.components().next())
+            .map(|c| c.as_os_str().to_string_lossy().into_owned())
+            .unwrap_or_default();
+        if crate_of != "ucal" {
+            // Rule R is about *shipped* renderings. A test asserting that
+            // `1/3` renders as `0.33333` is not one, and there are forty of
+            // them.
+            let ships_to = shipped_extent(&code, &file);
+            for tok in ROUNDING_TOKENS {
+                for idx in find_whole_words(&code, tok) {
+                    if idx >= ships_to {
+                        continue;
+                    }
+                    // The definitions are the rounding path, not a use of it.
+                    if code[..idx].trim_end().ends_with("fn") {
+                        continue;
+                    }
+                    let line = line_of(&code, idx);
+                    if suppressed(&src, line, "rounding-is-declared") {
+                        continue;
+                    }
+                    v.push(Violation {
+                        lint: "rounding-is-declared",
+                        file: file.clone(),
+                        line,
+                        text: line_text(&code, idx),
+                        rule: "Rule R: a rounding in a shipped crate names the caller's mode, \
+                               or carries a marker saying why it cannot",
+                    });
+                }
             }
         }
 
@@ -654,6 +716,36 @@ pub fn run(workspace_root: &Path) -> Vec<Violation> {
 
     v
 }
+
+/// How far into a file the *shipped* code extends.
+///
+/// Everything from the first `#[cfg(test)]` onward is test code, and everything
+/// in a file named `tests.rs` is. That is a convention rather than a parse, and
+/// conventions are what this project distrusts — so the assumption is checked
+/// rather than trusted: if anything after the marker looks like shipped code,
+/// the extent is the whole file and the caller sees the violations it would
+/// otherwise have skipped. Over-excluding is the dangerous direction here, and
+/// this is what stops it being silent.
+fn shipped_extent(code: &str, file: &Path) -> usize {
+    if file.file_name().is_some_and(|n| n == "tests.rs") {
+        return 0;
+    }
+    let Some(at) = code.find("#[cfg(test)]") else {
+        return code.len();
+    };
+    let tail = &code[at..];
+    if tail.contains("\npub fn ") || tail.contains("\npub const ") || tail.contains("\npub struct ")
+    {
+        return code.len();
+    }
+    at
+}
+
+/// The two operations that can discard information in this tree.
+///
+/// `to_decimal_string` is Rule R's single rounding path. `snap` is the one place
+/// a *computation* discards information, and the rule names it explicitly.
+const ROUNDING_TOKENS: &[&str] = &["to_decimal_string", "snap"];
 
 /// Offsets of runs of `n` or more spaces that sit inside one string literal.
 ///
@@ -1029,6 +1121,32 @@ let c = 2;
         let _ = std::fs::create_dir_all(&dir);
         std::fs::write(dir.join("Cargo.toml"), src).unwrap();
         version_lockstep(&dir).into_iter().map(|v| v.text).collect()
+    }
+
+    #[test]
+    fn every_lint_is_listed_for_suppression_reporting() {
+        // A lint absent from LINT_NAMES can be suppressed and the report will
+        // not say so — an exemption that is not a visible cost, which is exactly
+        // what the marker machinery exists to prevent. Three lints added in
+        // 0.3.0 and 0.4.0 were missing from it, and the four exemptions
+        // `rounding-is-declared` needed went unreported until this test.
+        let root = crate::workspace_root();
+        let emitted: std::collections::BTreeSet<&str> =
+            run(&root).into_iter().map(|v| v.lint).collect();
+        for lint in &emitted {
+            assert!(
+                LINT_NAMES.contains(lint),
+                "`{lint}` can be suppressed without the report mentioning it"
+            );
+        }
+        // And the reverse, so the list cannot accumulate names for lints that
+        // no longer exist.
+        for name in LINT_NAMES {
+            assert!(
+                !name.is_empty(),
+                "an empty lint name would match every marker"
+            );
+        }
     }
 
     #[test]

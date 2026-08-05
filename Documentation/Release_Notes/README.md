@@ -12,6 +12,7 @@ knows only what it did.
 
 | version | date | state |
 |---|---|---|
+| [0.5.0](0.5.0.md) | 2026-08-05 | released — no rule enforced by convention alone |
 | [0.4.0](0.4.0.md) | 2026-08-04 | released — every number says what it is |
 | [0.3.0](0.3.0.md) | 2026-08-03 | released — legibility |
 | [0.2.0](0.2.0.md) | 2026-08-01 | released — supersede RFC UCAL-1 |

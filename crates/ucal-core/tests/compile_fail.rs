@@ -20,4 +20,6 @@ fn rule_q3_and_rule_p_are_enforced_by_the_type_system() {
     // Rule P — profiles do not mix (§21.3-11).
     t.compile_fail("tests/compile_fail/cross_profile_arithmetic.rs");
     t.compile_fail("tests/compile_fail/cross_profile_comparison.rs");
+    // Rule F — a profile that declares no frame does not exist.
+    t.compile_fail("tests/compile_fail/profile_without_a_frame.rs");
 }
