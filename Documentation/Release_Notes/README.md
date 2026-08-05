@@ -13,7 +13,7 @@ knows only what it did.
 | version | date | state |
 |---|---|---|
 | [0.5.0](0.5.0.md) | — | **unreleased** — no rule enforced by convention alone |
-| [0.4.0](0.4.0.md) | — | **unreleased** — every number says what it is |
+| [0.4.0](0.4.0.md) | 2026-08-04 | released — every number says what it is |
 | [0.3.0](0.3.0.md) | 2026-08-03 | released — legibility |
 | [0.2.0](0.2.0.md) | 2026-08-01 | released — supersede RFC UCAL-1 |
 | [0.1.1](0.1.1.md) | 2026-07-31 | released |
@@ -71,7 +71,14 @@ one-line version and links to it.
    inherit them, and `xtask -- lint`'s `version-lockstep` fails if they drift
    apart.
 4. `cargo test --workspace --release`, both backends, plus
-   `cargo run -p xtask -- lint`, `check-docs` and `verify-vectors`.
+   `RUSTFLAGS="-D warnings" cargo build --workspace --all-targets --release`
+   and `cargo run -p xtask -- lint`, `check-docs`, `verify-vectors`.
+
+   **`--all-targets` matters.** Without it `cargo build` compiles the libraries
+   and binaries and never touches a test file, so an unused import in a test
+   passes locally and fails in CI — which is exactly what happened on the first
+   CI run, because the workflow sets `RUSTFLAGS` globally and `cargo test`
+   inherits it.
 5. `cargo run -p xtask -- publish` for the dry run, then
    `cargo run -p xtask -- publish --execute` for real.
 

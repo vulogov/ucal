@@ -1,7 +1,6 @@
 //! §20 UC-P15: **one-screen demo; every entry cited and `Window`-valued;
 //! `UCAL-W0006` where applicable.**
 
-use ucal::emit::Value;
 use ucal::{cmd_events_list, cmd_events_show, cmd_ruler, cmd_timeline};
 use ucal_core::Tier;
 

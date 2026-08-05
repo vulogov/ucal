@@ -337,6 +337,7 @@ fn hubble_time_ticks(h0_lo: &str, h0_hi: &str) -> Result<RatInterval> {
 
 /// A cosmological result, with its two widths kept apart (Rule X).
 #[derive(Clone, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct CosmoResult<T> {
     /// The certified enclosure.
     pub value: T,

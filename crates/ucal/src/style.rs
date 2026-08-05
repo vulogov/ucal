@@ -89,7 +89,12 @@ pub enum Role {
 /// Held as [`anstyle::Style`] values, which render to SGR sequences and to
 /// nothing at all when empty. `anstyle` arrives with clap and is not a new
 /// dependency.
+/// `#[non_exhaustive]`: construct through [`Style::PLAIN`] or
+/// [`Style::colored`]. Its fields are private, so this only forbids a
+/// functional-update literal — and a new role must not silently inherit an
+/// appearance from whichever role a caller happened to copy.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Style {
     title: anstyle::Style,
     key: anstyle::Style,
@@ -289,7 +294,12 @@ pub fn resolve_for_output(choice: ColorChoice, json: bool) -> Style {
 /// changes the characters, so it is not covered by the strip invariant and must
 /// not be — the invariant is a claim about *colour*, and quietly widening it to
 /// cover a flag that inserts characters would make it vacuous.
+/// `#[non_exhaustive]`: build one through [`Render::PLAIN`] and its builders
+/// rather than with a struct literal. Added in 0.4.0, which broke literals
+/// anyway by introducing three fields — so the marker costs nothing now and
+/// would cost a second break later.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Render {
     /// The role-to-appearance table.
     pub style: Style,
