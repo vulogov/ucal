@@ -67,10 +67,15 @@ use crate::anchor::{Anchor, Determination, Meridian, PhaseDefinition};
 /// incomplete in phase; asking it for local fields is `UCAL-E0062`.
 pub const CALENDARS_WITH_ANCHORS: &[&str] = &["earth-d", "mars-d"];
 
+/// The IERS conventions and Delta-T series.
+///
+/// `www.iers.org` no longer answers — it returns HTTP 400. The locator is an
+/// archived copy; the original document is available in the Internet Archive.
 const IERS: Citation = Citation::new(
         "IERS Conventions (2010) and the IERS Earth Orientation Centre's \
-             published Delta-T series",
-        Some("https://www.iers.org/"),
+             published Delta-T series; iers.org no longer answers — the \
+             original document is available in the Internet Archive",
+        Some("https://web.archive.org/web/2024/https://www.iers.org/"),
     );
 
 const BIPM_TREATY: Citation = Citation::new(

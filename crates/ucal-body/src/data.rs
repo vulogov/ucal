@@ -42,10 +42,18 @@ pub const IAU_WGCCRE: Citation = Citation::new(
     );
 
 /// The standard planetary and lunar ephemeris fact sheets.
+///
+/// The original location, `nssdc.gsfc.nasa.gov/planetary/factsheet/`, no longer
+/// serves them — it redirects to a general NASA page. The locator below is an
+/// archived copy of the document these parameters were read from, which is what
+/// a citation is for: naming the thing that was actually read, at a place a
+/// reader can still reach it.
 pub const NASA_FACT_SHEET: Citation = Citation::new(
         "NASA Planetary Fact Sheets (Williams, D. R.), NASA Space Science \
-             Data Coordinated Archive",
-        Some("https://nssdc.gsfc.nasa.gov/planetary/factsheet/"),
+             Data Coordinated Archive; originally at \
+             nssdc.gsfc.nasa.gov/planetary/factsheet/, which no longer serves \
+             them — the original document is available in the Internet Archive",
+        Some("https://web.archive.org/web/2024/https://nssdc.gsfc.nasa.gov/planetary/factsheet/"),
     );
 
 /// The tropical year and mean solar day, as used by the civil calendar's own
