@@ -22,12 +22,14 @@ use ucal::emit::{Doc, Value};
 use ucal::style::{Render, Style};
 
 const T: &str = "8070205189123984864657505252035637180530466139316558837890625";
+const T2: &str = "8070205189999984864657505252035637180530466139316558837890625";
 
 /// Commands that are *not* about Earth. Their default output must contain no
 /// foreign unit at all.
 fn non_earth() -> Vec<(&'static str, Doc)> {
     let mut v: Vec<(&'static str, Doc)> = vec![
         ("explain", ucal::cmd_explain(T, false).unwrap()),
+("between", ucal::cmd_between(T, T2, Some(ucal_core::Tier::BEAT)).unwrap()),
         (
             "ladder",
             ucal::cmd_ladder(ucal_core::LocaleId::En, false).unwrap(),

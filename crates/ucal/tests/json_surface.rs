@@ -37,6 +37,7 @@ use std::collections::BTreeMap;
 use ucal::emit::{Doc, Value};
 
 const T: &str = "8070205189123984864657505252035637180530466139316558837890625";
+const T2: &str = "8070205189999984864657505252035637180530466139316558837890625";
 
 fn baseline_path() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -52,6 +53,7 @@ fn commands() -> Vec<(&'static str, Doc)> {
         ("datum", ucal::cmd_datum().unwrap()),
         ("doctor", ucal::cmd_doctor().unwrap()),
         ("explain", ucal::cmd_explain(T, true).unwrap()),
+("between", ucal::cmd_between(T, T2, Some(ucal_core::Tier::BEAT)).unwrap()),
         (
             "ladder",
             ucal::cmd_ladder(ucal_core::LocaleId::En, true).unwrap(),

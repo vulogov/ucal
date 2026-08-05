@@ -30,7 +30,8 @@ disagree, the source is right.
 - [Reading a timestamp](#reading-a-timestamp)
 - [Exit codes](#exit-codes)
 - Commands: [`now`](#ucal-now) · [`datum`](#ucal-datum) ·
-  [`explain`](#ucal-explain) · [`from-civil`](#ucal-from-civil) ·
+  [`explain`](#ucal-explain) · [`between`](#ucal-between) ·
+  [`from-civil`](#ucal-from-civil) ·
   [`to-civil`](#ucal-to-civil) · [`ladder`](#ucal-ladder) ·
   [`cal`](#ucal-cal) · [`show`](#ucal-show) · [`events`](#ucal-events) ·
   [`timeline`](#ucal-timeline) · [`ruler`](#ucal-ruler) ·
@@ -194,6 +195,46 @@ ucal explain <INSTANT> [--claim]
 | `si_bridge.seconds_from_epoch` | The instant expressed through the bridge. Informative (Rule A.5) — this is the *only* place Earth enters, and it is division, so it is the only place a rounding mode is chosen. |
 | `claim` | Present with `--claim`: `BIG_BANG_CLAIM`, verbatim. Metadata, never an operand (Rule Q.3). |
 | `warning` | Present when the instant lies inside the claim's half-width (`UCAL-W0006`). |
+
+---
+
+## `ucal between`
+
+How far apart two instants are, stated on the tier ladder.
+
+```
+ucal between <FROM> <TO> [--at <TIER>]
+```
+
+Every other command answers *what is this instant*. This one answers *how far
+apart*, which is the operation the tier grid exists for: a duration's natural
+home is a ratio between rungs, not a count of somebody's seconds.
+
+| option | notes |
+|---|---|
+| `--at <TIER>` | Also report the whole count and remainder at one named tier, by name, `T<k>` or `5^e`. Without it you get the decomposition's own choice of tiers. |
+
+| field | meaning |
+|---|---|
+| `from` / `to` | The two instants, exactly, in ticks. |
+| `direction` | Which way round they are: `` `to` is later than `from` ``, `` `to` is earlier than `from` ``, or `the same instant`. **The sign is reported, never absorbed** — `between a b` and `between b a` do not print the same thing. |
+| `ticks` | How far apart, exactly. A magnitude, so it is unsigned; `direction` carries the rest. |
+| `natural_tier` | The coarsest rung of the whole 45-tier grid that fits inside the difference. Unnamed rungs appear as `T<k>`. |
+| `on_the_ladder.<tier>` | The difference decomposed across the **named** tiers, coarsest first. Leading zeros are omitted; a zero *between* two non-zero tiers is kept, because it is information. Reassembles to `ticks` exactly. |
+| `at.tier` | Present with `--at`: the tier asked for. |
+| `at.whole` | How many whole ones of that tier fit. |
+| `at.remainder_ticks` | What is left over. `whole × tier + remainder_ticks == ticks`. |
+| `si_bridge.seconds` | Present with `--bridge`: the difference through the SI bridge. Rounded, and the certification block says how. |
+
+**Why the decomposition stops at the tick.** The named tiers are not contiguous
+— there is a gap between `spark` (`5^45` ticks) and `tick` (one tick) — so
+everything below one spark lands in the `tick` row whole. The decomposition is
+still exact and still total; a `0` in the tick row means the difference is
+exactly representable at spark granularity.
+
+**Why no SI unless asked.** A second is an Earth unit, and the interval between
+two absolute instants is not an Earth quantity. `--bridge` converts on request
+(Rule A.5, D-A16).
 
 ---
 

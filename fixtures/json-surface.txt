@@ -4,6 +4,20 @@
 #
 # A path removed or a kind changed is a breaking change. A path added
 # is not — that is the contract Documentation/STABILITY.md states.
+between.at	object
+between.at.remainder_ticks	string
+between.at.tier	string
+between.at.whole	string
+between.direction	string
+between.from	string
+between.natural_tier	string
+between.on_the_ladder	object
+between.on_the_ladder.*	string
+between.si_bridge	object (--bridge)
+between.si_bridge.seconds	string
+between.si_bridge.unit	string
+between.ticks	string
+between.to	string
 cal-anchor.calendar	string
 cal-anchor.determination	object
 cal-anchor.determination.citation	string

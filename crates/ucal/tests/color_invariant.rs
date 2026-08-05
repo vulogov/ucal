@@ -24,11 +24,13 @@ use ucal::style::{group_decimal, paint_form, strip_ansi, ColorChoice, Render, Ro
 fn documents() -> Vec<(&'static str, Doc)> {
     // A fixed instant, so this file says the same thing on every run.
     const T: &str = "8070205189123984864657505252035637180530466139316558837890625";
+    const T2: &str = "8070205189999984864657505252035637180530466139316558837890625";
 
     let mut v: Vec<(&'static str, Doc)> = vec![
         ("datum", ucal::cmd_datum().unwrap()),
         ("doctor", ucal::cmd_doctor().unwrap()),
         ("explain", ucal::cmd_explain(T, false).unwrap()),
+("between", ucal::cmd_between(T, T2, Some(ucal_core::Tier::BEAT)).unwrap()),
         ("explain --claim", ucal::cmd_explain(T, true).unwrap()),
         (
             "ladder",

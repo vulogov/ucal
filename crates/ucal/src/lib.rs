@@ -513,6 +513,139 @@ pub fn cmd_explain(input: &str, show_claim: bool) -> CmdResult {
 }
 
 // ---------------------------------------------------------------------------
+// ucal between — a duration, on the ladder
+// ---------------------------------------------------------------------------
+
+/// The named tiers, coarsest first.
+///
+/// The grid has forty-five rungs and ten of them have names (Rule N). A
+/// decomposition across all forty-five would be arithmetically identical and
+/// unreadable; across the named ones it is the sentence a person would say.
+///
+/// The floor is `TICK`, which is `5^0` ticks — one — so the decomposition is
+/// exact and total even though the named tiers are not contiguous: whatever
+/// falls below one spark lands in the tick row, whole.
+const NAMED_DESCENDING: &[Tier] = &[
+    Tier::DEEP,
+    Tier::DRIFT,
+    Tier::SPAN,
+    Tier::SWEEP,
+    Tier::ARC,
+    Tier::BEAT,
+    Tier::FLICKER,
+    Tier::GLINT,
+    Tier::SPARK,
+    Tier::TICK,
+];
+
+/// A tier's label: `T4 drift`, or `T7` where the grid has no name.
+fn tier_label(tier: Tier) -> String {
+    match ucal_core::tier::name_of(tier) {
+        Some(n) => format!("{tier} {}", n.key()),
+        None => tier.to_string(),
+    }
+}
+
+/// How far apart two instants are, stated on the tier ladder.
+///
+/// The project's claim is that a duration belongs on the grid rather than in a
+/// foreign unit, and until 0.8.0 no command put one there: `explain` describes a
+/// point and `ruler` marks a span without measuring it. The arithmetic existed
+/// and was unreachable from the binary.
+///
+/// The sign is reported rather than absorbed. [`Instant::between`] returns a
+/// [`ucal_core::Signed`] because the domain is unsigned (Rule Z) and the
+/// difference need not be; quietly taking the magnitude would make
+/// `between a b` and `between b a` print the same thing, which is the kind of
+/// convenience Rule Q refuses.
+pub fn cmd_between(from: &str, to: &str, at: Option<Tier>) -> CmdResult {
+    let (a, _) = parse_instant(from)?;
+    let (b, _) = parse_instant(to)?;
+    let signed = b.between(&a);
+    let mag = signed.magnitude();
+
+    // Coarsest named tier that fits, and the whole/remainder walk below it.
+    let mut rows: Vec<(String, Value)> = Vec::new();
+    let mut rest = mag.ticks().clone();
+    let mut started = false;
+    for tier in NAMED_DESCENDING {
+        let (whole, rem) = rest.quot_rem(&tier.ticks());
+        // Leading zeros are noise: a span of three arcs should not open with
+        // six rows of `0`. A zero *between* two non-zero tiers is information
+        // and is kept.
+        if !started && whole.is_zero_ticks() {
+            rest = rem;
+            continue;
+        }
+        started = true;
+        rows.push((tier_label(*tier), Value::number(whole.to_dec_string())));
+        rest = rem;
+    }
+    if rows.is_empty() {
+        rows.push((tier_label(Tier::TICK), Value::number("0".to_string())));
+    }
+
+    let mut doc = Doc::new()
+        .title("ucal between")
+        .field("from", Value::number(a.ticks().to_dec_string()))
+        .field("to", Value::number(b.ticks().to_dec_string()))
+        .field(
+            "direction",
+            Value::text(match signed.sign() {
+                _ if signed.is_zero() => "the same instant",
+                ucal_core::Sign::Positive => "`to` is later than `from`",
+                ucal_core::Sign::Negative => "`to` is earlier than `from`",
+            }),
+        )
+        .field("ticks", Value::number(mag.ticks().to_dec_string()))
+        .field(
+            "natural_tier",
+            Value::text(match mag.tier_of() {
+                Some(t) => tier_label(t),
+                None => "— (zero: no tier contains it)".to_string(),
+            }),
+        )
+        .field("on_the_ladder", Value::rows_of("tier", "whole", rows));
+
+    // `--at <tier>`: the divmod a reader actually asked for, rather than the
+    // decomposition's opinion about which tiers are interesting.
+    if let Some(tier) = at {
+        let (whole, rem) = mag.in_tier(tier);
+        doc = doc.field(
+            "at",
+            Value::Section(vec![
+                ("tier".into(), Value::text(tier_label(tier))),
+                ("whole".into(), Value::number(whole.to_dec_string())),
+                (
+                    "remainder_ticks".into(),
+                    Value::number(rem.to_dec_string()),
+                ),
+            ]),
+        );
+    }
+
+    // SI on request only. A second is an Earth unit and a duration between two
+    // absolute instants is not an Earth quantity (Rule A.5, D-A16).
+    let bridge = UC1::bridge();
+    doc = doc.field(
+        "si_bridge",
+        Value::bridge(Value::Section(vec![
+            ("unit".into(), Value::text(bridge.name)),
+            (
+                "seconds".into(),
+                Value::quantity(
+                    &tick_ratio(mag.ticks(), &bridge.ticks),
+                    6,
+                    Rounding::HalfEven,
+                ),
+            ),
+        ])),
+    );
+
+    Ok(doc)
+}
+
+// ---------------------------------------------------------------------------
 // ucal now / from-civil / to-civil (§19, feature `civil`)
 // ---------------------------------------------------------------------------
 

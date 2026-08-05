@@ -26,6 +26,7 @@ use ucal::style::{strip_ansi, Render, Style};
 use ucal::table::BASELINE_WIDTH;
 
 const T: &str = "8070205189123984864657505252035637180530466139316558837890625";
+const T2: &str = "8070205189999984864657505252035637180530466139316558837890625";
 
 /// Every command that renders a table, with the field that holds it.
 fn tabular() -> Vec<(&'static str, &'static str, Doc)> {
@@ -224,6 +225,7 @@ fn long_valued() -> Vec<(&'static str, Doc)> {
     let mut v: Vec<(&'static str, Doc)> = vec![
         ("doctor", ucal::cmd_doctor().unwrap()),
         ("explain", ucal::cmd_explain(T, false).unwrap()),
+("between", ucal::cmd_between(T, T2, Some(ucal_core::Tier::BEAT)).unwrap()),
         ("datum", ucal::cmd_datum().unwrap()),
     ];
     #[cfg(all(feature = "body", feature = "civil"))]
