@@ -207,6 +207,7 @@ Exit criteria, in the shape §20's phases use:
 | two consecutive releases with no breaking change | 0.8.0 → 1.0.0 |
 | the specification and the source agree, checked | already: `check-docs`, 116 citations |
 | both backends byte-identical | already: Rule W, every release |
+| CI green on every push, with no known-failing job | 0.5.0 onward — the first run failed on three unused imports the local block could not see, and that is the class this criterion exists to keep out |
 
 ---
 

@@ -14,7 +14,7 @@ use ucal_civil::calendar::CivilCalendar;
 use ucal_civil::legacy::{Gregorian, LegacyCalendar};
 use ucal_civil::si::{self, Scale, SubSecond};
 use ucal_core::backend::TickInt;
-use ucal_core::{Delta, Instant, Profile, Rounding, Ticks, UC1};
+use ucal_core::{Instant, Rounding, Ticks, UC1};
 
 fn tt(y: i64, m: u8, d: u8) -> Instant<UC1> {
     si::from_civil(
@@ -22,13 +22,6 @@ fn tt(y: i64, m: u8, d: u8) -> Instant<UC1> {
         SubSecond::zero(), Scale::Tt, CivilCalendar::Gregorian,
     )
     .unwrap()
-}
-
-fn day_ticks() -> Ticks {
-    UC1::bridge()
-        .ticks
-        .try_mul(&<Ticks as TickInt>::from_u64(86_400))
-        .unwrap()
 }
 
 #[test]

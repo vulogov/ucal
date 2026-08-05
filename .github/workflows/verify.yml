@@ -54,8 +54,11 @@ jobs:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
 
+      # --all-targets, so test and example files are compiled under -D warnings
+      # too. Without it `cargo build` never touches a test file, and the first
+      # CI run failed on three unused imports that the local gate could not see.
       - name: workspace builds clean
-        run: cargo build --workspace --release
+        run: cargo build --workspace --all-targets --release
 
       # GE-5: ucal-core with no allocator. `bigint` implies `alloc`, so a
       # no-alloc build is a u512 build by construction.
