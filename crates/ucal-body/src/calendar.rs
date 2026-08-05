@@ -374,17 +374,36 @@ impl CalendarIdentity for BodyCalendar {
     }
 }
 
+/// Every derived calendar this crate knows how to build, anchored or not.
+///
+/// One list, so that a caller enumerating calendars and a caller building them
+/// cannot disagree. `ucal cal list` used to carry its own hard-coded list of the
+/// anchorless ones, which would have gone stale the moment a body was added —
+/// and in 0.8.0 four were.
+pub fn registered() -> Vec<(&'static str, crate::body::Body, Option<&'static str>)> {
+    alloc::vec![
+        ("earth-d", crate::data::earth(), Some("moon")),
+        ("mars-d", crate::data::mars(), None),
+        ("titan-d", crate::data::titan(), None),
+        ("luna-d", crate::data::luna(), None),
+        ("mercury-d", crate::data::mercury(), None),
+        ("venus-d", crate::data::venus(), None),
+        ("jupiter-d", crate::data::jupiter(), None),
+    ]
+}
+
+/// Every calendar id, anchored or not, in registration order.
+pub fn ids() -> Vec<&'static str> {
+    registered().into_iter().map(|(id, _, _)| id).collect()
+}
+
 /// Build every calendar for which an anchor exists.
 ///
 /// Calendars without an anchor are absent, not defaulted — Rule J.3, and the
 /// state Appendix I.6 describes.
 pub fn all() -> Vec<BodyCalendar> {
     let mut out = Vec::new();
-    for (id, body, grouping) in [
-        ("earth-d", crate::data::earth(), Some("moon")),
-        ("mars-d", crate::data::mars(), None),
-        ("titan-d", crate::data::titan(), None),
-    ] {
+    for (id, body, grouping) in registered() {
         if let Some(anchor) = crate::anchors::for_calendar(id) {
             if let Ok(c) = BodyCalendar::build(
                 id,

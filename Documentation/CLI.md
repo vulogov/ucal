@@ -341,7 +341,31 @@ ucal cal anchor <ID>
 | `calendars.<id>.anchor_revision` | Which revision of the body's anchor was used. Anchors are versioned because they are observations (Rule J). |
 | `calendars.<id>.leap_rule` | The intercalation rule, **derived** by continued fraction, with which convergent it is. Earth's is `31/128 (convergent 4)`. |
 | `calendars.<id>.cycles` | The grouping cycle, or a statement that the body has none. Mars has no month: neither moon qualifies, and the mechanism returns nothing rather than inventing one. |
-| `calendars.<id>.status` | Present instead of the above when a calendar is structurally complete but unusable — Titan has no published anchor to cite, so asking for local fields is `UCAL-E0062`. |
+| `calendars.<id>.status` | Present when a calendar is structurally complete but has no anchor to cite, so asking for local fields is `UCAL-E0062`. The `body` and `leap_rule` are still shown, because the row claims the calendar is complete in intercalation and that claim should be visible rather than taken on trust. |
+
+**Most calendars have no anchor, and that is the ordinary case.** Seven derived
+calendars ship: `earth-d`, `mars-d`, `titan-d`, `luna-d`, `mercury-d`,
+`venus-d`, `jupiter-d`. Two have anchors. Earth and Mars are the exceptions —
+they have had landers, orbiters and centuries of meridian argument, and the
+others have not. That is a fact about where the instruments are, not about the
+mechanism (Rule K.5, Rule Y).
+
+A body without a phase is not a failure of the calendar. It is a calendar that
+is complete in units, intercalation and cycles and incomplete in phase, which
+Appendix I.6 anticipates and which the API states rather than defaults away. No
+anchor is invented so that a calendar renders — see
+[`D5-titan-anchor.md`](Proposals/D5-titan-anchor.md) for what it costs to
+establish one honestly.
+
+Two of the derived calendars are worth looking at because they show the
+mechanism doing something Earth would never ask of it:
+
+- **`mercury-d` has fewer than one day per year.** The 3:2 spin–orbit resonance
+  makes Mercury's solar day about twice its orbit, so the intercalation rule is
+  `1/2` — a "year" is half a "day". Rule K derives it with no special case.
+- **`jupiter-d` is a calendar for a body with no surface.** The rotation is
+  System III, a magnetic field rather than any ground. The mechanism takes
+  periods and returns a rule; it has no opinion about what is rotating.
 
 ### `cal show`
 

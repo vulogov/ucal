@@ -1233,23 +1233,47 @@ pub fn cmd_cal_list() -> CmdResult {
     }
 
     // Calendars whose body is known but whose phase is not (Rule J.3).
-    for id in ["titan-d"] {
-        if anchors::for_calendar(id).is_none() {
-            rows.push((
-                id.to_string(),
-                Value::Section(vec![
-                    ("kind".into(), Value::text("derived — Rule K")),
-                    (
-                        "status".into(),
-                        Value::text(
-                            "no anchor: complete in units, intercalation and cycles, \
-                             incomplete in phase. Asking for local fields is \
-                             UCAL-E0062 (Rule J.3).",
-                        ),
-                    ),
-                ]),
+    //
+    // Read from the registry rather than listed here. This was a hard-coded
+    // `["titan-d"]` until 0.8.0, which would have silently omitted every body
+    // added since — and four were added in the same cycle.
+    for (id, body, _) in bodycal::registered() {
+        if anchors::for_calendar(id).is_some() {
+            continue;
+        }
+        let mut fields = vec![
+            ("kind".into(), Value::text("derived — Rule K")),
+            ("body".into(), Value::text(body.id().to_string())),
+        ];
+        // The status says these calendars are complete in intercalation. Show
+        // it, rather than asking the reader to take the sentence on trust — the
+        // whole claim of Rule K is that the rule falls out of the periods, and
+        // an anchor is not needed to see that it does.
+        if let Ok(rule) = ucal_body::derive_leap_rule(
+            body.solar_day().value_at_epoch(),
+            body.orbital_period().value_at_epoch(),
+            ucal_body::DriftBound::DEFAULT,
+            32,
+        ) {
+            fields.push((
+                "leap_rule".into(),
+                Value::text(format!(
+                    "{}/{} (convergent {})",
+                    rule.chosen.value.numer().to_dec_string(),
+                    rule.chosen.value.denom().to_dec_string(),
+                    rule.depth
+                )),
             ));
         }
+        fields.push((
+            "status".into(),
+            Value::text(
+                "no anchor: complete in units, intercalation and cycles, \
+                 incomplete in phase. Asking for local fields is \
+                 UCAL-E0062 (Rule J.3).",
+            ),
+        ));
+        rows.push((id.to_string(), Value::Section(fields)));
     }
 
     for c in [&Gregorian as &dyn LegacyCalendar, &Julian] {
