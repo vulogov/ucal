@@ -148,7 +148,16 @@ impl Value {
                     out.push_str(n);
                     out.push(' ');
                 }
-                _ => {}
+                Value::Bool(b) => {
+                    out.push_str(if *b { "true" } else { "false" });
+                    out.push(' ');
+                }
+                // Deliberately absent, not forgotten. A `Bridge` value is shown
+                // only when `--bridge` asks for it, and this helper has no
+                // `Render` to consult — so the default answer, which is "not
+                // shown", is the correct one. Rendering it here would put an
+                // Earth unit into a text extraction that never requested it.
+                Value::Bridge(_) => {}
             }
         }
         walk(self, &mut out);

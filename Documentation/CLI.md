@@ -35,7 +35,7 @@ disagree, the source is right.
   [`to-civil`](#ucal-to-civil) · [`ladder`](#ucal-ladder) ·
   [`cal`](#ucal-cal) · [`show`](#ucal-show) · [`events`](#ucal-events) ·
   [`timeline`](#ucal-timeline) · [`ruler`](#ucal-ruler) ·
-  [`cosmo`](#ucal-cosmo) · [`doctor`](#ucal-doctor)
+  [`cosmo`](#ucal-cosmo) · [`verify`](#ucal-verify) · [`doctor`](#ucal-doctor)
 - [Recurring fields](#recurring-fields)
 
 ---
@@ -552,6 +552,54 @@ measurement it is integrating. Merging them would hide which one matters.
 A tolerance finer than about a millisecond is refused with `UCAL-E0071`. The
 limit is not the step budget: the bisection midpoints leave the 512-bit domain
 at around step 125, with the bracket still some `7.8 × 10^26` ticks wide.
+
+---
+
+## `ucal verify`
+
+Re-derive the declared constants and check that this build reproduces them.
+
+```
+ucal verify
+```
+
+Re-deriving the constants otherwise needs the source repository and `xtask`,
+and `xtask` is `publish = false`. Someone who typed `cargo install ucal` had no
+way to check that the binary they were holding agreed with the published values,
+and the first question an external implementer asks is *what should I get* — to
+which the answer was "clone a repository first".
+
+| field | meaning |
+|---|---|
+| `profile` | The profile whose constants were checked. |
+| `backend` | `u512` or `bigint`. Rule W says both must give identical answers; this reports which one answered. |
+| `agrees` | `true` when every constant and every invariant below holds. |
+| `constants.BEAT` | `5^60` ticks — the universe second (§0.5). Re-derived by repeated multiplication. |
+| `constants.SECOND` | The SI second in ticks: `18548584399861 × 10^30` (D-3). The bridge constant, and the only place an Earth unit is declared. |
+| `constants.ORIGIN_OFFSET` | Ticks from the datum to the bridge epoch. Re-derived by re-executing §2.2's provenance chain from the record's own published input, not from a copy of the answer. |
+| `constants.<NAME>.value` | What the profile declares. |
+| `constants.<NAME>.derived` | What this build computed, from the definition rather than from the profile. |
+| `constants.<NAME>.agrees` | Whether the two are equal. They are exact integers, so this is equality and not a tolerance. |
+| `constants.<NAME>.from` | The definition that was re-executed. |
+| `invariants.origin_offset_is_whole_beats` | §2.4: the datum is a whole number of beats, which is what makes the bridge epoch's sub-beat digits zero. |
+| `invariants.bridge_divisibility_is_exact` | D-3: `5^divisibility` divides `SECOND` exactly, and `5^(divisibility+1)` does not. |
+| `invariants.tier_grid_is_five_powers` | Every one of the 45 rungs recomputed as `5^(60+5k)` and compared with the table. |
+| `compare_with` | Where the published values live. |
+| `what_this_does_not_establish` | Read it. |
+
+**What a green run means, and what it does not.** Every number is computed by one
+implementation from one specification, so agreement means this build's arithmetic
+works and reproduces `fixtures/vectors.json`. It **cannot** mean the
+specification is right, because nothing here is independent of it.
+
+What it does catch is worth having: a miscompiled backend, a feature combination
+that silently changes a value, a corrupted install, and — because the values are
+printed in full rather than only compared internally — an implementer's
+transcription error.
+
+The check that would establish more is an independent implementation reproducing
+these constants. That has never been done, it is the cheapest of the three asks
+in [`CONTACT.md`](CONTACT.md), and it takes about thirty minutes in any language.
 
 ---
 

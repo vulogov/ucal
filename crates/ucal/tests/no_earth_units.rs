@@ -30,6 +30,7 @@ fn non_earth() -> Vec<(&'static str, Doc)> {
     let mut v: Vec<(&'static str, Doc)> = vec![
         ("explain", ucal::cmd_explain(T, false).unwrap()),
 ("between", ucal::cmd_between(T, T2, Some(ucal_core::Tier::BEAT)).unwrap()),
+        ("verify", ucal::cmd_verify().unwrap()),
         (
             "ladder",
             ucal::cmd_ladder(ucal_core::LocaleId::En, false).unwrap(),

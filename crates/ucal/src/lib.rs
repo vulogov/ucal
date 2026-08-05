@@ -513,6 +513,239 @@ pub fn cmd_explain(input: &str, show_claim: bool) -> CmdResult {
 }
 
 // ---------------------------------------------------------------------------
+// ucal verify — the self-check, inside the shipped binary
+// ---------------------------------------------------------------------------
+
+/// A Julian year in SI seconds, exact by definition (§2.2's `unit_defs`).
+const JULIAN_YEAR_S: u64 = 31_557_600;
+
+/// One check: what was claimed, what this build computed, and whether they meet.
+fn checked(name: &str, note: &str, derived: &Ticks, declared: &Ticks) -> (String, Value) {
+    let agrees = derived == declared;
+    (
+        name.to_string(),
+        Value::Section(vec![
+            ("agrees".into(), Value::Bool(agrees)),
+            ("value".into(), Value::number(declared.to_dec_string())),
+            (
+                "derived".into(),
+                Value::number(derived.to_dec_string()),
+            ),
+            ("from".into(), Value::text(note)),
+        ]),
+    )
+}
+
+/// Re-derive the declared constants and check this build reproduces them.
+///
+/// # What this is for
+///
+/// Re-deriving the constants otherwise needs the repository and `xtask`, and
+/// `xtask` is `publish = false`. Someone who typed `cargo install ucal` could
+/// not check that the binary they were holding agreed with the published
+/// values, and the first question an external implementer asks is *what should
+/// I get* — to which the answer was "clone a repository first".
+///
+/// # What it does not establish
+///
+/// **This is a self-check, not an independent verification, and the output says
+/// so.** Every number here is computed by one implementation from one
+/// specification. Agreement means this build's arithmetic works and that it
+/// reproduces `fixtures/vectors.json`; it cannot mean the specification is
+/// right, because nothing here is independent of it. That is C1, and it needs
+/// somebody else's code.
+///
+/// What it *can* catch is real and worth having: a miscompiled backend, a
+/// feature combination that silently changes a value, a corrupted install, and
+/// an implementer's transcription error — since the values are printed in full
+/// for comparison rather than only compared internally.
+pub fn cmd_verify() -> CmdResult {
+    let one = <Ticks as TickInt>::one();
+    let five = <Ticks as TickInt>::from_u64(5);
+    let ten = <Ticks as TickInt>::from_u64(10);
+    let mul = |a: &Ticks, b: &Ticks| a.try_mul(b).ok_or(TimeError::new(Code::E0002));
+
+    // BEAT = 5^60, by repeated multiplication rather than by asking the profile.
+    let mut beat = one.clone();
+    for _ in 0..60 {
+        beat = mul(&beat, &five)?;
+    }
+
+    // SECOND = 18 548 584 399 861 x 10^30 (D-3). The mantissa is the declared
+    // one; what is being checked is the arithmetic and the build, not the
+    // mantissa, which no amount of recomputation here could confirm.
+    let mut second = <Ticks as TickInt>::from_u64(18_548_584_399_861);
+    for _ in 0..30 {
+        second = mul(&second, &ten)?;
+    }
+
+    // ORIGIN_OFFSET, by re-executing §2.2's chain from the *provenance record's
+    // own input* rather than from a copy of the answer.
+    let prov = UC1::datum_provenance()?;
+    // "13.787" Gyr -> 13 787 000 000 Julian years, exactly, without a float.
+    let gyr = prov.input.verbatim;
+    let (whole, frac) = gyr.split_once('.').unwrap_or((gyr, ""));
+    let scaled = format!("{whole}{frac}");
+    let years = <Ticks as TickInt>::from_dec_str(&scaled)
+        .and_then(|v| {
+            // 10^(9 - |frac|), so 13.787 Gyr becomes 13 787 000 000 years.
+            let mut p = <Ticks as TickInt>::one();
+            for _ in 0..(9usize.checked_sub(frac.len())?) {
+                p = p.try_mul(&ten)?;
+            }
+            v.try_mul(&p)
+        })
+        .ok_or(TimeError::with_context(
+            Code::E0002,
+            "the provenance input is not a decimal in Gyr",
+        ))?;
+    let age_s = mul(&years, &<Ticks as TickInt>::from_u64(JULIAN_YEAR_S))?;
+    let age_ticks = mul(&age_s, &second)?;
+    // beats = round_half_even(AGE_ticks / BEAT), then ORIGIN_OFFSET = beats x BEAT.
+    let (q, r) = age_ticks.quot_rem(&beat);
+    let twice = mul(&r, &<Ticks as TickInt>::from_u64(2))?;
+    let beats = match twice.cmp(&beat) {
+        core::cmp::Ordering::Greater => q.try_add(&one).ok_or(TimeError::new(Code::E0002))?,
+        core::cmp::Ordering::Less => q,
+        // Exactly a half: to even.
+        core::cmp::Ordering::Equal if q.is_odd() => {
+            q.try_add(&one).ok_or(TimeError::new(Code::E0002))?
+        }
+        core::cmp::Ordering::Equal => q,
+    };
+    let origin = mul(&beats, &beat)?;
+
+    let constants = vec![
+        checked(
+            "BEAT",
+            "5^60, by repeated multiplication",
+            &beat,
+            &UC1::beat(),
+        ),
+        checked(
+            "SECOND",
+            "18548584399861 x 10^30 (D-3)",
+            &second,
+            &UC1::bridge().ticks,
+        ),
+        checked(
+            "ORIGIN_OFFSET",
+            "round_half_even(AGE_ticks / BEAT) x BEAT, from the provenance input",
+            &origin,
+            &UC1::origin_offset(),
+        ),
+    ];
+    let mut disagreements: Vec<String> = constants
+        .iter()
+        .filter(|(_, v)| {
+            v.as_rows()
+                .and_then(|r| r.iter().find(|(k, _)| k == "agrees"))
+                .map(|(_, b)| !matches!(b, Value::Bool(true)))
+                .unwrap_or(true)
+        })
+        .map(|(n, _)| n.clone())
+        .collect();
+
+    // Structural invariants (§2.4). These are checks on relationships rather
+    // than on values, so a transcription error that happened to be internally
+    // consistent would still fail them.
+    let whole_beats = UC1::origin_offset().quot_rem(&UC1::beat()).1.is_zero_ticks();
+    // The bridge claims 5^divisibility divides it exactly, and no more (D-3).
+    let div = UC1::bridge().divisibility;
+    let mut s = UC1::bridge().ticks;
+    let mut divides = true;
+    for _ in 0..div {
+        let (q, r) = s.quot_rem(&five);
+        if !r.is_zero_ticks() {
+            divides = false;
+            break;
+        }
+        s = q;
+    }
+    let exact_power = divides && !s.quot_rem(&five).1.is_zero_ticks();
+
+    // Every rung is 5^(60 + 5k), recomputed rather than read from the table.
+    let mut grid_ok = true;
+    for tier in Tier::all_descending() {
+        let mut p = <Ticks as TickInt>::one();
+        for _ in 0..tier.exponent() {
+            match p.try_mul(&five) {
+                Some(v) => p = v,
+                None => {
+                    grid_ok = false;
+                    break;
+                }
+            }
+        }
+        if p != tier.ticks() {
+            grid_ok = false;
+            break;
+        }
+    }
+
+    let invariants = vec![
+        (
+            "origin_offset_is_whole_beats".to_string(),
+            Value::Bool(whole_beats),
+        ),
+        (
+            "bridge_divisibility_is_exact".to_string(),
+            Value::Bool(exact_power),
+        ),
+        ("tier_grid_is_five_powers".to_string(), Value::Bool(grid_ok)),
+    ];
+    for (n, v) in &invariants {
+        if !matches!(v, Value::Bool(true)) {
+            disagreements.push(n.clone());
+        }
+    }
+
+    let ok = disagreements.is_empty();
+    let mut doc = Doc::new()
+        .title("ucal verify")
+        .field("profile", Value::text(UC1::TAG))
+        .field(
+            "backend",
+            Value::text(if cfg!(feature = "bigint") {
+                "bigint"
+            } else {
+                "u512"
+            }),
+        )
+        .field("agrees", Value::Bool(ok))
+        .field("constants", Value::Section(constants))
+        .field("invariants", Value::Section(invariants))
+        .field(
+            "compare_with",
+            Value::text(
+                "fixtures/vectors.json in the source repository, whose digest is \
+                 signed; spec/CONFORMANCE.md describes the file and the key",
+            ),
+        )
+        .field(
+            "what_this_does_not_establish",
+            Value::text(
+                "This is a self-check. Every number above was computed by one \
+                 implementation from one specification, so agreement means this \
+                 build's arithmetic works and reproduces the published values — \
+                 not that the specification is right. An independent \
+                 implementation reproducing these constants is the check that \
+                 would mean that, and it has never been done. See \
+                 Documentation/CONTACT.md.",
+            ),
+        );
+    if !ok {
+        doc = doc.note(format!(
+            "This build does NOT reproduce the declared constants: {}. That is a \
+             defect in the build or the install, not a difference of opinion — \
+             every quantity above is an exact integer. Please report it.",
+            disagreements.join(", ")
+        ));
+    }
+    Ok(doc)
+}
+
+// ---------------------------------------------------------------------------
 // ucal between — a duration, on the ladder
 // ---------------------------------------------------------------------------
 

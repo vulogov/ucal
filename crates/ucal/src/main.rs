@@ -203,6 +203,8 @@ enum Command {
         #[command(subcommand)]
         what: CosmoCommand,
     },
+    /// Re-derive the declared constants and check this build reproduces them.
+    Verify,
     /// Profile, backend, domain ceiling, leap table, features, provenance.
     Doctor,
 }
@@ -392,6 +394,7 @@ fn main() {
         Command::Ladder { named_only } => {
             LocaleId::parse(&cli.locale).and_then(|l| cmd_ladder(l, *named_only))
         }
+        Command::Verify => ucal::cmd_verify(),
         Command::Explain { instant, claim } => cmd_explain(instant, *claim),
         Command::Between { from, to, at } => match at {
             Some(a) => LocaleId::parse(&cli.locale)

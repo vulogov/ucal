@@ -226,6 +226,7 @@ fn long_valued() -> Vec<(&'static str, Doc)> {
         ("doctor", ucal::cmd_doctor().unwrap()),
         ("explain", ucal::cmd_explain(T, false).unwrap()),
 ("between", ucal::cmd_between(T, T2, Some(ucal_core::Tier::BEAT)).unwrap()),
+        ("verify", ucal::cmd_verify().unwrap()),
         ("datum", ucal::cmd_datum().unwrap()),
     ];
     #[cfg(all(feature = "body", feature = "civil"))]
