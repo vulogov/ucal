@@ -182,8 +182,21 @@ whether 1.0 is honest.
   them as the cycle's product rather than its cost. A 1.0 that ships without
   ever having been wrong about its surface has not learned anything.
 
-**Done when** at least one of C1–C3 has happened and its findings are recorded —
-including "nothing changed", if that is the finding.
+**Done when** — two different things, kept apart in 0.7.0 because conflating
+them was making the cycle unshippable.
+
+**The cycle ships** when the author-side work is done: the asks are stated so a
+stranger can act on them without reading a specification first, the obstacles
+between that stranger and a completed task are removed, and whatever else the
+cycle turned up is recorded. Contact is not a condition on *releasing*. Holding
+the branch open until someone arrives would make the repository look abandoned
+to exactly the person it is waiting for, and an unreleased cycle publishes
+nothing — including the ask itself.
+
+**The gate closes** when at least one of C1–C3 has happened and its findings are
+recorded, including "nothing changed" if that is the finding. That is a
+condition on **1.0**, and it does not expire. If it is still open at 0.9.0 it is
+still open, and 1.0 waits.
 
 ## 0.8.0 — the last breaking window, and the last additions
 

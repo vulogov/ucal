@@ -12,7 +12,7 @@ knows only what it did.
 
 | version | date | state |
 |---|---|---|
-| [0.7.0](0.7.0.md) | — | **unreleased** — the surface meets someone who is not the author |
+| [0.7.0](0.7.0.md) | 2026-08-05 | released — the asks made specific, then the waiting |
 | [0.6.0](0.6.0.md) | 2026-08-05 | released — know exactly what 1.0 would freeze |
 | [0.5.0](0.5.0.md) | 2026-08-05 | released — no rule enforced by convention alone |
 | [0.4.0](0.4.0.md) | 2026-08-04 | released — every number says what it is |
