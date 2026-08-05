@@ -1,0 +1,302 @@
+# The ucal-json/1 surface. One line per field path, with the JSON kind
+# it serialises to. A `*` segment is a table row key, which is data
+# rather than schema. See crates/ucal/tests/json_surface.rs.
+#
+# A path removed or a kind changed is a breaking change. A path added
+# is not — that is the contract Documentation/STABILITY.md states.
+cal-anchor.calendar	string
+cal-anchor.determination	object
+cal-anchor.determination.citation	string
+cal-anchor.determination.method	string
+cal-anchor.determination.uncertainty	string
+cal-anchor.phase	string
+cal-anchor.revision	string
+cal-anchor.tick	string
+cal-anchor.window	object
+cal-anchor.window.hi	string
+cal-anchor.window.lo	string
+cal-anchor.window.width_ticks	string
+cal-list.calendars	object
+cal-list.calendars.*	object
+cal-list.calendars.*.anchor_revision	string
+cal-list.calendars.*.arbitrary	string
+cal-list.calendars.*.body	string
+cal-list.calendars.*.cycles	string
+cal-list.calendars.*.kind	string
+cal-list.calendars.*.leap_rule	string
+cal-list.calendars.*.status	string
+cal-show.anchor	object
+cal-show.anchor.citation	string
+cal-show.anchor.method	string
+cal-show.anchor.phase	string
+cal-show.anchor.revision	string
+cal-show.anchor.uncertainty	string
+cal-show.anchor.window_ticks	string
+cal-show.body	string
+cal-show.calendar	string
+cal-show.cycles	object
+cal-show.cycles.convergents	array
+cal-show.cycles.cycles_per_year	string
+cal-show.cycles.satellite	string
+cal-show.fields	object
+cal-show.fields.anchor_revision	string
+cal-show.fields.day	string
+cal-show.fields.day_fraction	string
+cal-show.fields.window_ticks	string
+cal-show.fields.year	string
+cal-show.intercalation	object
+cal-show.intercalation.bound	string
+cal-show.intercalation.rule	string
+cal-show.intercalation.walked	array
+cal-show.intercalation.whole_days_per_year	string
+cal-show.kind	string
+cosmo-age-interval.audit	object
+cosmo-age-interval.audit.0. how to read this	string
+cosmo-age-interval.audit.1. substitution	string
+cosmo-age-interval.audit.10. quantise to ticks	string
+cosmo-age-interval.audit.11. an interval input	string
+cosmo-age-interval.audit.2. integrand	string
+cosmo-age-interval.audit.3. why not endpoints	string
+cosmo-age-interval.audit.4. panels	string
+cosmo-age-interval.audit.5. panel bound	string
+cosmo-age-interval.audit.6. densities	string
+cosmo-age-interval.audit.7. square roots	string
+cosmo-age-interval.audit.8. accumulation	string
+cosmo-age-interval.audit.9. Hubble time	string
+cosmo-age-interval.audit.conclusion	string
+cosmo-age-interval.citation	string
+cosmo-age-interval.enclosure	object
+cosmo-age-interval.enclosure.at_drift	string
+cosmo-age-interval.enclosure.hi_ticks	string
+cosmo-age-interval.enclosure.hi_years	string (--bridge)
+cosmo-age-interval.enclosure.lo_ticks	string
+cosmo-age-interval.enclosure.lo_years	string (--bridge)
+cosmo-age-interval.input_width	object
+cosmo-age-interval.input_width.drifts	string
+cosmo-age-interval.input_width.note	string
+cosmo-age-interval.input_width.ticks	string
+cosmo-age-interval.input_width.years	string (--bridge)
+cosmo-age-interval.model	string
+cosmo-age-interval.parameters	string
+cosmo-age-interval.quadrature	object
+cosmo-age-interval.quadrature.depth	string
+cosmo-age-interval.quadrature.panels	string
+cosmo-age-interval.quadrature.sqrt_scale_digits	string
+cosmo-age-interval.warning	string
+cosmo-age-interval.widths	object
+cosmo-age-interval.widths.arithmetic_drifts	string
+cosmo-age-interval.widths.arithmetic_ticks	string
+cosmo-age-interval.widths.arithmetic_years	string (--bridge)
+cosmo-age-interval.widths.note	string
+cosmo-age-interval.widths.parameter_drifts	string
+cosmo-age-interval.widths.parameter_ticks	string
+cosmo-age-interval.widths.parameter_years	string (--bridge)
+cosmo-age-interval.year	string (--bridge)
+cosmo-age-interval.z	string
+cosmo-age.citation	string
+cosmo-age.enclosure	object
+cosmo-age.enclosure.at_drift	string
+cosmo-age.enclosure.hi_ticks	string
+cosmo-age.enclosure.hi_years	string (--bridge)
+cosmo-age.enclosure.lo_ticks	string
+cosmo-age.enclosure.lo_years	string (--bridge)
+cosmo-age.model	string
+cosmo-age.parameters	string
+cosmo-age.quadrature	object
+cosmo-age.quadrature.depth	string
+cosmo-age.quadrature.panels	string
+cosmo-age.quadrature.sqrt_scale_digits	string
+cosmo-age.warning	string
+cosmo-age.widths	object
+cosmo-age.widths.arithmetic_drifts	string
+cosmo-age.widths.arithmetic_ticks	string
+cosmo-age.widths.arithmetic_years	string (--bridge)
+cosmo-age.widths.note	string
+cosmo-age.widths.parameter_drifts	string
+cosmo-age.widths.parameter_ticks	string
+cosmo-age.widths.parameter_years	string (--bridge)
+cosmo-age.year	string (--bridge)
+cosmo-age.z	string
+cosmo-model.as_published	object
+cosmo-model.as_published.H0	string
+cosmo-model.as_published.Omega_Lambda	string
+cosmo-model.as_published.Omega_m	string
+cosmo-model.as_published.Omega_r	string
+cosmo-model.citation	string
+cosmo-model.ge1	string
+cosmo-model.ge2	string
+cosmo-model.hubble_time	object
+cosmo-model.hubble_time.gyr	string (--bridge)
+cosmo-model.hubble_time.note	string
+cosmo-model.hubble_time.ticks_lo	string
+cosmo-model.model	string
+cosmo-model.monotonicity	object
+cosmo-model.monotonicity.note	string
+cosmo-model.monotonicity.turns_at_u	string
+cosmo-model.year	string (--bridge)
+cosmo-z.citation	string
+cosmo-z.instant_ticks	string
+cosmo-z.model	string
+cosmo-z.tolerance_years	string
+cosmo-z.year	string (--bridge)
+cosmo-z.years_after_datum	string (--bridge)
+cosmo-z.z	object
+cosmo-z.z.hi	string
+cosmo-z.z.lo	string
+datum.big_bang_claim	object
+datum.big_bang_claim.citation	string
+datum.big_bang_claim.half_width_drifts	string
+datum.big_bang_claim.half_width_ticks	string
+datum.big_bang_claim.locator	string
+datum.big_bang_claim.status	string
+datum.big_bang_claim.window	string
+datum.datum	string
+datum.datum_provenance	object
+datum.datum_provenance.chain	array
+datum.datum_provenance.citation	string
+datum.datum_provenance.input	string
+datum.datum_provenance.unit_defs	array
+datum.earth_dependency	string
+datum.frame	string
+datum.implied_age	object
+datum.implied_age.note	string
+datum.implied_age.seconds	string (--bridge)
+datum.rounding	object
+datum.rounding.mode	string
+datum.rounding.rationale	string
+datum.rounding.residual_rendered	string
+datum.rounding.residual_ticks	string
+datum.rounding.to	string
+datum.tick_zero	string
+doctor.backend	string
+doctor.datum_provenance	object
+doctor.datum_provenance.note	string
+doctor.datum_provenance.present	bool
+doctor.domain_bits	string
+doctor.domain_max_ticks	string
+doctor.features	array
+doctor.frame	string
+doctor.leap_seconds	object
+doctor.leap_seconds.complete_through	string
+doctor.leap_seconds.entries	string
+doctor.leap_seconds.network	string
+doctor.leap_seconds.pre_1972	string
+doctor.leap_seconds.table_version	string
+doctor.profile	string
+doctor.spec	object
+doctor.spec.deltas	array
+doctor.spec.rfc	string
+events-list.citation_set	string
+events-list.events	object
+events-list.events.*	object
+events-list.events.*.as_published	string
+events-list.events.*.citation	string
+events-list.events.*.label	string
+events-list.events.*.warning	string
+events-list.events.*.window_ticks	string
+events-show.as_published	string
+events-show.citation	string
+events-show.description	string
+events-show.label	string
+events-show.midpoint	object
+events-show.midpoint.at_drift	string
+events-show.midpoint.note	string
+events-show.midpoint.ticks	string
+events-show.stated_as	string
+events-show.warning	string
+events-show.window	object
+events-show.window.hi	string
+events-show.window.lo	string
+events-show.window.width_ticks	string
+events-show.window.width_years	string (--bridge)
+events-show.year	string (--bridge)
+explain.beats_since_datum	object
+explain.beats_since_datum.note	string
+explain.beats_since_datum.remainder_ticks	string
+explain.beats_since_datum.whole	string
+explain.claim	object
+explain.claim.citation	string
+explain.claim.status	string
+explain.claim.window	string
+explain.digit5	string
+explain.human	string
+explain.precision	string
+explain.si_bridge	object (--bridge)
+explain.si_bridge.epoch	string
+explain.si_bridge.seconds_from_epoch	string
+explain.si_bridge.unit	string
+explain.ticks	string
+explain.tiers	object
+explain.tiers.T0 beat	string
+explain.tiers.T1 arc	string
+explain.tiers.T2 sweep	string
+explain.tiers.T3 span	string
+explain.tiers.T4 drift	string
+explain.tiers.T5 deep	string
+explain.ucid	string
+from-civil.human	string
+from-civil.input	object
+from-civil.input.calendar	string
+from-civil.input.exactness	string
+from-civil.input.label	string
+from-civil.input.scale	string
+from-civil.ticks	string
+from-civil.ucid	string
+ladder.locale	string
+ladder.note	string
+ladder.tiers	object
+ladder.tiers.*	object
+ladder.tiers.*.beats	string
+ladder.tiers.*.exponent	string
+ladder.tiers.*.name	string
+ladder.tiers.*.seconds (bridge)	string (--bridge)
+ladder.tiers.*.ticks	string
+now.human	string
+now.precision	string
+now.rendered	string
+now.source	object
+now.source.clock	string
+now.source.leap_table	string
+now.source.network	string
+now.ticks	string
+now.ucid	string
+ruler.from	string
+ruler.marks	object
+ruler.marks.*	string
+ruler.step	string
+ruler.to	string
+ruler.whole_steps	string
+show.calendars	object
+show.calendars.*	object
+show.calendars.*.anchor_revision	string
+show.calendars.*.day_is_ambiguous	bool
+show.calendars.*.error	string
+show.calendars.*.kind	string
+show.calendars.*.note	string
+show.calendars.*.rendered	string
+show.calendars.*.warning	string
+show.calendars.*.window_ticks	string
+show.human	string
+show.ticks	string
+timeline.events	object
+timeline.events.*	object
+timeline.events.*.as_published	string
+timeline.events.*.at	string
+timeline.events.*.tiers_since_datum	string
+timeline.events.*.warning	string
+timeline.tier	string
+to-civil.calendar_id	string
+to-civil.fields	object
+to-civil.fields.day	string
+to-civil.fields.hour	string
+to-civil.fields.minute	string
+to-civil.fields.month	string
+to-civil.fields.second	string
+to-civil.fields.weekday	string
+to-civil.fields.year	string
+to-civil.kind	string
+to-civil.lossy	bool
+to-civil.qualified	string
+to-civil.rounding	string
+to-civil.ticks	string
+to-civil.warning	string
