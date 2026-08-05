@@ -82,7 +82,26 @@ one-line version and links to it.
    passes locally and fails in CI — which is exactly what happened on the first
    CI run, because the workflow sets `RUSTFLAGS` globally and `cargo test`
    inherits it.
-5. `cargo run -p xtask -- publish` for the dry run, then
+5. `cargo run -p xtask -- check-links`, which asks the network whether the
+   cited URLs still reach the cited documents.
+
+   **Deliberately not in CI**, and deliberately not in the verification block
+   above. Every other check here is offline and deterministic; this one depends
+   on third-party servers, and a check that turns the tree red because somebody
+   else is having a bad morning trains its reader to ignore it. "CI green on
+   every push, with no known-failing job" is a 1.0 exit criterion, and the way
+   the last false criterion survived a whole release was nobody reading a red
+   job.
+
+   A `MOVED` result matters as much as a `FAIL`. The citation that prompted
+   this check answered **`200 OK`** — `nssdc.gsfc.nasa.gov/planetary/factsheet/`
+   redirects to a general NASA page, which serves a perfectly good document that
+   is not the one being cited. A status check alone would have passed it.
+
+   It cannot tell you the page still *says* what was cited. Nothing mechanical
+   can.
+
+6. `cargo run -p xtask -- publish` for the dry run, then
    `cargo run -p xtask -- publish --execute` for real.
 
    It derives the order from the dependency graph rather than repeating a list,
@@ -107,5 +126,5 @@ one-line version and links to it.
    only for its float oracle, and cargo still resolves it when verifying the
    package — so the edge is real even though nothing in the shipped code uses
    it.
-6. Tag `vX.Y.Z`, annotated and signed, and push the tag.
-7. Open the next file.
+7. Tag `vX.Y.Z`, annotated and signed, and push the tag.
+8. Open the next file.
