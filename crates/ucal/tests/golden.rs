@@ -505,3 +505,35 @@ fn tier_names_from_any_locale_resolve_on_input() {
         Tier::BEAT
     );
 }
+
+#[test]
+fn every_command_that_reports_a_profile_names_its_frame() {
+    // Rule F: the frame is stated, not assumed. `Profile::FRAME` being a
+    // required constant means a frameless profile does not compile — see
+    // `ucal-core/tests/compile_fail/profile_without_a_frame.rs`. This is the
+    // other half: a declared frame that never reaches a reader has been stated
+    // to nobody.
+    //
+    // `datum` was covered; `doctor` reports the profile and was not.
+    for (name, doc) in [
+        ("datum", cmd_datum().unwrap()),
+        ("doctor", ucal::cmd_doctor().unwrap()),
+    ] {
+        let frame = doc
+            .get("frame")
+            .and_then(|v| match v {
+                Value::Text(t) => Some(t.clone()),
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("`{name}` reports a profile without naming its frame"));
+        assert!(
+            frame.contains("FLRW"),
+            "`{name}` names a frame that is not the declared one: {frame}"
+        );
+        // And it survives into what a reader actually sees.
+        assert!(
+            doc.to_text().contains("FLRW"),
+            "`{name}`: the frame is in the document and not in the rendering"
+        );
+    }
+}

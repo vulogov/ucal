@@ -78,9 +78,31 @@ This is the rule the project is *about*. Everything else is arithmetic.
 The reference frame is stated, not assumed: FLRW comoving, cosmological time,
 CMB rest frame.
 
-*Enforced by* **convention** — the profile carries `FRAME` and every `datum`
-rendering prints it. Nothing prevents a second profile from declaring a
-different frame; that is the point of declaring it.
+*Enforced by* **type system** — `Profile::FRAME` is a required associated
+constant with no default, so a profile that declares no frame does not exist:
+it fails to compile, and `profile_without_a_frame.rs` is the compile-fail case
+that says so. Every value is `Instant<P>`, parameterised by its profile, so
+values declared in different frames are different types and cannot be combined
+— Rule P's mechanism doing Rule F's work as well. Also **test** — `datum` and
+`doctor` both report the frame, and both renderings are checked, because a
+frame declared and never shown has been stated to nobody.
+
+Nothing prevents a second profile from declaring a different frame. That is the
+point of declaring it, and `Frame` is `#[non_exhaustive]` so that admitting one
+is not a breaking change.
+
+*What is left to convention, and why it stays there.* That the frame declared
+is the frame the numbers were computed in. No type can check that, and the rule
+does not ask for it: Rule F requires the frame to be **stated**, not to be
+true. A profile that declares `FlrwComoving` and computes something else is
+wrong in a way this project cannot detect and has never claimed to — the
+guarantee is that the claim is on the record, so that being wrong about it is
+visible rather than assumed.
+
+That is the whole of Rule F's convention, and it is irreducible. The previous
+entry described the *rest* of the rule as convention too, which understated it
+— a reader consulting this file to know what is guaranteed was being told less
+than the compiler actually enforces.
 
 ---
 

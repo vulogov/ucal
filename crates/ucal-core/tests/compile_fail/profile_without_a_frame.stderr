@@ -1,0 +1,7 @@
+error[E0046]: not all trait items implemented, missing: `FRAME`
+  --> tests/compile_fail/profile_without_a_frame.rs:19:1
+   |
+19 | impl Profile for FramelessProfile {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `FRAME` in implementation
+   |
+   = help: implement the missing item: `const FRAME: Frame = /* value */;`
