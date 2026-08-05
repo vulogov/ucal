@@ -12,6 +12,7 @@ knows only what it did.
 
 | version | date | state |
 |---|---|---|
+| [0.9.0](0.9.0.md) | — | **unreleased** — hold still |
 | [0.8.0](0.8.0.md) | 2026-08-05 | released — the last breaking window, spent on additions |
 | [0.7.0](0.7.0.md) | 2026-08-05 | released — the asks made specific, then the waiting |
 | [0.6.0](0.6.0.md) | 2026-08-05 | released — know exactly what 1.0 would freeze |
