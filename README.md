@@ -252,6 +252,25 @@ install: compute `BEAT`, `SECOND` and `ORIGIN_OFFSET` from
 they match. A mismatch is worth more than a match, and *"I could not tell what
 to compute from the documents"* is worth more than either.
 
+## Verifying what you downloaded
+
+`fixtures/vectors.json` carries every declared constant of profile UC-1 and its
+derivation. Its digest is signed:
+
+```
+minisign -Vm fixtures/SHA256SUMS -P RWTMVJ5DqeXk0HgeN+BIdnQaamRTdzkjITkdprOPLVsGWP8R/2HYIj0r
+```
+
+The public key is `RWTMVJ5DqeXk0HgeN+BIdnQaamRTdzkjITkdprOPLVsGWP8R/2HYIj0r`,
+minisign key ID `D0E4E5A9439E54CC`.
+
+That key is printed here, in this crate's README on crates.io, and in
+`spec/CONFORMANCE.md`. Those are copies placed by one person, not independent
+authorities — but a crates.io version cannot be altered once published, so a key
+changed *in this repository* can be contradicted by one nobody can edit.
+[`spec/CONFORMANCE.md`](spec/CONFORMANCE.md)
+states the rest of what a signature here does and does not establish.
+
 ## Licence
 
 Mozilla Public License 2.0 — see [LICENSE](LICENSE).

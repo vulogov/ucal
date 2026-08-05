@@ -79,8 +79,17 @@ minisign -Vm fixtures/SHA256SUMS \
   -P RWTMVJ5DqeXk0HgeN+BIdnQaamRTdzkjITkdprOPLVsGWP8R/2HYIj0r
 ```
 
-`spec/CONFORMANCE.md` states the key's custody plainly, including what a
-signature here does *not* establish.
+The same key is printed on **crates.io** and **docs.rs** in the READMEs of
+`ucal` and `ucal-core`, where a published version cannot be edited afterwards.
+If the key in this repository ever stops matching those, something is wrong and
+you found it.
+
+Do not read that as five independent confirmations. One person put it in all
+five places, so against a forgery you are no better off than with one copy —
+what the copies buy is that a *change* to the key here can be contradicted by an
+artefact nobody can quietly edit. `spec/CONFORMANCE.md` states the key's custody
+plainly, including what a signature here does *not* establish and what would
+actually improve it.
 
 ---
 
