@@ -54,6 +54,13 @@ jobs:
   refused:
     name: every unsupported combination fails with a sentence
     runs-on: ubuntu-latest
+    # This job reads cargo's output as text, so it must ask for text. With the
+    # workspace default of `always`, every diagnostic arrives as
+    # `ESC[1mESC[91merrorESC[0m: …` and an anchored `^error` matches nothing —
+    # which is how the ordering assertion below failed for the whole of 0.6.0
+    # while the guard it checks was working correctly.
+    env:
+      CARGO_TERM_COLOR: never
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -78,7 +85,7 @@ jobs:
             || { echo "$out"; echo "expected the backend guard"; exit 1; }
           first=$(echo "$out" | grep -m1 "^error")
           echo "$first" | grep -q "mutually exclusive" \
-            || { echo "first error was: $first"; exit 1; }
+            || { echo "$out"; echo "--- first error line was: '$first'"; exit 1; }
 
       - name: a crate above core without alloc is refused, by name
         run: |
