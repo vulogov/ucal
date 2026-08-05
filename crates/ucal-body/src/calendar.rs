@@ -339,10 +339,17 @@ impl BodyCalendar {
     pub fn render(&self, t: &Instant<UC1>) -> Result<Qualified<'_, alloc::string::String>> {
         use alloc::format;
         let f = self.fields(t)?;
+        // ucal-lint-allow-begin(rounding-is-declared): not the caller's choice, and
+        // the mode is forced rather than preferred. `Trunc` is required: a day
+        // fraction rounded *up* can reach 1.0000 and name the following day, so
+        // half-even here would make `render` disagree with `fields`. The four
+        // digits are part of the label's grammar (§6.6), like the two digits in
+        // a civil minute — not a precision the caller sets.
         let frac = f
             .day_fraction
             .to_decimal_string(4, ucal_core::Rounding::Trunc)
             .unwrap_or_default();
+        // ucal-lint-allow-end(rounding-is-declared)
         let frac = frac.split('.').nth(1).unwrap_or("0000").to_string();
         let body = match &f.cycle {
             None => format!("{:04}-{:03}.{}", f.year, f.day, frac),

@@ -660,3 +660,34 @@ fn a_wider_input_gives_a_wider_answer() {
     assert!(w(1000, 1200) > w(1090, 1110));
     assert!(w(1090, 1110) > w(1100, 1100));
 }
+
+#[test]
+fn the_quadrature_snaps_outward() {
+    // `snap` is Rule R's one permitted discard inside a computation, and the
+    // marker at each call site says its direction is forced rather than chosen.
+    // This is what makes that a checked claim: snapping the lower sum can only
+    // lower it and snapping the upper sum can only raise it, so the enclosure
+    // cannot tighten. A transposed pair would still produce a plausible
+    // interval, narrower than the truth and wrong.
+    let grid = 20u32;
+    for (n, d) in [(1u64, 3u64), (2, 7), (355, 113), (1, 1)] {
+        let r = Ratio::from_u64(n).div(&Ratio::from_u64(d)).unwrap();
+        let down = r.snap(grid, Rounding::Trunc).unwrap();
+        let up = r.snap(grid, Rounding::Ceil).unwrap();
+        assert!(down <= r, "{n}/{d}: Trunc raised the value");
+        assert!(up >= r, "{n}/{d}: Ceil lowered the value");
+        assert!(down <= up);
+    }
+}
+
+#[test]
+fn the_audit_declares_its_own_rounding() {
+    // The audit's figures are truncated. A description of outward rounding whose
+    // own numbers rounded up would be a small joke at the reader's expense, so
+    // it says which way they go, in its first line.
+    let m = model();
+    let steps = m.audit(&Ratio::from_u64(1100), 4, S).unwrap();
+    let first = &steps[0].1;
+    assert!(first.contains("truncated"), "the audit does not say: {first}");
+    assert!(first.contains("12 digits") || first.contains("12"), "no digit count");
+}

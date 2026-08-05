@@ -429,7 +429,13 @@ fn integral_enclosure(model: &LambdaCdm, u0: &Ratio, depth: u32, scale: u32) -> 
         let g_b = g(&b, or_hi, om_hi, ol_hi)?;
         let (root_b, _) = RatInterval::exact(g_b).sqrt_enclosure(scale)?;
         if !root_b.hi().is_zero() {
+            // ucal-lint-allow-begin(rounding-is-declared): Rule R names `snap` as the
+            // one place a computation may discard information. The direction is
+            // forced, not chosen -- this is the *lower* sum, so it truncates
+            // down and can only widen the enclosure. Audit step 8 states it and
+            // `the_quadrature_snaps_outward` checks it.
             let term = h.mul(&a)?.div(root_b.hi())?.snap(grid, Rounding::Trunc)?;
+            // ucal-lint-allow-end(rounding-is-declared)
             lo_sum = lo_sum.add(&term)?;
         }
 
@@ -442,7 +448,10 @@ fn integral_enclosure(model: &LambdaCdm, u0: &Ratio, depth: u32, scale: u32) -> 
                 "the integrand's denominator reached zero; Omega_r must be positive",
             ));
         }
+        // ucal-lint-allow-begin(rounding-is-declared): the *upper* sum, so it ceils
+        // up. Same reasoning as its counterpart above, opposite direction.
         let term = h.mul(&b)?.div(root_a.lo())?.snap(grid, Rounding::Ceil)?;
+        // ucal-lint-allow-end(rounding-is-declared)
         hi_sum = hi_sum.add(&term)?;
     }
 
@@ -813,13 +822,26 @@ impl LambdaCdm {
         let u0 = Ratio::one().add(z)?.recip()?;
         let panels = 1u64 << depth.min(30);
         let h = u0.div(&Ratio::from_u64(panels))?;
+        // ucal-lint-allow-begin(rounding-is-declared): figures inside the audit's own
+        // prose, not values a caller consumes. Truncated so that no number in a
+        // description of outward rounding is itself rounded up, and the audit
+        // says so in its first line.
         let d6 = |r: &Ratio| {
             r.to_decimal_string(12, Rounding::Trunc)
                 .unwrap_or_else(|_| r.to_ratio_string())
         };
+        // ucal-lint-allow-end(rounding-is-declared)
         let turn = self.monotonicity_turns_at()?;
 
         let mut v = Vec::new();
+        v.push((
+            "0. how to read this".to_string(),
+            "Every figure quoted below is truncated to 12 digits, never rounded \
+             up, so that no number in a description of outward rounding is itself \
+             rounded the wrong way. The values a caller consumes are in the \
+             enclosure and widths above, certified separately."
+                .to_string(),
+        ));
         v.push((
             "1. substitution".to_string(),
             format!(
