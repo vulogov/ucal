@@ -42,10 +42,18 @@ pub const IAU_WGCCRE: Citation = Citation::new(
     );
 
 /// The standard planetary and lunar ephemeris fact sheets.
+///
+/// The original location, `nssdc.gsfc.nasa.gov/planetary/factsheet/`, no longer
+/// serves them — it redirects to a general NASA page. The locator below is an
+/// archived copy of the document these parameters were read from, which is what
+/// a citation is for: naming the thing that was actually read, at a place a
+/// reader can still reach it.
 pub const NASA_FACT_SHEET: Citation = Citation::new(
         "NASA Planetary Fact Sheets (Williams, D. R.), NASA Space Science \
-             Data Coordinated Archive",
-        Some("https://nssdc.gsfc.nasa.gov/planetary/factsheet/"),
+             Data Coordinated Archive; originally at \
+             nssdc.gsfc.nasa.gov/planetary/factsheet/, which no longer serves \
+             them — the original document is available in the Internet Archive",
+        Some("https://web.archive.org/web/2024/https://nssdc.gsfc.nasa.gov/planetary/factsheet/"),
     );
 
 /// The tropical year and mean solar day, as used by the civil calendar's own
@@ -257,9 +265,127 @@ pub fn titan() -> Body {
     Body::new("titan", rotation, solar_day, year).orbiting("saturn")
 }
 
+/// Mercury.
+///
+/// The 3:2 spin–orbit resonance in plain numbers: a sidereal rotation of
+/// 1407.6 h against an orbit of 87.969 d, which makes the solar day 4222.6 h —
+/// **longer than the year**, at about 1.5 orbits. The derived calendar is
+/// therefore one where a "day" outlasts a "year", and Rule K handles that
+/// without a special case, which is the point of deriving rather than declaring.
+///
+/// No anchor: there is no published convention naming a zero for a Mercurian
+/// solar day. See [`crate::anchors`].
+pub fn mercury() -> Body {
+    Body::new(
+        "mercury",
+        // 1407.6 h x 3600 = 5 067 360 s, exact.
+        param(5_067_360, 0, MeasuredUnit::SiSecond, NASA_FACT_SHEET, 1_000),
+        // 4222.6 h x 3600 = 15 201 360 s, exact.
+        param(15_201_360, 0, MeasuredUnit::SiSecond, NASA_FACT_SHEET, 1_000),
+        param(87_969, 3, MeasuredUnit::SiDay, NASA_FACT_SHEET, 10_000),
+    )
+    .orbiting("sun")
+    .with_obliquity(AngleParam::degrees(34, 3, IAU_WGCCRE).expect("valid angle"))
+}
+
+/// Venus.
+///
+/// # The one parameter this model cannot express
+///
+/// Venus rotates **retrograde**: the fact sheet prints its sidereal rotation as
+/// `-5832.6` hours, and the sign is not decoration. It is the reason the solar
+/// day is 2802.0 h. Run `1/(1/P_rot − 1/P_year)` with the magnitude and the
+/// answer is 2980 days — about 71 500 hours, wrong by a factor of twenty-five.
+/// Run it with the sign and it is 116.752 days, which is 2802.0 h to the
+/// published precision. The sign is the difference between those two.
+///
+/// [`Measured`] carries an unsigned mantissa, so the value here is the
+/// **magnitude**, and the retrograde sense is recorded in this comment and
+/// nowhere the type system can see. Stated rather than quietly dropped, because
+/// the omission is invisible in the output.
+///
+/// What follows from it is bounded and worth being precise about: the derived
+/// calendar uses the *solar day* and the *year*, both published and both
+/// positive, so `venus-d` is correct. What is lost is the explanation — a reader
+/// asking why the solar day is shorter than the rotation finds no answer in the
+/// data. Giving `Measured` a sign would be a breaking change to a published
+/// type and it buys one fact about one body; it is recorded here as a known
+/// limitation rather than spent.
+pub fn venus() -> Body {
+    Body::new(
+        "venus",
+        // |-5832.6| h x 3600 = 20 997 360 s. Retrograde; see above.
+        param(20_997_360, 0, MeasuredUnit::SiSecond, NASA_FACT_SHEET, 1_000),
+        // 2802.0 h x 3600 = 10 087 200 s, exact.
+        param(10_087_200, 0, MeasuredUnit::SiSecond, NASA_FACT_SHEET, 1_000),
+        param(224_701, 3, MeasuredUnit::SiDay, NASA_FACT_SHEET, 10_000),
+    )
+    .orbiting("sun")
+    // 177.36 deg — an obliquity past 90 is how a retrograde spin is stated
+    // when the rotation itself is given as a magnitude.
+    .with_obliquity(AngleParam::degrees(17_736, 2, IAU_WGCCRE).expect("valid angle"))
+}
+
+/// Jupiter.
+///
+/// System III rotation, 9.9250 h, which is the magnetic field rather than any
+/// surface — a gas giant has no surface to have a rotation period, and the
+/// fact sheet's asterisk says so. Recorded because a derived calendar for a body
+/// with no ground is a stranger object than one for a body with one, and the
+/// mechanism does not notice the difference.
+pub fn jupiter() -> Body {
+    Body::new(
+        "jupiter",
+        // 9.9250 h x 3600 = 35 730 s, exact.
+        param(35_730, 0, MeasuredUnit::SiSecond, NASA_FACT_SHEET, 1_000),
+        // 9.9259 h x 3600 = 35 733.24 s.
+        param(3_573_324, 2, MeasuredUnit::SiSecond, NASA_FACT_SHEET, 1_000),
+        param(4_332_589, 3, MeasuredUnit::SiDay, NASA_FACT_SHEET, 10_000),
+    )
+    .orbiting("sun")
+    .with_obliquity(AngleParam::degrees(313, 2, IAU_WGCCRE).expect("valid angle"))
+}
+
+/// The Moon.
+///
+/// Named `luna` so that the calendar id `luna-d` sits beside `mars-d` and
+/// `titan-d` without reading as Earth's possession. Rule K.5 again: Earth is an
+/// ordinary instance, and so is its satellite.
+///
+/// Tidally locked like Titan, and with the same consequence — the solar day is
+/// the **synodic** month, not the orbit. Unlike Titan, a source publishes it:
+/// 29.53 d against a revolution of 27.3217 d. So this parameter is *measured*
+/// where Titan's is *derived*, which is the Rule C preference, and the
+/// derivation agrees with it to the published precision — see
+/// `luna_synodic_month_agrees_with_the_derivation`.
+///
+/// The year is Earth's orbit, as Titan's is Saturn's.
+pub fn luna() -> Body {
+    Body::new(
+        "luna",
+        // 655.720 h x 3600 = 2 360 592 s, exact.
+        param(2_360_592, 0, MeasuredUnit::SiSecond, NASA_FACT_SHEET, 1_000),
+        // Synodic period, published: 29.53 d.
+        param(29_53, 2, MeasuredUnit::SiDay, NASA_FACT_SHEET, 10_000),
+        // Earth's sidereal orbit, the period the Sun moves against.
+        param(365_256, 3, MeasuredUnit::SiDay, NASA_FACT_SHEET, 10_000),
+    )
+    .orbiting("earth")
+    .with_obliquity(AngleParam::degrees(668, 2, IAU_WGCCRE).expect("valid angle"))
+}
+
 /// Every built-in body (§9.7).
 pub fn all() -> alloc::vec::Vec<Body> {
-    alloc::vec![earth(), mars(), saturn(), titan()]
+    alloc::vec![
+        earth(),
+        mars(),
+        saturn(),
+        titan(),
+        luna(),
+        mercury(),
+        venus(),
+        jupiter(),
+    ]
 }
 
 /// A built-in body by id.

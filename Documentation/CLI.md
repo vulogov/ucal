@@ -30,11 +30,12 @@ disagree, the source is right.
 - [Reading a timestamp](#reading-a-timestamp)
 - [Exit codes](#exit-codes)
 - Commands: [`now`](#ucal-now) · [`datum`](#ucal-datum) ·
-  [`explain`](#ucal-explain) · [`from-civil`](#ucal-from-civil) ·
+  [`explain`](#ucal-explain) · [`between`](#ucal-between) ·
+  [`from-civil`](#ucal-from-civil) ·
   [`to-civil`](#ucal-to-civil) · [`ladder`](#ucal-ladder) ·
   [`cal`](#ucal-cal) · [`show`](#ucal-show) · [`events`](#ucal-events) ·
   [`timeline`](#ucal-timeline) · [`ruler`](#ucal-ruler) ·
-  [`cosmo`](#ucal-cosmo) · [`doctor`](#ucal-doctor)
+  [`cosmo`](#ucal-cosmo) · [`verify`](#ucal-verify) · [`doctor`](#ucal-doctor)
 - [Recurring fields](#recurring-fields)
 
 ---
@@ -197,6 +198,46 @@ ucal explain <INSTANT> [--claim]
 
 ---
 
+## `ucal between`
+
+How far apart two instants are, stated on the tier ladder.
+
+```
+ucal between <FROM> <TO> [--at <TIER>]
+```
+
+Every other command answers *what is this instant*. This one answers *how far
+apart*, which is the operation the tier grid exists for: a duration's natural
+home is a ratio between rungs, not a count of somebody's seconds.
+
+| option | notes |
+|---|---|
+| `--at <TIER>` | Also report the whole count and remainder at one named tier, by name, `T<k>` or `5^e`. Without it you get the decomposition's own choice of tiers. |
+
+| field | meaning |
+|---|---|
+| `from` / `to` | The two instants, exactly, in ticks. |
+| `direction` | Which way round they are: `` `to` is later than `from` ``, `` `to` is earlier than `from` ``, or `the same instant`. **The sign is reported, never absorbed** — `between a b` and `between b a` do not print the same thing. |
+| `ticks` | How far apart, exactly. A magnitude, so it is unsigned; `direction` carries the rest. |
+| `natural_tier` | The coarsest rung of the whole 45-tier grid that fits inside the difference. Unnamed rungs appear as `T<k>`. |
+| `on_the_ladder.<tier>` | The difference decomposed across the **named** tiers, coarsest first. Leading zeros are omitted; a zero *between* two non-zero tiers is kept, because it is information. Reassembles to `ticks` exactly. |
+| `at.tier` | Present with `--at`: the tier asked for. |
+| `at.whole` | How many whole ones of that tier fit. |
+| `at.remainder_ticks` | What is left over. `whole × tier + remainder_ticks == ticks`. |
+| `si_bridge.seconds` | Present with `--bridge`: the difference through the SI bridge. Rounded, and the certification block says how. |
+
+**Why the decomposition stops at the tick.** The named tiers are not contiguous
+— there is a gap between `spark` (`5^45` ticks) and `tick` (one tick) — so
+everything below one spark lands in the `tick` row whole. The decomposition is
+still exact and still total; a `0` in the tick row means the difference is
+exactly representable at spark granularity.
+
+**Why no SI unless asked.** A second is an Earth unit, and the interval between
+two absolute instants is not an Earth quantity. `--bridge` converts on request
+(Rule A.5, D-A16).
+
+---
+
 ## `ucal from-civil`
 
 A civil date to absolute time. Exact, or an error — never rounded.
@@ -300,7 +341,31 @@ ucal cal anchor <ID>
 | `calendars.<id>.anchor_revision` | Which revision of the body's anchor was used. Anchors are versioned because they are observations (Rule J). |
 | `calendars.<id>.leap_rule` | The intercalation rule, **derived** by continued fraction, with which convergent it is. Earth's is `31/128 (convergent 4)`. |
 | `calendars.<id>.cycles` | The grouping cycle, or a statement that the body has none. Mars has no month: neither moon qualifies, and the mechanism returns nothing rather than inventing one. |
-| `calendars.<id>.status` | Present instead of the above when a calendar is structurally complete but unusable — Titan has no published anchor to cite, so asking for local fields is `UCAL-E0062`. |
+| `calendars.<id>.status` | Present when a calendar is structurally complete but has no anchor to cite, so asking for local fields is `UCAL-E0062`. The `body` and `leap_rule` are still shown, because the row claims the calendar is complete in intercalation and that claim should be visible rather than taken on trust. |
+
+**Most calendars have no anchor, and that is the ordinary case.** Seven derived
+calendars ship: `earth-d`, `mars-d`, `titan-d`, `luna-d`, `mercury-d`,
+`venus-d`, `jupiter-d`. Two have anchors. Earth and Mars are the exceptions —
+they have had landers, orbiters and centuries of meridian argument, and the
+others have not. That is a fact about where the instruments are, not about the
+mechanism (Rule K.5, Rule Y).
+
+A body without a phase is not a failure of the calendar. It is a calendar that
+is complete in units, intercalation and cycles and incomplete in phase, which
+Appendix I.6 anticipates and which the API states rather than defaults away. No
+anchor is invented so that a calendar renders — see
+[`D5-titan-anchor.md`](Proposals/D5-titan-anchor.md) for what it costs to
+establish one honestly.
+
+Two of the derived calendars are worth looking at because they show the
+mechanism doing something Earth would never ask of it:
+
+- **`mercury-d` has fewer than one day per year.** The 3:2 spin–orbit resonance
+  makes Mercury's solar day about twice its orbit, so the intercalation rule is
+  `1/2` — a "year" is half a "day". Rule K derives it with no special case.
+- **`jupiter-d` is a calendar for a body with no surface.** The rotation is
+  System III, a magnetic field rather than any ground. The mechanism takes
+  periods and returns a rule; it has no opinion about what is rotating.
 
 ### `cal show`
 
@@ -511,6 +576,54 @@ measurement it is integrating. Merging them would hide which one matters.
 A tolerance finer than about a millisecond is refused with `UCAL-E0071`. The
 limit is not the step budget: the bisection midpoints leave the 512-bit domain
 at around step 125, with the bracket still some `7.8 × 10^26` ticks wide.
+
+---
+
+## `ucal verify`
+
+Re-derive the declared constants and check that this build reproduces them.
+
+```
+ucal verify
+```
+
+Re-deriving the constants otherwise needs the source repository and `xtask`,
+and `xtask` is `publish = false`. Someone who typed `cargo install ucal` had no
+way to check that the binary they were holding agreed with the published values,
+and the first question an external implementer asks is *what should I get* — to
+which the answer was "clone a repository first".
+
+| field | meaning |
+|---|---|
+| `profile` | The profile whose constants were checked. |
+| `backend` | `u512` or `bigint`. Rule W says both must give identical answers; this reports which one answered. |
+| `agrees` | `true` when every constant and every invariant below holds. |
+| `constants.BEAT` | `5^60` ticks — the universe second (§0.5). Re-derived by repeated multiplication. |
+| `constants.SECOND` | The SI second in ticks: `18548584399861 × 10^30` (D-3). The bridge constant, and the only place an Earth unit is declared. |
+| `constants.ORIGIN_OFFSET` | Ticks from the datum to the bridge epoch. Re-derived by re-executing §2.2's provenance chain from the record's own published input, not from a copy of the answer. |
+| `constants.<NAME>.value` | What the profile declares. |
+| `constants.<NAME>.derived` | What this build computed, from the definition rather than from the profile. |
+| `constants.<NAME>.agrees` | Whether the two are equal. They are exact integers, so this is equality and not a tolerance. |
+| `constants.<NAME>.from` | The definition that was re-executed. |
+| `invariants.origin_offset_is_whole_beats` | §2.4: the datum is a whole number of beats, which is what makes the bridge epoch's sub-beat digits zero. |
+| `invariants.bridge_divisibility_is_exact` | D-3: `5^divisibility` divides `SECOND` exactly, and `5^(divisibility+1)` does not. |
+| `invariants.tier_grid_is_five_powers` | Every one of the 45 rungs recomputed as `5^(60+5k)` and compared with the table. |
+| `compare_with` | Where the published values live. |
+| `what_this_does_not_establish` | Read it. |
+
+**What a green run means, and what it does not.** Every number is computed by one
+implementation from one specification, so agreement means this build's arithmetic
+works and reproduces `fixtures/vectors.json`. It **cannot** mean the
+specification is right, because nothing here is independent of it.
+
+What it does catch is worth having: a miscompiled backend, a feature combination
+that silently changes a value, a corrupted install, and — because the values are
+printed in full rather than only compared internally — an implementer's
+transcription error.
+
+The check that would establish more is an independent implementation reproducing
+these constants. That has never been done, it is the cheapest of the three asks
+in [`CONTACT.md`](CONTACT.md), and it takes about thirty minutes in any language.
 
 ---
 

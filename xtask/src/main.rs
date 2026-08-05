@@ -21,6 +21,7 @@ mod publish;
 mod declared;
 mod derivation;
 mod gendocs;
+mod links;
 mod lint;
 mod route_bigint;
 mod route_bnum;
@@ -104,6 +105,9 @@ fn main() {
     }
     if mode == "gen-docs" || mode == "check-docs" {
         std::process::exit(run_docs(&mode));
+    }
+    if mode == "check-links" {
+        std::process::exit(links::run(&workspace_root()));
     }
     if mode == "verify-vectors" {
         std::process::exit(run_verify_vectors());

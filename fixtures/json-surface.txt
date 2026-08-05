@@ -4,6 +4,20 @@
 #
 # A path removed or a kind changed is a breaking change. A path added
 # is not — that is the contract Documentation/STABILITY.md states.
+between.at	object
+between.at.remainder_ticks	string
+between.at.tier	string
+between.at.whole	string
+between.direction	string
+between.from	string
+between.natural_tier	string
+between.on_the_ladder	object
+between.on_the_ladder.*	string
+between.si_bridge	object (--bridge)
+between.si_bridge.seconds	string
+between.si_bridge.unit	string
+between.ticks	string
+between.to	string
 cal-anchor.calendar	string
 cal-anchor.determination	object
 cal-anchor.determination.citation	string
@@ -300,3 +314,28 @@ to-civil.qualified	string
 to-civil.rounding	string
 to-civil.ticks	string
 to-civil.warning	string
+verify.agrees	bool
+verify.backend	string
+verify.compare_with	string
+verify.constants	object
+verify.constants.BEAT	object
+verify.constants.BEAT.agrees	bool
+verify.constants.BEAT.derived	string
+verify.constants.BEAT.from	string
+verify.constants.BEAT.value	string
+verify.constants.ORIGIN_OFFSET	object
+verify.constants.ORIGIN_OFFSET.agrees	bool
+verify.constants.ORIGIN_OFFSET.derived	string
+verify.constants.ORIGIN_OFFSET.from	string
+verify.constants.ORIGIN_OFFSET.value	string
+verify.constants.SECOND	object
+verify.constants.SECOND.agrees	bool
+verify.constants.SECOND.derived	string
+verify.constants.SECOND.from	string
+verify.constants.SECOND.value	string
+verify.invariants	object
+verify.invariants.bridge_divisibility_is_exact	bool
+verify.invariants.origin_offset_is_whole_beats	bool
+verify.invariants.tier_grid_is_five_powers	bool
+verify.profile	string
+verify.what_this_does_not_establish	string

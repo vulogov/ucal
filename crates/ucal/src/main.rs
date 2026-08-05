@@ -143,6 +143,16 @@ enum Command {
         #[arg(long)]
         claim: bool,
     },
+    /// How far apart two instants are, on the tier ladder.
+    Between {
+        /// A `UC1` text form, a UCID, or a decimal tick count.
+        from: String,
+        /// A `UC1` text form, a UCID, or a decimal tick count.
+        to: String,
+        /// Also report the whole count and remainder at one named tier.
+        #[arg(long)]
+        at: Option<String>,
+    },
     /// The universal tier grid (§4.2), in the chosen locale.
     Ladder {
         /// Show only the named tiers (D-20 leaves the rest addressable by index).
@@ -193,6 +203,8 @@ enum Command {
         #[command(subcommand)]
         what: CosmoCommand,
     },
+    /// Re-derive the declared constants and check this build reproduces them.
+    Verify,
     /// Profile, backend, domain ceiling, leap table, features, provenance.
     Doctor,
 }
@@ -382,7 +394,14 @@ fn main() {
         Command::Ladder { named_only } => {
             LocaleId::parse(&cli.locale).and_then(|l| cmd_ladder(l, *named_only))
         }
+        Command::Verify => ucal::cmd_verify(),
         Command::Explain { instant, claim } => cmd_explain(instant, *claim),
+        Command::Between { from, to, at } => match at {
+            Some(a) => LocaleId::parse(&cli.locale)
+                .and_then(|l| parse_tier_in(l, a))
+                .and_then(|t| ucal::cmd_between(from, to, Some(t))),
+            None => ucal::cmd_between(from, to, None),
+        },
         Command::Now { precision, form } => run_now(&cli.locale, precision, form),
         #[cfg(feature = "civil")]
         Command::FromCivil {
