@@ -66,17 +66,15 @@ fn sample_instants() -> Vec<I> {
 }
 
 fn fmt_for(form: Form, tier: Tier) -> Fmt {
-    Fmt {
-        form,
-        precision: if tier.is_tick() {
+    Fmt::default()
+        .with_form(form)
+        .with_precision(if tier.is_tick() {
             Precision::Tick
         } else {
             Precision::Tier(tier)
-        },
-        pad: matches!(form, Form::Digit5),
-        locale: LocaleId::En,
-        ..Fmt::default()
-    }
+        })
+        .with_pad(matches!(form, Form::Digit5))
+        .with_locale(LocaleId::En)
 }
 
 /// The named form needs its profile tag prepended before it can be parsed back.

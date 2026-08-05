@@ -67,6 +67,33 @@ jobs:
           cargo build -p ucal-core --target wasm32-unknown-unknown \
             --no-default-features --features u512
 
+  msrv:
+    name: the declared MSRV actually builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Pinned to the exact version `rust-version` declares. Reading it from the
+      # manifest would let the two drift apart silently in the direction that
+      # matters -- a manifest lowered by hand and a job that follows it proves
+      # nothing.
+      - uses: dtolnay/rust-toolchain@1.87
+      - uses: Swatinem/rust-cache@v2
+
+      # `rust-version` was 1.85 until 0.6.0 and had been false since bnum was
+      # updated to require 1.87. Nothing checked it, so nobody knew.
+      - name: msrv matches the manifest
+        run: |
+          declared=$(grep -m1 '^rust-version' Cargo.toml | grep -oE '[0-9]+\.[0-9]+')
+          test "$declared" = "1.87" || {
+            echo "Cargo.toml declares $declared but this job pins 1.87."
+            echo "Change both, and say so in the release notes: an MSRV bump is"
+            echo "a minor-version change (Documentation/STABILITY.md)."
+            exit 1
+          }
+
+      - name: workspace builds at the MSRV
+        run: cargo build --workspace --all-targets
+
   checks:
     name: harness, lints, docs, vectors
     runs-on: ubuntu-latest

@@ -92,6 +92,7 @@ pub enum Form {
 
 /// Formatting context (§13).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct Fmt {
     /// Which form to render.
     pub form: Form,
@@ -122,6 +123,56 @@ impl Default for Fmt {
 }
 
 impl Fmt {
+    // ---------------------------------------------------------------- builder
+    //
+    // `Fmt` is `#[non_exhaustive]`, so a caller assembles one from `default()`
+    // or a named preset rather than with a struct literal. The fields stay
+    // public to *read*.
+    //
+    // The alternative was to leave the type open and accept that any new
+    // rendering option is a breaking change. A caller writing
+    // `Fmt { .., ..Fmt::default() }` would have survived that, but one writing
+    // the exhaustive literal would not — and which of the two a caller wrote is
+    // not something this crate can influence. The builder makes the safe form
+    // the only form.
+
+    /// Which text form to render.
+    pub const fn with_form(mut self, form: Form) -> Fmt {
+        self.form = form;
+        self
+    }
+
+    /// Group separator. Must not be a decimal or base-5 digit (§6.3).
+    pub const fn with_sep(mut self, sep: char) -> Fmt {
+        self.sep = sep;
+        self
+    }
+
+    /// Sub-beat introducer.
+    pub const fn with_sub_sep(mut self, sub_sep: char) -> Fmt {
+        self.sub_sep = sub_sep;
+        self
+    }
+
+    /// The tier to render down to. This *is* the stated precision (Rule T).
+    pub const fn with_precision(mut self, precision: Precision) -> Fmt {
+        self.precision = precision;
+        self
+    }
+
+    /// Pad the high end to a fixed tier width — the only condition under which
+    /// text sorts chronologically (Rule S).
+    pub const fn with_pad(mut self, pad: bool) -> Fmt {
+        self.pad = pad;
+        self
+    }
+
+    /// Locale for the named form. Display only (Rule N).
+    pub const fn with_locale(mut self, locale: LocaleId) -> Fmt {
+        self.locale = locale;
+        self
+    }
+
     /// Human form at tick precision.
     pub fn human() -> Fmt {
         Fmt::default()

@@ -35,27 +35,27 @@ use crate::param::{Measured, MeasuredUnit, RatedParam};
 
 /// IAU rotational-element report, the standard source for body orientation and
 /// rotation periods.
-pub const IAU_WGCCRE: Citation = Citation {
-    source: "Archinal et al., Report of the IAU Working Group on Cartographic \
+pub const IAU_WGCCRE: Citation = Citation::new(
+        "Archinal et al., Report of the IAU Working Group on Cartographic \
              Coordinates and Rotational Elements: 2015",
-    locator: Some("doi:10.1007/s10569-017-9805-5"),
-};
+        Some("doi:10.1007/s10569-017-9805-5"),
+    );
 
 /// The standard planetary and lunar ephemeris fact sheets.
-pub const NASA_FACT_SHEET: Citation = Citation {
-    source: "NASA Planetary Fact Sheets (Williams, D. R.), NASA Space Science \
+pub const NASA_FACT_SHEET: Citation = Citation::new(
+        "NASA Planetary Fact Sheets (Williams, D. R.), NASA Space Science \
              Data Coordinated Archive",
-    locator: Some("https://nssdc.gsfc.nasa.gov/planetary/factsheet/"),
-};
+        Some("https://nssdc.gsfc.nasa.gov/planetary/factsheet/"),
+    );
 
 /// The tropical year and mean solar day, as used by the civil calendar's own
 /// definition. Recorded because Earth's parameters are the ones Appendix I.1 and
 /// I.2 are pinned against.
-pub const ASTRONOMICAL_ALMANAC: Citation = Citation {
-    source: "The Astronomical Almanac, Explanatory Supplement (3rd ed.), \
+pub const ASTRONOMICAL_ALMANAC: Citation = Citation::new(
+        "The Astronomical Almanac, Explanatory Supplement (3rd ed.), \
              Urban & Seidelmann",
-    locator: None,
-};
+        None,
+    );
 
 // ---------------------------------------------------------------------------
 // shared epoch and windows

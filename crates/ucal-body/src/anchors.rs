@@ -53,30 +53,30 @@ use crate::anchor::{Anchor, Determination, Meridian, PhaseDefinition};
 /// incomplete in phase; asking it for local fields is `UCAL-E0062`.
 pub const CALENDARS_WITH_ANCHORS: &[&str] = &["earth-d", "mars-d"];
 
-const IERS: Citation = Citation {
-    source: "IERS Conventions (2010) and the IERS Earth Orientation Centre's \
+const IERS: Citation = Citation::new(
+        "IERS Conventions (2010) and the IERS Earth Orientation Centre's \
              published Delta-T series",
-    locator: Some("https://www.iers.org/"),
-};
+        Some("https://www.iers.org/"),
+    );
 
-const BIPM_TREATY: Citation = Citation {
-    source: "International Meridian Conference (1884); UT1 is mean solar time at \
+const BIPM_TREATY: Citation = Citation::new(
+        "International Meridian Conference (1884); UT1 is mean solar time at \
              the prime meridian by definition",
-    locator: None,
-};
+        None,
+    );
 
-const MARS24: Citation = Citation {
-    source: "Allison, M. and McEwen, M. (2000), A post-Pathfinder evaluation of \
+const MARS24: Citation = Citation::new(
+        "Allison, M. and McEwen, M. (2000), A post-Pathfinder evaluation of \
              areocentric solar coordinates with improved timing recipes for \
              Mars seasonal/diurnal climate studies, Planet. Space Sci. 48, 215",
-    locator: Some("doi:10.1016/S0032-0633(99)00092-6"),
-};
+        Some("doi:10.1016/S0032-0633(99)00092-6"),
+    );
 
-const AIRY_0: Citation = Citation {
-    source: "de Vaucouleurs, Davies & Sturms (1973), Mariner 9 areographic \
+const AIRY_0: Citation = Citation::new(
+        "de Vaucouleurs, Davies & Sturms (1973), Mariner 9 areographic \
              coordinate system; Airy-0 fixes the Mars prime meridian",
-    locator: None,
-};
+        None,
+    );
 
 fn ticks(decimal: &str) -> Instant<UC1> {
     Instant::from_ticks(

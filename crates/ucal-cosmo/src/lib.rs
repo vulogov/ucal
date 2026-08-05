@@ -61,6 +61,21 @@
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
+// This crate needs an allocator: its calendars, catalogues and enclosures are
+// built out of `Vec` and `String`. `ucal-core` is the crate that runs without
+// one (GE-5), and it does; nothing above it does.
+//
+// Said here rather than left to a cascade of "unresolved module `alloc`". The
+// backend guard in `ucal-core` fails a bad combination with one sentence, and
+// an unsupported combination that fails with twenty errors is unsupported by
+// accident rather than by design.
+#[cfg(not(feature = "alloc"))]
+compile_error!(
+    "this crate requires the `alloc` feature. `ucal-core` builds without an \
+     allocator; the crates above it do not. Enable `alloc`, or `std` which \
+     implies it."
+);
+
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -176,10 +191,12 @@ type Result<T> = core::result::Result<T, CosmoError>;
 
 /// A model identifier, carried on every result (Rule X).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct ModelId(pub &'static str);
 
 /// A measured cosmological parameter, recorded as published (Rule Y.1).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct MeasuredParam {
     /// The parameter's name.
     pub name: &'static str,
@@ -193,6 +210,7 @@ pub struct MeasuredParam {
 /// uncertainties as the bounds, so a result's `parameter_width` is the propagated
 /// consequence of what was actually measured rather than a guess at it.
 #[derive(Clone, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct LambdaCdm {
     /// Matter density.
     pub omega_m: RatInterval,
@@ -211,11 +229,11 @@ pub struct LambdaCdm {
     pub model: ModelId,
 }
 
-const PLANCK_2018: Citation = Citation {
-    source: "Planck 2018 results VI: Cosmological parameters, A&A 641, A6 (2020), \
+const PLANCK_2018: Citation = Citation::new(
+        "Planck 2018 results VI: Cosmological parameters, A&A 641, A6 (2020), \
              TT,TE,EE+lowE+lensing+BAO",
-    locator: Some("doi:10.1051/0004-6361/201833910"),
-};
+        Some("doi:10.1051/0004-6361/201833910"),
+    );
 
 fn r(decimal: &str) -> Ratio {
     Ratio::from_decimal_str(decimal).expect("model constant is an exact decimal")

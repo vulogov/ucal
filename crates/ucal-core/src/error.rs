@@ -215,6 +215,7 @@ impl fmt::Display for Code {
 
 /// An error from absolute-time arithmetic or representation.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct TimeError {
     /// The Appendix E code.
     pub code: Code,

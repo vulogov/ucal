@@ -43,6 +43,7 @@ type Result<T> = core::result::Result<T, TimeError>;
 /// computed. Earth's is Greenwich by treaty; Mars's is Airy-0, the crater chosen
 /// to continue a nineteenth-century convention.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct Meridian {
     /// The meridian's name, e.g. `"greenwich"` or `"airy-0"`.
     pub name: &'static str,
@@ -169,6 +170,7 @@ fn to_lower(s: &str) -> &str {
 /// be checked, only believed. Rule Y permits the determination to cite an
 /// observation in any scale — which is exactly what these do.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct Determination {
     /// How the instant was obtained, in a sentence.
     pub method: &'static str,
@@ -362,10 +364,7 @@ mod tests {
     use ucal_core::backend::TickInt;
     use ucal_core::{Profile, Ticks};
 
-    const SRC: Citation = Citation {
-        source: "test",
-        locator: None,
-    };
+    const SRC: Citation = Citation::new("test", None);
 
     fn tick(offset_seconds: i64) -> Instant<UC1> {
         let base = data::j2000();

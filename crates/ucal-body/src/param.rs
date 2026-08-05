@@ -104,6 +104,7 @@ impl MeasuredUnit {
 /// parsed number, so `88775.244 s` round-trips to the character. Rule Y.1 says
 /// "recorded verbatim"; a value that has been through a lossy parse is not.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub struct Measured {
     /// The digits, with the decimal point removed.
     pub mantissa: u128,
@@ -226,10 +227,10 @@ impl Provenance {
     pub fn citation(&self) -> Citation {
         match self {
             Provenance::Measured(m) => m.citation,
-            Provenance::Derived { inputs, .. } => inputs.first().copied().unwrap_or(Citation {
-                source: "derived; no input citation recorded",
-                locator: None,
-            }),
+            Provenance::Derived { inputs, .. } => inputs.first().copied().unwrap_or(Citation::new(
+        "derived; no input citation recorded",
+        None,
+    )),
         }
     }
 
@@ -462,10 +463,10 @@ mod tests {
     use super::*;
     use ucal_core::Delta;
 
-    const IAU: Citation = Citation {
-        source: "IAU WGCCRE 2015 report on cartographic coordinates and rotational elements",
-        locator: Some("doi:10.1007/s10569-017-9805-5"),
-    };
+    const IAU: Citation = Citation::new(
+        "IAU WGCCRE 2015 report on cartographic coordinates and rotational elements",
+        Some("doi:10.1007/s10569-017-9805-5"),
+    );
 
     fn j2000() -> Instant<UC1> {
         // 2000-01-01T12:00:00 TT — Appendix C's fixture, as a literal so that

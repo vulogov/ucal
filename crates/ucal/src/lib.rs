@@ -134,11 +134,9 @@ fn tick_ratio(a: &Ticks, b: &Ticks) -> Ratio {
 /// blank is the worst of the available failures: it looks like a value.
 fn render_at(t: &Instant<UC1>, tier: Tier) -> String {
     let fmt = if tier.index() > 0 {
-        Fmt {
-            form: Form::Named,
-            precision: Precision::Tier(tier),
-            ..Fmt::default()
-        }
+        Fmt::default()
+            .with_form(Form::Named)
+            .with_precision(Precision::Tier(tier))
     } else {
         Fmt::human_at(tier)
     };
@@ -698,16 +696,14 @@ pub fn cmd_now(precision: Tier, form: Form) -> CmdResult {
         CivilCalendar::Gregorian,
     )?;
 
-    let fmt = Fmt {
-        form,
-        precision: if precision.is_tick() {
+    let fmt = Fmt::default()
+        .with_form(form)
+        .with_precision(if precision.is_tick() {
             Precision::Tick
         } else {
             Precision::Tier(precision)
-        },
-        pad: matches!(form, Form::Digit5),
-        ..Fmt::default()
-    };
+        })
+        .with_pad(matches!(form, Form::Digit5));
     let mut doc = instant_doc("ucal now", &t);
     if let Ok(r) = codec::render(&t, &fmt) {
         doc = doc.field("rendered", Value::form(r));
@@ -1246,6 +1242,16 @@ pub fn cmd_events_show(id: &str) -> CmdResult {
             Value::text(match e.stated_as {
                 events::StatedAs::AfterDatum => "after the datum",
                 events::StatedAs::BeforeBridgeEpoch => "before the bridge epoch",
+                // `StatedAs` is #[non_exhaustive] from 0.6.0: a source could
+                // state an event some third way — by redshift, say — and this
+                // crate would then be older than the catalogue it is rendering.
+                //
+                // Saying so is the honest fallback. Guessing a label would put a
+                // wrong description of a source's own words into the output,
+                // which is the one thing an `as_published` field exists to
+                // prevent.
+                _ => "stated in a form this version does not recognise; \
+                      see `as_published` for the source's own words",
             }),
         )
         .field(
