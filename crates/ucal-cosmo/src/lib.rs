@@ -61,6 +61,21 @@
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
+// This crate needs an allocator: its calendars, catalogues and enclosures are
+// built out of `Vec` and `String`. `ucal-core` is the crate that runs without
+// one (GE-5), and it does; nothing above it does.
+//
+// Said here rather than left to a cascade of "unresolved module `alloc`". The
+// backend guard in `ucal-core` fails a bad combination with one sentence, and
+// an unsupported combination that fails with twenty errors is unsupported by
+// accident rather than by design.
+#[cfg(not(feature = "alloc"))]
+compile_error!(
+    "this crate requires the `alloc` feature. `ucal-core` builds without an \
+     allocator; the crates above it do not. Enable `alloc`, or `std` which \
+     implies it."
+);
+
 use alloc::string::String;
 use alloc::vec::Vec;
 

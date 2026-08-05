@@ -305,7 +305,11 @@ mod imp {
 // Alternative backend: num-bigint heap BigUint, ceiling enforced (Rule W)
 // ---------------------------------------------------------------------------
 
-#[cfg(feature = "bigint")]
+// `not(u512)` as well as `bigint`, so that a build with both features
+// produces the guard above and *only* the guard. It used to emit
+// "the name `imp` is defined multiple times" first, which is the
+// error a caller reads and the one that says nothing.
+#[cfg(all(feature = "bigint", not(feature = "u512")))]
 mod imp {
     use super::{TickInt, CANONICAL_BYTES, DOMAIN_BITS};
     use alloc::string::String;

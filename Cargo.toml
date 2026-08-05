@@ -13,7 +13,10 @@ members = [
 [workspace.package]
 version = "0.6.0"
 edition = "2021"
-rust-version = "1.85"
+# Set by the default backend: bnum 0.14 requires 1.87, and `u512` is the
+# default. Verified by CI at exactly this version -- it read 1.85 until 0.6.0
+# and had been false since bnum was updated, because nothing checked it.
+rust-version = "1.87"
 license = "MPL-2.0"
 authors = ["Vladimir Ulogov"]
 repository = "https://github.com/vulogov/ucal"

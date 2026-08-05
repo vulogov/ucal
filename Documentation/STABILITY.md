@@ -171,17 +171,78 @@ order, the certification block — may change in any release. A script that pars
 the text output is relying on something this file does not protect, and `--json`
 exists so that it does not have to.
 
-### The MSRV, until S3 says otherwise
+### A fixed minimum Rust version
 
-`rust-version = "1.85"` today, with no stated policy for moving it. A 1.0 that
-silently raised its MSRV in a patch release would have broken something semver
-does not model. **This is an open item in 0.6.0.**
+`rust-version = "1.87"`, and the policy is:
 
-### Feature combinations, until S4 enumerates them
+- **An MSRV increase is a minor-version change**, never a patch. Within `1.x` a
+  patch release compiles on every toolchain the preceding minor release did.
+- **It is stated in the release notes**, in `Changed`, with what forced it.
+- **The floor is set by dependencies as much as by this code.** Today it is
+  `bnum 0.14`, which the default `u512` backend requires. A caller using only
+  `bigint` can build `ucal-core` on 1.85 — but `rust-version` describes the
+  default configuration, which is what a caller gets by typing `cargo add`.
 
-`u512` and `bigint` are mutually exclusive and say so with a `compile_error!`.
-The rest interact in ways only the test matrix knows, and it tests two
-combinations. **Open in 0.6.0.**
+*Enforced by* a CI job pinned to exactly 1.87 that builds the workspace and all
+targets, plus a check that the manifest still declares 1.87. The pin is a
+literal rather than read from the manifest: a job that follows the manifest
+would prove nothing about a manifest lowered by hand.
+
+*History, and the reason this is enforced rather than stated.* It read `1.85`
+until 0.6.0 and had been **false** since `bnum` was updated — a caller on 1.85
+could not build the default configuration at all. Nothing checked it, so nobody
+knew. This is the same shape as every other finding in 0.4.0 and 0.5.0: the
+claim without a mechanism was the claim that was wrong.
+
+### Deprecation
+
+Within `1.x`, nothing public is removed — that is the semver floor. What can
+happen is a `#[deprecated]` attribute, which is a signal and not a removal:
+
+- an item is deprecated in a minor release, with the replacement named in the
+  attribute;
+- it keeps working for the whole of `1.x`;
+- removal waits for `2.0`.
+
+A deprecation that removed something would be a breaking change wearing a
+warning, which is worse than either.
+
+### An enumerated set of feature combinations
+
+**Supported**, and each built by CI on every push:
+
+| crate | combinations |
+|---|---|
+| `ucal-core` | `u512`; `u512,alloc`; `u512,std`; `bigint`; `bigint,std` |
+| `ucal-civil` | `u512,std`; `u512,std,hifitime` |
+| `ucal-body`, `ucal-events`, `ucal-cosmo` | `u512,std` |
+| `ucal` | `u512,std` plus any of `civil`, `body`, `events`, `cosmo` |
+
+Either backend may be substituted for `u512` throughout; `bigint` implies
+`alloc`, because a heap-backed integer cannot be built without one — which is
+why GE-5's no-allocator build is a `u512` build by construction.
+
+**`ucal-core` is the only crate that builds without an allocator.** The crates
+above it are made of `Vec` and `String` and always will be.
+
+**Refused, each with a stated reason rather than a cascade:**
+
+| combination | what it says |
+|---|---|
+| no backend | *exactly one of `u512` or `bigint` must be enabled* |
+| both backends | *mutually exclusive: Rule B makes the value width a wire-format commitment* |
+| `ucal-body`/`events`/`cosmo` without `alloc` | *this crate requires the `alloc` feature* |
+
+*Enforced by* `.github/workflows/features.yml`, which builds every supported
+combination and asserts that each refused one **names its reason** — and, for
+the two-backend case, that the reason is the *first* error. It previously
+emitted "the name `imp` is defined multiple times" ahead of the guard, which is
+the error a caller reads and the one that says nothing.
+
+*What this changed.* Three combinations — `ucal-body`, `ucal-events` and
+`ucal-cosmo` on `u512` alone — failed with twenty unresolved-`alloc` errors and
+no explanation. They were unsupported by accident rather than by design, and the
+difference is what a caller sees at 2am.
 
 ### Performance
 
