@@ -3,9 +3,18 @@
 Written before 1.0 rather than after, so that the promise is a decision rather
 than a description of whatever happened to be true on the day.
 
-**Status: this document describes an intention. The crates are `0.x` and promise
-nothing yet.** Every `0.x` release is permitted to break anything, and three of
-the five so far did.
+**Status: in force from 1.0.0.** These are promises now, not intentions. Five of
+the nine `0.x` releases broke something — 0.1.1, 0.3.0, 0.4.0, 0.6.0 and the
+release that became 1.0.0. None of the remaining `1.x` line may.
+
+**Two of the exit criteria were not met, and 1.0 shipped anyway.** The
+[road to 1.0](Proposals/ROAD-TO-1.0.md) made contact the gate: an external
+implementation reproducing the conformance vectors, and a surface that had
+survived meeting someone. Neither happened in three cycles of asking. The
+criteria are left standing rather than rewritten, and what follows is a promise
+about a design **no one outside this repository has ever used**. The section at
+the end of this file, *What would make 1.0 dishonest*, still opens with
+"shipping before contact", and it is left there on purpose.
 
 ---
 
@@ -17,7 +26,7 @@ interesting part of this file.
 
 ## Above the floor
 
-Semver has no vocabulary for most of what this project actually claims. Five
+Semver has no vocabulary for most of what this project actually claims. Six
 promises, each with the mechanism that keeps it — because a promise with no
 mechanism is a convention, and 0.5.0 was spent removing the last two of those.
 
@@ -74,7 +83,51 @@ this check, and is exactly the breakage this promise is about. Nothing
 mechanical reaches meaning. What the baseline gives is that the *shape* cannot
 drift unnoticed, which is the part that can be automated.
 
-### 5. A certified enclosure never narrows silently
+### 5. The command line never aborts
+
+A failure leaves through §19.5's table: an Appendix E code and a sentence on
+stderr, nothing on stdout, and an exit status in `0–9`. No release makes a
+diagnosable condition arrive as a panic, and none prints a Rust backtrace or
+suggests `RUST_BACKTRACE` — neither is addressed to the person running the
+program.
+
+A defect is not the same as a failure and does not pretend to be: a panic that
+reaches the top exits **70** (`EX_SOFTWARE`), outside §19.5's range on purpose,
+and says that the input was not at fault.
+
+*Enforced by* the `no-panic-in-cli` lint over `crates/ucal/src`, a corpus of
+malformed invocations in `hostile_input.rs` that asserts all of the above
+against the real binary, and `panic_handler.rs`, which induces a panic and
+checks what comes out.
+
+**Its limit, and it is a large one: this promise is about the binary, not the
+libraries.** A caller who links `ucal-core`, `ucal-civil`, `ucal-events` or
+`ucal-cosmo` gets neither the lint nor the handler. Those crates carry twenty-two `expect` calls on invariants they have just established — `self >=
+other` immediately after comparing — and a caller who trips one gets a panic in
+their process, with no diagnostic and no exit code, because there is no process
+of ours to exit.
+
+That is stated here rather than left for a reader to infer from "the command
+line never aborts", because the natural reading of a stability document that
+promises no aborts is that the library does not abort either, and it does not
+promise that.
+
+Why the libraries are not held to the same rule: rewriting a provably
+unreachable branch into a `Result` gives every caller an error case that no
+input can produce, on a path where the alternative is not a wrong answer but no
+answer. A caller who wants the guarantee anyway can have it today by catching
+unwinds at their own boundary, which is where the decision belongs.
+
+**What a `1.x` release will not do** is make a *reachable* condition arrive as a
+panic in any crate. An `expect` guarding an established invariant is allowed to
+stay; an `expect` on something a caller's input can reach is a defect, and gets
+fixed rather than documented.
+
+The lint's own limits are narrower: it covers `crates/ucal/src` and not the
+integration tests, and the hostile corpus is forty hand-chosen invocations
+rather than a fuzzer.
+
+### 6. A certified enclosure never narrows silently
 
 An enclosure claims the true value provably lies inside it. Within `1.x`, an
 enclosure may widen — a correction always may — and may narrow only when the
@@ -158,8 +211,12 @@ prevent.
 
 ### The specification is not frozen
 
-UCAL-1 was superseded, not finished. `spec/SPEC-DELTAS.md` carries sixteen
-recorded amendments and D-A16 was written in 0.4.0. **1.0 freezes the API; the
+UCAL-1 was superseded, not finished. `spec/SPEC-DELTAS.md` carries seventeen
+entries — sixteen standing and one withdrawn — and D-A17 was written in 0.9.0.
+Two of them, D-A16 and D-A17, sat recorded but **unapplied** in the normative
+text until 0.9.0 went looking; `check-docs` now fails if a standing delta is not
+marked inline in `UCAL-1.1.md`, because a delta that is written and not applied
+reads as decided while the normative document still says the old thing. **1.0 freezes the API; the
 specification keeps its amendment procedure.** A delta that changes behaviour
 still produces a breaking change and still needs a major bump — the two are
 independent.
@@ -206,6 +263,27 @@ happen is a `#[deprecated]` attribute, which is a signal and not a removal:
 
 A deprecation that removed something would be a breaking change wearing a
 warning, which is worse than either.
+
+### Coexistence with another library that chose the other backend
+
+**It does not work, and 1.0 freezes that.** `u512` and `bigint` are mutually
+exclusive. If two libraries in one dependency graph each depend on `ucal-core`
+having chosen different backends, cargo unifies the features, the guard fires,
+and *nothing in the graph builds*. Neither library author can fix it; only the
+end user can, by making one of them change.
+
+Demonstrated rather than assumed, in 0.9.0: two crates, one on each backend, and
+an application depending on both fails with the guard's own message.
+
+It also breaks tooling that expects features to be additive —
+`cargo semver-checks` enables all features by default and cannot build this
+crate without `--default-features`.
+
+**Why it is here and not fixed.** Removing it needs either a generic integer
+parameter through the whole API or the withdrawal of one backend from the public
+surface. Both are breaking changes, and this is the release after which there
+are none. It is recorded as a known limitation of `1.x` rather than left for a
+downstream user to discover at link time.
 
 ### An enumerated set of feature combinations
 
@@ -262,12 +340,17 @@ and carry no compatibility promise.
 Recorded here because the pressure to ship a version number is real and arrives
 without an argument attached.
 
-**Shipping before contact.** The API has never been used by anyone but its
-author. Every breaking change so far cost nothing, which means none of them
-tested whether the surface is *right* — only that it could be changed. A promise
-made in that state is a promise about a guess, and
-[`ROAD-TO-1.0.md`](Proposals/ROAD-TO-1.0.md) makes 0.7.0 the gate for exactly
-this reason.
+**Shipping before contact — which is what happened.** The API has never been
+used by anyone but its author. Every breaking change up to 1.0 cost nothing,
+which means none of them tested whether the surface is *right* — only that it
+could be changed. A promise made in that state is a promise about a guess.
+
+This paragraph is kept, unedited in substance, because the argument did not stop
+being true when the decision went the other way. 1.0.0 shipped with the gate
+open, by the author's decision, after three cycles in which the asks in
+[`CONTACT.md`](CONTACT.md) were stated, made cheap, and not taken up. What that
+costs is specific and now unavoidable: **a finding that arrives from outside
+needs a major version.** `2.0` is where it goes.
 
 **Freezing a surface nobody has enumerated.** At the opening of 0.6.0, thirty-
 nine public types carried public fields or variants and no `#[non_exhaustive]`.

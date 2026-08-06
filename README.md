@@ -126,7 +126,7 @@ the binary codec stay.
 
 RFC UCAL-1 is **superseded, not merely implemented** — vendored verbatim as a
 historical document and corrected in place, because verification found it wrong
-in fourteen places.
+in sixteen places.
 
 | | |
 |---|---|
@@ -216,9 +216,11 @@ computation along two routes. Every Appendix A constant, the whole §2.2 provena
 chain, all eight Appendix C tick fixtures and the Appendix I intercalation
 derivations reproduce bit-exactly.
 
-Fifteen entries came out of that pass — fourteen standing deltas and one
+Seventeen entries have come out of that pass — sixteen standing deltas and one
 **withdrawal**, a claimed error in the RFC that turned out, on a second look, to
-be an error in the oracle. Every entry is covered by a test.
+be an error in the oracle. Every entry is covered by a test, and `check-docs`
+fails if a standing delta is recorded without being applied to the normative
+text.
 
 The §21 gated experiments were run rather than assumed, and four of the six kill
 criteria fired.
@@ -233,17 +235,27 @@ cargo run -p xtask -- verify-vectors  # conformance vectors re-derive
 
 ## Status
 
-Released **0.7.0** on crates.io, all six crates. `main` carries the released line;
-`0.8.0` is where development happens. The API is **not yet stable** — a `0.x` bump
-may break it.
+Released **1.0.0** on crates.io, all six crates.
+
+The API is **stable**: within `1.x` no public item is removed, no signature
+changes, and nothing that compiled stops compiling. What is promised above the
+semver floor, and what is not, is in
+[`Documentation/STABILITY.md`](Documentation/STABILITY.md) — including the two
+1.0 exit criteria that were **not** met, which is that nobody outside this
+repository has used the API.
 
 Release notes: [`Documentation/Release_Notes`](Documentation/Release_Notes).
-What 1.0 will promise: [`Documentation/STABILITY.md`](Documentation/STABILITY.md).
 
 ## Help wanted, specifically
 
-Three things this project needs from someone who is not its author, and 1.0 does
-not ship without at least one of them —
+Three things this project needs from someone who is not its author.
+
+1.0 was supposed to wait for one of them. It did not — the asks went three
+cycles without being taken up and 1.0 shipped anyway, which is recorded rather
+than tidied away in
+[`STABILITY.md`](Documentation/STABILITY.md). They are still open, and they are
+worth **more** now, not less: a finding that arrives today costs a major version
+instead of a minor one, and it is still better to know —
 [`Documentation/CONTACT.md`](Documentation/CONTACT.md).
 
 The cheapest is thirty minutes in any language, with no Rust and nothing to

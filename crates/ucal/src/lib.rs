@@ -118,9 +118,23 @@ pub(crate) fn ratio_of(a: &Ticks, b: &Ticks) -> Ratio {
     tick_ratio(a, b)
 }
 
+/// A ratio of two tick counts.
+///
+/// ucal-lint-allow-begin(no-panic-in-cli): every denominator this is called with
+/// is a profile constant or a tier — `BEAT`, `SECOND`, a Julian year, `5^e` —
+/// and none of them is zero. The alternative to asserting that is returning
+/// `Result` through twenty-three call sites, most of them inside a
+/// `Value::Section` literal, to handle a case no input can produce.
+///
+/// The fallback that would avoid both is worse than either: substituting any
+/// value for a zero denominator prints a *wrong number* where this prints
+/// nothing at all, and this project would rather stop than answer incorrectly.
+/// `main.rs`'s panic hook turns the stop into a diagnostic and exit 70 rather
+/// than a backtrace.
 fn tick_ratio(a: &Ticks, b: &Ticks) -> Ratio {
     Ratio::new(a.clone(), b.clone()).expect("non-zero denominator")
 }
+// ucal-lint-allow-end(no-panic-in-cli)
 
 /// Render an instant at a stated tier, choosing a form that can express it.
 ///
@@ -458,10 +472,15 @@ pub fn cmd_explain(input: &str, show_claim: bool) -> CmdResult {
 
     // The bridge equivalent, shown alongside (§4.3) — never instead.
     let since_epoch = if t.ticks() >= &UC1::origin_offset() {
-        let d = t.ticks().try_sub(&UC1::origin_offset()).expect("ge");
+        let d = t
+            .ticks()
+            .try_sub(&UC1::origin_offset())
+            .ok_or(TimeError::new(Code::E0020))?;
         format!("+{}", dec(&tick_ratio(&d, &bridge.ticks), 6))
     } else {
-        let d = UC1::origin_offset().try_sub(t.ticks()).expect("lt");
+        let d = UC1::origin_offset()
+            .try_sub(t.ticks())
+            .ok_or(TimeError::new(Code::E0020))?;
         format!("-{}", dec(&tick_ratio(&d, &bridge.ticks), 6))
     };
     // §4.3 said `ucal explain` "always prints the SI equivalent alongside".
@@ -1322,6 +1341,7 @@ pub fn cmd_cal_list() -> CmdResult {
 pub fn cmd_show(input: &str, calendars: &[String]) -> CmdResult {
     let (t, _) = parse_instant(input)?;
     let mut rows: Vec<(String, Value)> = Vec::new();
+    let mut produced = 0usize;
 
     for id in calendars {
         let entry = match id.as_str() {
@@ -1332,6 +1352,7 @@ pub fn cmd_show(input: &str, calendars: &[String]) -> CmdResult {
                     &Julian
                 };
                 let r = c.render(&t, Scale::Tt, 0, Rounding::Trunc)?;
+                produced += 1;
                 Value::Section(vec![
                     ("rendered".into(), Value::text(r.to_string())),
                     ("kind".into(), Value::text("legacy (§8.6)")),
@@ -1356,6 +1377,7 @@ pub fn cmd_show(input: &str, calendars: &[String]) -> CmdResult {
                 Ok(c) => {
                     let r = c.render(&t)?;
                     let f = c.fields(&t)?;
+                    produced += 1;
                     Value::Section(vec![
                         ("rendered".into(), Value::text(r.to_string())),
                         ("kind".into(), Value::text("derived (Rule K)")),
@@ -1376,6 +1398,22 @@ pub fn cmd_show(input: &str, calendars: &[String]) -> CmdResult {
             },
         };
         rows.push((id.clone(), entry));
+    }
+
+    // Every requested calendar failed, so nothing was produced and the process
+    // must say so. It exited 0 until 0.9.0 — a script asking for a calendar that
+    // does not exist got a success and a table of dashes.
+    //
+    // A *partial* failure still exits 0 deliberately: the output is useful, the
+    // per-row `error` field is visible in text and in `--json`, and turning the
+    // default invocation non-zero the moment one body lacks an anchor would
+    // make the ordinary case look broken.
+    if produced == 0 && !calendars.is_empty() {
+        return Err(TimeError::with_context(
+            Code::E0062,
+            "none of the requested calendars could be rendered; `ucal cal list` \
+             names the ones that exist",
+        ));
     }
 
     Ok(Doc::new()
@@ -1525,6 +1563,17 @@ pub fn cmd_cal_show(id: &str, input: &str) -> CmdResult {
 /// `ucal cal anchor <id>` — the anchor, or the fact that there is none (Rule J).
 #[cfg(feature = "body")]
 pub fn cmd_cal_anchor(id: &str) -> CmdResult {
+    // A calendar that does not exist and a calendar with no anchor are different
+    // answers, and until 0.9.0 both produced the same confident document —
+    // `ucal cal anchor nope` reported `anchor: none` and exited 0, which reads
+    // as "this calendar exists and its phase is undetermined" rather than "there
+    // is no such calendar".
+    if !bodycal::ids().contains(&id) {
+        return Err(TimeError::with_context(
+            Code::E0062,
+            "no such derived calendar; `ucal cal list` names the ones that exist",
+        ));
+    }
     let Some(a) = anchors::for_calendar(id) else {
         return Ok(Doc::new()
             .title(format!("ucal cal anchor {id}"))
@@ -1778,10 +1827,14 @@ pub fn cmd_ruler(from: &str, to: &str, step: Tier) -> CmdResult {
 /// Years, as a rendering of a tick count.
 #[cfg(feature = "cosmo")]
 fn ticks_in_years(t: &Ticks, digits: u32) -> String {
+    // ucal-lint-allow-begin(no-panic-in-cli): SECOND x 31 557 600 is a constant
+    // some forty orders of magnitude inside the domain ceiling. See `tick_ratio`
+    // for why this is asserted rather than propagated.
     let year = UC1::bridge()
         .ticks
         .try_mul(&<Ticks as TickInt>::from_u64(31_557_600))
         .expect("a Julian year fits the domain");
+    // ucal-lint-allow-end(no-panic-in-cli)
     dec(&tick_ratio(t, &year), digits)
 }
 
@@ -1831,10 +1884,12 @@ pub const YEAR_DEFINITION: &str =
 /// expansion fits the digits asked for depends on the value — so it goes through
 /// the certified constructor like every other rendered rational.
 fn years_quantity(t: &Ticks, digits: u32) -> Value {
+    // ucal-lint-allow-begin(no-panic-in-cli): as `ticks_in_years`.
     let year = UC1::bridge()
         .ticks
         .try_mul(&<Ticks as TickInt>::from_u64(31_557_600))
         .expect("a Julian year fits the domain");
+    // ucal-lint-allow-end(no-panic-in-cli)
     Value::quantity(&tick_ratio(t, &year), digits, Rounding::HalfEven)
 }
 
@@ -2086,6 +2141,9 @@ pub fn cmd_cosmo_model() -> CmdResult {
                             .hubble_time
                             .lo()
                             .div(&Ratio::from_int(
+                                // ucal-lint-allow-begin(no-panic-in-cli): a
+                                // gigayear in ticks, still far inside the
+                                // domain. As `tick_ratio`.
                                 UC1::bridge()
                                     .ticks
                                     .try_mul(&<Ticks as TickInt>::from_u64(31_557_600))
@@ -2093,6 +2151,7 @@ pub fn cmd_cosmo_model() -> CmdResult {
                                         y.try_mul(&<Ticks as TickInt>::from_u64(1_000_000_000))
                                     })
                                     .expect("a gigayear fits the domain"),
+                                // ucal-lint-allow-end(no-panic-in-cli)
                             ))?,
                         3,
                     ))),

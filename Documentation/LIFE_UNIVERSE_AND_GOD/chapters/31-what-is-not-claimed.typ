@@ -123,7 +123,7 @@ that did not establish it.
   distinction between what a system computes and what it merely records can be made
   mechanical, and until it is mechanical it depends on someone remembering.*
 
-  Everything else here — the nine traditions, the six samples, the fourteen deltas, the
+  Everything else here — the nine traditions, the six samples, the sixteen deltas, the
   convergent ladders — is either evidence for that or an honest account of what failed
   to be.
 ]

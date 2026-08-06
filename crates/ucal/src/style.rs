@@ -313,6 +313,18 @@ pub struct Render {
     /// the separator anyway, or who is reading without colour — down a pipe,
     /// in a log, on a terminal that has none.
     pub group: Option<char>,
+    /// Group separator for §6 text forms, replacing the default `·`.
+    ///
+    /// §6.3 lets a profile's text form be written with any separator that is
+    /// not a digit, and `--sep` is that choice. Distinct from [`Render::group`],
+    /// which separates *decimal* digit groups in a tick count: one is the shape
+    /// of a UC1 form, the other is a reading aid on an integer.
+    ///
+    /// Applied at render time rather than at construction. The alternative was a
+    /// separator threaded into every `cmd_*` signature, which would have been a
+    /// breaking change to the library — and `Render` is `#[non_exhaustive]`
+    /// precisely so that a rendering option can arrive without one.
+    pub form_sep: Option<char>,
     /// Available columns. See [`crate::table`] for why the floor is fixed.
     pub cols: usize,
     /// Fractional digits to render rationals at, overriding each field's own
@@ -340,6 +352,7 @@ impl Render {
     pub const PLAIN: Render = Render {
         style: Style::PLAIN,
         group: None,
+        form_sep: None,
         cols: crate::table::BASELINE_WIDTH,
         decimals: None,
         round: None,
@@ -352,6 +365,12 @@ impl Render {
             style,
             ..Render::PLAIN
         }
+    }
+
+    /// Set the §6 form separator (`--sep`).
+    pub fn form_sep(mut self, sep: Option<char>) -> Render {
+        self.form_sep = sep;
+        self
     }
 
     /// Set the available width, never below the documented baseline.
@@ -497,8 +516,28 @@ pub fn group_decimal(render: &Render, s: &str) -> String {
 /// - the digits, with their group separators.
 ///
 /// A string with no space is taken as all body, which is what a UCID is.
+/// A §6 text form with `--sep`'s separator substituted, if one was asked for.
+///
+/// Applied at render time rather than at construction, so that the choice does
+/// not have to be threaded into every `cmd_*` signature — which would be a
+/// breaking change to the library, and `Render` is `#[non_exhaustive]` exactly
+/// so a rendering option can arrive without one.
+pub fn apply_form_sep(render: &Render, s: &str) -> String {
+    match render.form_sep {
+        Some(c) if c != ucal_core::codec::SEP => {
+            s.replace(ucal_core::codec::SEP, &c.to_string())
+        }
+        _ => s.to_string(),
+    }
+}
+
+/// Paint a §6 text form: tag, leading-zero run, alternating groups.
 pub fn paint_form(render: &Render, s: &str) -> String {
     let style = &render.style;
+    // Substituted before anything measures or paints the string, so wrapping
+    // and dimming see the form the reader will.
+    let substituted = apply_form_sep(render, s);
+    let s = substituted.as_str();
     let (tag, body) = match s.find(' ') {
         Some(i) => (&s[..=i], &s[i + 1..]),
         None => ("", s),

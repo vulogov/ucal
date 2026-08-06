@@ -1,7 +1,7 @@
 <!--
   NORMATIVE. This is the corrected specification.
 
-  It is RFC UCAL-1 with the fourteen standing deltas applied in place. The
+  It is RFC UCAL-1 with the sixteen standing deltas applied in place. The
   original is kept verbatim at RFC-UCAL-1.md; the reasoning behind each change
   is in SPEC-DELTAS.md. Section and rule numbering is unchanged from the
   original and MUST NOT be renumbered: the implementation cites it 494 times.
@@ -9,13 +9,13 @@
 
 > ## UCAL-1.1 — the normative specification
 >
-> RFC UCAL-1 with the **fourteen standing deltas applied in place**. Every
+> RFC UCAL-1 with the **sixteen standing deltas applied in place**. Every
 > amended passage is marked inline with the delta that changed it and its class:
 >
 > | class | meaning | count |
 > |---|---|---|
 > | **CORRECTION** | the original is wrong | 6 |
-> | **AMENDMENT** | a normative change adopted by decision | 3 |
+> | **AMENDMENT** | a normative change adopted by decision | 5 |
 > | **EDITORIAL** | no behavioural effect | 5 |
 >
 > The original text is preserved at [`RFC-UCAL-1.md`](RFC-UCAL-1.md) — a
@@ -353,11 +353,15 @@ The present epoch is 31.22 deeps. For scale, `BIG_BANG_CLAIM`'s half-width is 14
 
 **4.2** The tier grid is the **universal** ladder: body-independent, and the canonical way to state any duration. Calendar units (§9) are a local overlay, never a replacement.
 
-**Rule N (Names are display-only).** The canonical identity of a tier is its exponent. Names come from a locale table (Appendix D). Implementations MUST accept `T[k]` and `5^e` notation wherever a name is accepted. A name collision within an active table is `UCAL-E0011`.
+**Rule N (Names are display-only).** The canonical identity of a tier is its exponent. Names come from a locale table (Appendix D). Implementations MUST accept `T[k]` and `5^e` notation wherever a name is accepted. A name collision within an active table is `UCAL-E0011`; a name **not found** in it is `UCAL-E0014`.
+
+> **[D-A17 · AMENDMENT]** **A lookup miss needs its own code.** The original defined `UCAL-E0011` for a *collision* and named nothing for a *miss*, which is the far commoner event — a person types a tier name that does not exist. An implementation had to invent a code or misuse one, and misusing one is worse: a misused code looks correct in every place a reader might check it.
 
 **4.3** Bridge table (informative, for `ucal explain`): 1 ms = 66.83 flicker · 1 s = 21.385 beat · 1 min = 1283.1 beat · 1 h = 24.64 arc · 1 d = 591.25 arc · 1 week = 1.324 sweep · 1 yr (Julian) = 69.11 sweep · 1 kyr = 22.11 span · 1 Myr = 7.076 drift · 1 Gyr = 2.264 deep.
 
-Nothing on the ladder is near a second or an hour. That is the accepted cost of leaving the Earth paradigm (D-2 rationale); `ucal explain` always prints the SI equivalent alongside.
+Nothing on the ladder is near a second or an hour. That is the accepted cost of leaving the Earth paradigm (D-2 rationale); `ucal explain` prints the SI equivalent **on request**.
+
+> **[D-A16 · AMENDMENT]** **The SI equivalent is printed on request, not always.** The original said `ucal explain` "always prints the SI equivalent alongside". An SI second is an Earth unit, and printing one beside every instant is the substitution Rule A.5 exists to refuse — the conversion is available under `--bridge` and is not performed unasked. The two Earth-calendar commands (`to-civil`, `from-civil`) and `datum`'s provenance chain keep theirs unconditionally, the first because a civil label *is* an Earth label and the second because §19.2 requires the audit trail.
 
 ## 5. Value types
 
@@ -1242,6 +1246,7 @@ Canonical identity is `exp`; `id` is a stable key; locale strings are display an
 | UCAL-E0011 | duplicate name in active locale table (Rule N) |
 | UCAL-E0012 | unknown key in HJSON data file |
 | UCAL-E0013 | profile lacks a `datum_provenance` record (Rule Q.4) |
+| UCAL-E0014 | name not found in the active locale table (Rule N) — D-A17 |
 | UCAL-E0020 | result precedes the datum (Rule Z) |
 | UCAL-E0021 | result exceeds DOMAIN (Rules O, W) |
 | UCAL-E0022 | window inversion, lo > hi (Rule U) |

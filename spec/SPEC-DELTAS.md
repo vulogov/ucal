@@ -771,3 +771,61 @@ rather than something a call site must remember.
 `crates/ucal/tests/no_earth_units.rs` asserts that no non-Earth command prints
 a foreign unit by default, that `--bridge` brings them back, and that the Earth
 commands above keep theirs.
+
+---
+
+## D-A17 — `UCAL-E0014`, a name that is not found
+
+**Status: AMENDMENT.** Appendix E gains one code.
+
+### What the RFC says
+
+Rule N: *"A name collision within an active table is `UCAL-E0011`."* Appendix E
+lists `UCAL-E0011` as *duplicate name in active locale table (Rule N)*.
+
+### What was wrong
+
+Rule N and Appendix E define a code for a **collision** — two entries claiming
+one name — and no code for a **miss**, which is the far commoner event: a person
+types a tier name that does not exist.
+
+This implementation returned `E0011` for both. The diagnostic read
+
+```
+UCAL-E0014: name not found in the active locale table (unknown tier name; …)
+```
+
+before the amendment as
+
+```
+UCAL-E0011: duplicate name in the active locale table (unknown tier name; …)
+```
+
+— a code whose canonical meaning is the opposite of the context beside it. A
+reader looking up `E0011` in Appendix E would have found a description of a
+condition that had not occurred, and a conforming implementation reproducing
+this behaviour would have propagated the error rather than the diagnosis.
+
+### The amendment
+
+| code | meaning |
+|---|---|
+| `UCAL-E0014` | name not found in the active locale table (Rule N) |
+
+`UCAL-E0011` keeps Rule N's meaning exactly: a collision, and only a collision.
+`UCAL-E0014` takes exit code 6 — data/config error — as the rest of the
+`E001x` family does.
+
+### Why it is an amendment and not an erratum
+
+Nothing in the RFC was self-contradictory: it simply did not name this
+condition. An implementation had to either invent a code or misuse one, and
+misusing one is worse, because a misused code looks correct in every place a
+reader might check it.
+
+### Enforcement
+
+`Code` is `#[non_exhaustive]`, so the addition breaks no exhaustive match. The
+CLI's hostile-input corpus asserts that `ucal between 0 100 --at nope` exits with
+a §19.5 code and a message; `crates/ucal-core/src/locale.rs` is the only site
+that raises it.

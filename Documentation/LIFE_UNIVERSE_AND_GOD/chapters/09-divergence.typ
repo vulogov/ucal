@@ -95,8 +95,9 @@ Twenty-four named rules. Six were amended by contact with the implementation.
 
 #section("Three kinds of losing")
 
-The fourteen findings sort into three classes, and the classes matter more than the
-count.
+The sixteen findings sort into three classes, and the classes matter more than the
+count — which has itself moved twice since the verification pass, both times
+because the software was used rather than reread.
 
 *Editorial* — five findings where the specification stated a number or a description
 inaccurately, with no behavioural consequence. `ORIGIN_OFFSET` has 61 trailing base-5
@@ -109,8 +110,20 @@ could not follow it. The synodic-period formula computed the wrong quantity. A d
 bound was typed as a duration when it is a rate. The cosmological integral, as
 written, was improper and could not be certified at all.
 
-*Amendment* — three findings where the specification was coherent, buildable, and
+*Amendment* — five findings where the specification was coherent, buildable, and
 adopted differently on purpose after implementation revealed what it cost.
+
+Two of the five arrived after the verification pass had closed, which is the more
+interesting fact about them. D-A16 struck the words "always prints the SI
+equivalent alongside" from §4.3, because an SI second is an Earth unit and
+printing one beside every instant is exactly the substitution the project exists
+to refuse — nobody noticed until the output was read by someone who cared about
+that. D-A17 gave a lookup miss its own diagnostic code, after the existing one
+was found reporting *"duplicate name in the active locale table"* for a name that
+was simply not there.
+
+Neither was found by rereading the specification. Both were found by running the
+program.
 
 #claim("interpretation")[
   The amendments are the interesting category, because nothing forced them.

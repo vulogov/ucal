@@ -2,7 +2,7 @@
 
 #chapter(number: 16, title: "Where it breaks")
 
-Chapter 15 showed the mechanism working on three bodies. This chapter is the same
+Chapter 15 showed the mechanism working on seven bodies. This chapter is the same
 length, and that is a rule rather than a coincidence: a book whose capability section
 outruns its limits section is selling something.
 

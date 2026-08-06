@@ -414,7 +414,7 @@ impl<P: Profile> core::fmt::Debug for Instant<P> {
 impl<P: Profile> Instant<P> {
     /// Tick 0 — the datum (Rule Z, Rule Q).
     pub const ZERO: Self = Instant {
-        ticks: bnum::types::U512::MIN,
+        ticks: Ticks::ZERO,
         _p: PhantomData,
     };
 }

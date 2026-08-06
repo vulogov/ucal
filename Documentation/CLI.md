@@ -108,6 +108,20 @@ A tier is written `T<k>`, `5^e`, or a locale name — `T4`, `5^80`, `drift`,
 | 7 | calendar derivation or anchor error (Rules K, J, C) |
 | 8 | cosmology model or enclosure error (Rule X) |
 | 9 | internal invariant violation, including metadata used as an operand (Rule Q.3) |
+| 70 | **a panic reached the top.** `EX_SOFTWARE` from `sysexits.h`, outside §19.5's range on purpose so it cannot be mistaken for a diagnosed failure |
+
+**Every failure leaves through this table.** A diagnosed one prints an Appendix E
+code and a sentence on **stderr**, writes nothing to stdout, and exits 0–9. A
+panic — which would be a defect in `ucal`, not in your input — prints what
+happened and where, says so plainly, gives the issue tracker, and exits 70. It
+never prints a Rust backtrace or suggests `RUST_BACKTRACE`, because neither is
+addressed to the person running the program.
+
+Checked by `crates/ucal/tests/hostile_input.rs`, which runs the real binary over
+a corpus of malformed input and asserts all three properties, and by
+`panic_handler.rs`, which induces a panic and asserts on what comes out. The
+`no-panic-in-cli` lint keeps new panicking constructs out of the CLI crate; the
+handler is the backstop for the libraries beneath it.
 
 ---
 

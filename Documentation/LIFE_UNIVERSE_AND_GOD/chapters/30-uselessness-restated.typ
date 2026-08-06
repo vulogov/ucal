@@ -86,7 +86,7 @@ and found the same response in all four: error or warn, never default. That cons
 is not a coding convention. It is the position the artifact holds, expressed in the only
 vocabulary an artifact has.
 
-*The corrections are the evidence.* Chapter 10's 97/400 finding, chapter 9's fourteen
+*The corrections are the evidence.* Chapter 10's 97/400 finding, chapter 9's sixteen
 deltas and one withdrawal, chapter 28's six null results. A body of work that reported
 only its successes would be making the same claims with none of the standing.
 
@@ -95,11 +95,11 @@ only its successes would be making the same claims with none of the standing.
   should mark the boundary between what they compute and what they merely record. That
   paper would be shorter, easier to write, and read by more people.
 
-  It would also have no `SignedWindow` in it, no compile-fail test, no fourteen deltas,
+  It would also have no `SignedWindow` in it, no compile-fail test, no sixteen deltas,
   and no case where the machinery contradicted its author. The paper would assert that
   the discipline is possible; the artifact demonstrates that it is, and pays for the
   demonstration in the only currency that counts — a specification that was wrong in
-  fourteen places and said so.
+  sixteen places and said so.
 
   That is what "the rigor is the medium" means. Not that rigour makes the argument more
   respectable. That without the rigour there is no argument, only a proposal.
@@ -107,7 +107,7 @@ only its successes would be making the same claims with none of the standing.
 
 #section("What was actually built")
 
-Six crates. 381 tests on two integer backends. A specification vendored, corrected in
+Six crates. 518 tests on two integer backends. A specification vendored, corrected in
 place, and cited by the source about a thousand times, with a build step that fails if
 a citation resolves to nothing. A tier grid generated from the library so it cannot
 drift. A lint that reports every exemption it honours. A book, marked throughout where

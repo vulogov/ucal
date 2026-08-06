@@ -23,10 +23,20 @@ Here it is as one line of a comparison:
     [*body*], [*days/year*], [*rule chosen*], [*at the default bound*],
     [Earth], [365.242190], [31/128 — conv. 4], [1 day slips in 400,000 yr],
     [Mars], [668.599], [45/76 — conv. 6], [1 sol slips in 16,566 Mars yr],
-    [Titan], [—], [derived], [no anchor: phase unavailable],
+    [Titan], [673.752068], [88/117 — conv. 3], [no anchor: phase unavailable],
+    [Moon], [12.368981], [31/84 — conv. 5], [no anchor: phase unavailable],
+    [Mercury], [0.499990], [1/2 — conv. 1], [no anchor: phase unavailable],
+    [Venus], [1.924634], [135/146 — conv. 5], [no anchor: phase unavailable],
+    [Jupiter], [10475.839571], [68/81 — conv. 4], [no anchor: phase unavailable],
   )
 ]
 #v(2mm)
+
+Mercury's row is the one that makes the point without arguing it. Its solar day is
+almost exactly twice its year — the 3:2 spin–orbit resonance, in a column that was
+not built to display resonances — so a Mercurian year holds *half* a Mercurian day
+and the chosen rule is `1/2`. Nothing in the derivation treats a ratio below one as
+unusual, because nothing in it knows that ratios above one are usual.
 
 The Julian rule, 1/4, is Earth's first convergent. The Gregorian rule is not a
 convergent at any depth. Both facts came out of the mechanism with no knowledge of

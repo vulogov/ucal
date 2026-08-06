@@ -107,20 +107,40 @@ periods alone.
 If a calendar names no grouping satellite, it has no months. Not a default month, not
 a synthesised one, not a fallback to Earth's. None.
 
-#terminal(caption: "ucal cal list — three derived calendars")[
+#terminal(caption: "ucal cal list — seven derived calendars, two of them anchored")[
 ```
-earth-d:
-  leap_rule        31/128 (convergent 4)
-  cycles           from moon
+earth-d      earth    anchor 1   31/128 (convergent 4)   cycles from moon
+mars-d       mars     anchor 1   45/76  (convergent 6)   no grouping satellite
+titan-d      titan    —          88/117 (convergent 3)   no anchor
+luna-d       luna     —          31/84  (convergent 5)   no anchor
+mercury-d    mercury  —          1/2    (convergent 1)   no anchor
+venus-d      venus    —          135/146 (convergent 5)  no anchor
+jupiter-d    jupiter  —          68/81  (convergent 4)   no anchor
 
-mars-d:
-  leap_rule        45/76 (convergent 6)
-  cycles           none — the calendar names no grouping satellite
-
-titan-d:
-  status  no anchor: complete in units, intercalation and cycles,
-          incomplete in phase. Asking for local fields is UCAL-E0062.
+  no anchor: complete in units, intercalation and cycles, incomplete in
+  phase. Asking for local fields is UCAL-E0062.
 ```
+]
+
+#callout(label: "Five of the seven have no anchor, and that is the ordinary case")[
+  It would be easy to read that table as five failures beside two successes. It is
+  the other way round.
+
+  Earth and Mars have anchors because they have had landers, orbiters, and
+  centuries of argument about where their prime meridians are. The other five have
+  not. That is a fact about where the instruments are, not about the mechanism —
+  and every one of the seven derives its intercalation from its own periods by the
+  identical code path.
+
+  Mercury is the one worth staring at. Its solar day is about twice its year, so
+  the derived rule is `1/2`: a Mercurian year is *half a Mercurian day*. Nothing in
+  the derivation treats a ratio below one as a special case, because nothing in the
+  derivation knows that ratios above one are normal. Only an Earth-shaped
+  expectation thinks so.
+
+  Jupiter is the other. It is a calendar for a body with no surface — the rotation
+  is System III, a magnetic field. The mechanism takes two periods and returns a
+  rule; it has no opinion about what is rotating.
 ]
 
 #callout(label: "Mars has no month, and that is the correct output")[

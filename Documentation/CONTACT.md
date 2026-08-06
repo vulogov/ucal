@@ -1,8 +1,18 @@
 # Three things this project needs from someone who is not its author
 
-Everything else on the way to 1.0 is a matter of sitting down. These three are
-not, and 1.0 does not ship without at least one of them —
-[`ROAD-TO-1.0.md`](Proposals/ROAD-TO-1.0.md) says so and means it.
+These three need someone who is not the author. Everything else was a matter of
+sitting down.
+
+**1.0 was gated on them and shipped without them.** The asks below went three
+cycles unanswered and 1.0.0 was released anyway, by the author's decision; the
+argument against doing that is left standing in
+[`STABILITY.md`](STABILITY.md) and [`ROAD-TO-1.0.md`](Proposals/ROAD-TO-1.0.md)
+rather than revised to agree with the outcome.
+
+That makes these **more** valuable now, not less. Until 1.0 a finding cost a
+minor version; now it costs a major one — and it is still much better to know.
+If something here is wrong, the useful moment to say so has not passed, it has
+only become more expensive to act on.
 
 The asks below are specific on purpose. "Contributions welcome" gets nothing,
 and deserves to.
@@ -58,6 +68,21 @@ exercise.
 If those three match, `vectors.json` has 45 tier values, 13 fixtures and 4
 continued-fraction tables you can go on to, and `spec/CONFORMANCE.md` explains
 the file's shape.
+
+### If you would rather see the expected values first
+
+Since 0.8.0 the binary prints them itself, so you need neither this repository
+nor the vector file to know what you are aiming at:
+
+```
+cargo install ucal
+ucal verify
+```
+
+It re-derives all three from their definitions and shows what it got. Read the
+last field before you trust it: that command is a **self-check**, so its
+agreeing with itself is not the confirmation being asked for here. It exists to
+make the target cheap to see, not to stand in for C1.
 
 ### What to report
 
@@ -117,16 +142,22 @@ negative result is a real outcome rather than a disappointment.
 cargo install ucal
 ucal datum
 ucal explain 8070205189123984864657505252035637180530466139316558837890625
-ucal cal show earth-d 8070205189123984864657505252035637180530466139316558837890625
+ucal cal list
+ucal between 0 8070205189123984864657505252035637180530466139316558837890625
 ```
 
 Then tell me what you expected and did not get.
 
-Several decisions in 0.4.0 and 0.6.0 were guesses about a reader who has never
-existed: that foreign units should be off by default and behind `--bridge`; that
-a certification block belongs in the output at all; that promoting a wide column
-beneath its row reads better than truncating it. Each is defensible and none has
-met anyone.
+Several decisions were guesses about a reader who has never existed: that
+foreign units should be off by default and behind `--bridge`; that a
+certification block belongs in the output at all; that promoting a wide column
+beneath its row reads better than truncating it; that a duration is better
+stated as a walk down the tier ladder than as a number of seconds. Each is
+defensible and none has met anyone.
+
+`ucal cal list` is the one to look at if you only look at one. Seven derived
+calendars, five of them with no anchor — which is the project's whole argument
+sitting in a table, and the place a reader most likely to think it is broken.
 
 ---
 
@@ -137,9 +168,11 @@ notes carry four gated experiments whose kill criteria fired and were written
 down rather than worked around; a fifth was dropped in 0.4.0 after a measurement
 contradicted the reason for doing it.
 
-Contact findings are expected to break things, and 0.8.0 exists specifically to
-spend the breaking changes 0.7.0 earns. A finding that arrives after 1.0 is a
-finding that has to wait for 2.0, which is the whole reason to ask now.
+Contact findings are expected to break things. Before 1.0 there was a cycle set
+aside to spend them cheaply; that window has closed, and a finding now waits for
+`2.0`. This is exactly the cost the ordering was meant to avoid, and it was
+accepted knowingly — which is a reason to report something, not a reason to
+assume it is too late.
 
 ## Where to send it
 

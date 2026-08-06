@@ -323,7 +323,72 @@ fn locale_values() -> clap::builder::PossibleValuesParser {
     )
 }
 
+/// Exit code for a panic that reached the top. §19.5 assigns 0–9 to defined
+/// conditions; 70 is `EX_SOFTWARE` from `sysexits.h`, which is what this is.
+const EXIT_INTERNAL: i32 = 70;
+
+/// Turn any panic into a diagnostic and a defined exit code.
+///
+/// # Why this exists
+///
+/// Every failure this program *knows about* already leaves through
+/// [`ucal::exit_code`] with an Appendix E code and a sentence. A panic leaves
+/// through neither: the default hook prints `thread 'main' panicked at ...`,
+/// suggests `RUST_BACKTRACE`, and exits 101 — a Rust implementation detail
+/// shown to someone who typed a date wrong, and an exit code that means nothing
+/// in §19.5.
+///
+/// A panic here would be a defect rather than a user error, and the difference
+/// is exactly what the message should say. So the hook keeps the location —
+/// which is the one genuinely useful part, and what a bug report needs — drops
+/// the backtrace machinery, and asks for the report.
+///
+/// This is a backstop, not a policy. The policy is that the CLI crate contains
+/// no panicking construct at all, which `xtask -- lint` enforces
+/// (`no-panic-in-cli`). The backstop covers the libraries beneath it, where an
+/// `expect` on a genuine invariant is the right code and an unreachable branch
+/// is still reachable by a bug.
+fn install_panic_handler() {
+    std::panic::set_hook(Box::new(|info| {
+        let where_ = info
+            .location()
+            .map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column()))
+            .unwrap_or_else(|| "an unknown location".into());
+        let what = info
+            .payload()
+            .downcast_ref::<&str>()
+            .map(|s| (*s).to_string())
+            .or_else(|| info.payload().downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "no message".into());
+        eprintln!("ucal: internal error — this is a bug in ucal, not in your input.");
+        eprintln!("      {what}");
+        eprintln!("      at {where_}");
+        eprintln!();
+        eprintln!("      Nothing was computed incorrectly; the program stopped instead.");
+        eprintln!("      Please report it with the command you ran:");
+        eprintln!("      https://github.com/vulogov/ucal/issues");
+        std::process::exit(EXIT_INTERNAL);
+    }));
+}
+
 fn main() {
+    install_panic_handler();
+
+    // Checking that the handler works needs a panic to hand. An environment
+    // variable rather than a flag: it is not part of the CLI surface, does not
+    // appear in `--help`, adds no JSON path, and cannot be reached by a user
+    // who is not looking for it — the same shape as `UCAL_BLESS` in the test
+    // suite. `panic_handler.rs` sets it and asserts on what comes out, so the
+    // hook is verified rather than read.
+    // ucal-lint-allow-begin(no-panic-in-cli): this *is* the panic, on purpose.
+    // It is the only way to check the handler from outside the process, and it
+    // is unreachable without setting an environment variable that appears in no
+    // help text.
+    if std::env::var_os("UCAL_PANIC_SELFTEST").is_some() {
+        panic!("induced panic: UCAL_PANIC_SELFTEST is set");
+    }
+    // ucal-lint-allow-end(no-panic-in-cli)
+
     let cli = Cli::parse();
 
     if cli.profile != "UC-1" && cli.profile != "UC1" {
@@ -333,6 +398,18 @@ fn main() {
         );
         std::process::exit(5);
     }
+
+    // `--sep` was declared, documented as "must not be a digit (§6.3)", and
+    // never read: `--sep 1` was accepted in violation of its own help text, and
+    // `--sep _` changed nothing while appearing to work. It is validated here
+    // and applied at render time through `Render::form_sep`.
+    let form_sep = match cli.sep.map(|c| parse_group_sep(&c.to_string())).transpose() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("{e}");
+            std::process::exit(exit_code(&e));
+        }
+    };
 
     // Parsed before dispatch: `--round` reaches both the rendering and
     // `to-civil`'s sub-second field, so it has to exist before either runs.
@@ -458,6 +535,7 @@ fn main() {
     };
     let render = Render::styled(style)
         .group(sep)
+        .form_sep(form_sep)
         .decimals(cli.decimals)
         .round(round)
         .bridge(cli.bridge)

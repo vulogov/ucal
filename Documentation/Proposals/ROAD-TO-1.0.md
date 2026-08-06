@@ -1,5 +1,19 @@
 # The road to 1.0
 
+> **Outcome, 2026-08-06.** 1.0.0 shipped with the contact gate open. C1, C2 and
+> C3 were never taken up, and the criterion *the conformance apparatus has been
+> used by someone else* is unmet. The decision to ship anyway was the author's,
+> taken with the argument below in front of him.
+>
+> This plan is left as written rather than revised to fit what happened. A plan
+> edited after the fact to agree with the outcome records nothing; this one
+> records that the gate was set, held for three cycles, and then overridden —
+> which is the more useful thing for a reader to know, and the only version of
+> events that is true.
+>
+> What it costs is stated in `STABILITY.md`: a finding that arrives from outside
+> now needs `2.0`.
+
 Three questions were asked at 0.4.0, and the answers are what this plan is built
 from. They are answered first, with evidence, because a plan that starts from a
 flattering assessment plans the wrong work.
@@ -333,10 +347,35 @@ Exit criteria, in the shape §20's phases use:
 | the surface has survived contact | 0.7.0 |
 | the specification and the source agree, checked | already: `check-docs`, 116 citations |
 | both backends byte-identical | already: Rule W, every release |
-| two consecutive releases with no breaking change | 0.9.0 → 1.0.0 |
+| two consecutive releases with no breaking change | 0.9.0 → 1.0.0 — **and see the note below**, because 0.7.0 and 0.8.0 already satisfy it on a literal reading and must not be allowed to |
 | CI green on every push, with no known-failing job | 0.7.0 — **not 0.5.0, as this table claimed until then.** The `features` workflow added in 0.6.0 failed on every push it ever ran, including the 0.6.0 release tag, because an assertion read colourised cargo output through an anchored `^error`. The criterion was written, nothing checked whether it held, and this document asserted it did — which is the failure this table exists to keep out, occurring in the table itself |
 
 ---
+
+## A criterion that is already met, and should not count
+
+Recorded in 0.9.0, because a gate this project could walk through by accident is
+worse than one it cannot meet.
+
+**0.7.0 and 0.8.0 both shipped with an empty `Breaking` section.** Read
+literally, *two consecutive releases with no breaking change* is satisfied and
+1.0 is one release away.
+
+It should not count, and the reason is the same reason the contact gate is open:
+both were quiet because **nobody outside this repository has used the API**, so
+nothing pushed back on it. 0.8.0 was defined as the cycle that spends contact's
+breaking changes and it spent none, not because the surface was right but
+because no one told it otherwise.
+
+A counter of quiet releases measures attention, not stability. It is worth
+keeping only in the case it was written for — a surface that stops moving *while
+being used* — and in the case that actually obtains it measures nothing at all.
+
+**So the criterion stands and is not yet met**, on the grounds that a release
+nobody exercised is not evidence about a surface. If contact happens, 0.8.0's
+window reopens, the breaks land, and the count starts from the release after
+them. If it never happens, this criterion is moot anyway, because the one above
+it in the table is not met either and 1.0 does not ship.
 
 ## What this plan refuses
 
