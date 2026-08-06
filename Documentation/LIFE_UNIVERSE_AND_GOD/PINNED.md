@@ -7,10 +7,10 @@ the RFC is evidence about the past.
 
 | | |
 |---|---|
-| commit | `f84f157344226f317381b7b6051ed7e950fc6543` |
-| short | `f84f157` |
+| commit | `96d673cee03246deb12b00bd52c0ca0317f8a8d2` |
+| short | `96d673c` |
 | branch | `0.9.0` |
-| date | 2026-07-31 |
+| date | 2026-08-05 |
 | released | 0.8.0 on crates.io (six crates); this tree is 0.9.0, in development |
 
 ## Toolchain
@@ -25,12 +25,13 @@ the RFC is evidence about the past.
 
 | | |
 |---|---|
-| tests passing | 381 |
-| suites | 22 |
+| tests passing | 518 |
+| suites | 33 |
 | backends | `u512` (bnum) and `bigint` (num-bigint), both green |
 | constants harness | `cargo run -p xtask` — 96/96, two independent routes |
-| lints | clean; two declared exemptions, both reported by the tool |
-| citations | every `§`, `Rule` and `D-A` resolves against `spec/` |
+| lints | clean; every exemption declared and reported by the tool |
+| citations | every `§`, `Rule` and `D-A` resolves against `spec/` (117 distinct) |
+| CLI | no invocation panics; every rejection is a §19.5 exit code and a sentence |
 
 ## Typst packages
 
@@ -43,7 +44,7 @@ Pinned at the import site, so the build fails rather than drifting.
 ## Reproducing
 
 ```
-git checkout f84f157
+git checkout 96d673c
 cargo test --workspace --release
 cargo run -p xtask
 typst compile Documentation/LIFE_UNIVERSE_AND_GOD/BOOK.typ

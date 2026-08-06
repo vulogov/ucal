@@ -10,7 +10,7 @@
 > ## Historical document
 >
 > **This is RFC UCAL-1 as issued, reproduced verbatim and never amended.** It
-> is known to be wrong in fourteen places.
+> is known to be wrong in sixteen places.
 >
 > - For the **corrected, normative** specification, read
 >   [`UCAL-1.1.md`](UCAL-1.1.md).

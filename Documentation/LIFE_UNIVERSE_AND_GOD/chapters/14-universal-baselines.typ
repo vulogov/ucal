@@ -47,18 +47,24 @@ Chapter 8 gave the shape: every calendar is (Body, Anchor, LeapRule, Cycles). Wh
 matters for this part is that there is exactly *one* implementation of that shape.
 
 There is no Earth path and no Mars path. There is no `if body == earth`. There is no
-crate named after a body — the crate is `ucal-body`, and Earth, Mars and Titan are
-entries in a data table it reads.
+crate named after a body — the crate is `ucal-body`, and Earth, Mars, Titan, the
+Moon, Mercury, Venus and Jupiter are entries in a data table it reads.
 
-#terminal(caption: "ucal cal list — three calendars, one mechanism")[
+#terminal(caption: "ucal cal list — seven calendars, one mechanism")[
 ```
-earth-d:  kind  derived — Rule K
-          body  earth
-mars-d:   kind  derived — Rule K
-          body  mars
-titan-d:  kind  derived — Rule K
+earth-d:    kind  derived — Rule K    body  earth
+mars-d:     kind  derived — Rule K    body  mars
+titan-d:    kind  derived — Rule K    body  titan
+luna-d:     kind  derived — Rule K    body  luna
+mercury-d:  kind  derived — Rule K    body  mercury
+venus-d:    kind  derived — Rule K    body  venus
+jupiter-d:  kind  derived — Rule K    body  jupiter
 ```
 ]
+
+The list grew from three to seven without the mechanism changing, which is the
+only kind of evidence this claim can have. Adding a body is adding a row of cited
+parameters; nothing else moved.
 
 The test that matters here constructs `earth-d` and `mars-d` through the identical
 generic path, from data alone, and asserts that neither required a special case. If

@@ -908,7 +908,7 @@ misfiled it. Every other item above is a claim *about the world* that the
 instrument declines to make. Usefulness is not that. It is a property of the
 artifact, and the project's position on it is structural rather than defensive.
 
-Three things are true, in this order. The artifact is real: six crates, 381
+Three things are true, in this order. The artifact is real: six crates, 518
 tests, constants reproducible by two independent derivations. Its practical
 utility is questionable: no task you have today needs a Planck-tick count, and
 nothing on its ladder is near an hour. *Therefore* it is research of another kind
@@ -921,13 +921,13 @@ published rather than quietly absorbed.
 
 #section("What the artifact actually is")
 
-Six crates on crates.io. 381 tests on two interchangeable integer backends that
+Six crates on crates.io. 518 tests on two interchangeable integer backends that
 accept and reject exactly the same values. A specification vendored, corrected in
 place, and cited by the source about a thousand times, with a build step that
 fails if a citation resolves to nothing. A tier table generated from the library
 so it cannot drift. A lint that reports every exemption it honours.
 
-Verification found the specification wrong in fourteen places, and one further
+Verification found the specification wrong in sixteen places, and one further
 claim was raised and *withdrawn* — an error alleged in the specification that
 turned out to be an error in the checking oracle. The withdrawal is kept in the
 record, because a process that only ever finds things is indistinguishable from

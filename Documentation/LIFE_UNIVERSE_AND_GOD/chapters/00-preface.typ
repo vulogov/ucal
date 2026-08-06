@@ -134,7 +134,7 @@ line, published and installable. Time is an unsigned integer count of Planck-tim
 units since a stipulated datum. There is no floating-point value anywhere in the
 workspace, not in a signature, a field, an intermediate, or the rendering path. Every
 constant in it is reproducible by two independent derivations that agree bit for bit.
-At the commit this book is pinned to, 381 tests pass on both integer backends. You can
+At the commit this book is pinned to, 518 tests pass on both integer backends. You can
 check every sentence in that paragraph; the last page of this book tells you how.
 
 *Its practical utility is questionable.* No task you have today needs a Planck-tick

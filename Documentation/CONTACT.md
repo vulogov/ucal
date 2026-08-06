@@ -59,6 +59,21 @@ If those three match, `vectors.json` has 45 tier values, 13 fixtures and 4
 continued-fraction tables you can go on to, and `spec/CONFORMANCE.md` explains
 the file's shape.
 
+### If you would rather see the expected values first
+
+Since 0.8.0 the binary prints them itself, so you need neither this repository
+nor the vector file to know what you are aiming at:
+
+```
+cargo install ucal
+ucal verify
+```
+
+It re-derives all three from their definitions and shows what it got. Read the
+last field before you trust it: that command is a **self-check**, so its
+agreeing with itself is not the confirmation being asked for here. It exists to
+make the target cheap to see, not to stand in for C1.
+
 ### What to report
 
 Either outcome is a result, and **a mismatch is worth more than a match**.
@@ -117,16 +132,22 @@ negative result is a real outcome rather than a disappointment.
 cargo install ucal
 ucal datum
 ucal explain 8070205189123984864657505252035637180530466139316558837890625
-ucal cal show earth-d 8070205189123984864657505252035637180530466139316558837890625
+ucal cal list
+ucal between 0 8070205189123984864657505252035637180530466139316558837890625
 ```
 
 Then tell me what you expected and did not get.
 
-Several decisions in 0.4.0 and 0.6.0 were guesses about a reader who has never
-existed: that foreign units should be off by default and behind `--bridge`; that
-a certification block belongs in the output at all; that promoting a wide column
-beneath its row reads better than truncating it. Each is defensible and none has
-met anyone.
+Several decisions were guesses about a reader who has never existed: that
+foreign units should be off by default and behind `--bridge`; that a
+certification block belongs in the output at all; that promoting a wide column
+beneath its row reads better than truncating it; that a duration is better
+stated as a walk down the tier ladder than as a number of seconds. Each is
+defensible and none has met anyone.
+
+`ucal cal list` is the one to look at if you only look at one. Seven derived
+calendars, five of them with no anchor — which is the project's whole argument
+sitting in a table, and the place a reader most likely to think it is broken.
 
 ---
 

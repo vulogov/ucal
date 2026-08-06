@@ -126,7 +126,7 @@ the binary codec stay.
 
 RFC UCAL-1 is **superseded, not merely implemented** — vendored verbatim as a
 historical document and corrected in place, because verification found it wrong
-in fourteen places.
+in sixteen places.
 
 | | |
 |---|---|
@@ -216,9 +216,11 @@ computation along two routes. Every Appendix A constant, the whole §2.2 provena
 chain, all eight Appendix C tick fixtures and the Appendix I intercalation
 derivations reproduce bit-exactly.
 
-Fifteen entries came out of that pass — fourteen standing deltas and one
+Seventeen entries have come out of that pass — sixteen standing deltas and one
 **withdrawal**, a claimed error in the RFC that turned out, on a second look, to
-be an error in the oracle. Every entry is covered by a test.
+be an error in the oracle. Every entry is covered by a test, and `check-docs`
+fails if a standing delta is recorded without being applied to the normative
+text.
 
 The §21 gated experiments were run rather than assumed, and four of the six kill
 criteria fired.

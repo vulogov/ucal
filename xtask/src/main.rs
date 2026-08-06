@@ -967,6 +967,18 @@ fn run_docs(mode: &str) -> i32 {
         // The key is published in several places so that one beyond the
         // author's reach can contradict a repository that has been rewritten.
         // Copies that disagree for an innocent reason destroy exactly that.
+        // A delta recorded and never applied reads as decided while the
+        // normative text still says the old thing.
+        match citations::check_deltas_are_applied(&root) {
+            Ok(n) => println!("  ok    every standing spec delta is applied ({n})"),
+            Err(bad) => {
+                eprintln!("  FAIL  the normative spec has not absorbed its deltas:");
+                for b in &bad {
+                    eprintln!("          {b}");
+                }
+                code = 6;
+            }
+        }
         match citations::check_signing_key(&root) {
             Ok(n) => println!("  ok    the signing key is published identically ({n} places)"),
             Err(bad) => {

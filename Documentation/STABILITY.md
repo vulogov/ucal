@@ -4,8 +4,17 @@ Written before 1.0 rather than after, so that the promise is a decision rather
 than a description of whatever happened to be true on the day.
 
 **Status: this document describes an intention. The crates are `0.x` and promise
-nothing yet.** Every `0.x` release is permitted to break anything, and three of
-the five so far did.
+nothing yet.** Every `0.x` release is permitted to break anything, and four of
+the eight so far did — 0.1.1, 0.3.0, 0.4.0 and 0.6.0.
+
+**0.7.0 and 0.8.0 broke nothing, and that proves less than it looks.** The 1.0
+exit criteria ask for *two consecutive releases with no breaking change*, and on
+a literal reading those two satisfy it. They should not be allowed to: both were
+quiet for the same reason the contact gate is still open — nobody outside this
+repository has used the API, so nothing pushed back on it. A counter of quiet
+releases measures attention, not stability, and there has been none. The
+criterion is kept because a surface that stops moving *while being used* is
+evidence; the same surface unused is only a surface nobody looked at.
 
 ---
 
@@ -17,7 +26,7 @@ interesting part of this file.
 
 ## Above the floor
 
-Semver has no vocabulary for most of what this project actually claims. Five
+Semver has no vocabulary for most of what this project actually claims. Six
 promises, each with the mechanism that keeps it — because a promise with no
 mechanism is a convention, and 0.5.0 was spent removing the last two of those.
 
@@ -74,7 +83,29 @@ this check, and is exactly the breakage this promise is about. Nothing
 mechanical reaches meaning. What the baseline gives is that the *shape* cannot
 drift unnoticed, which is the part that can be automated.
 
-### 5. A certified enclosure never narrows silently
+### 5. The command line never aborts
+
+A failure leaves through §19.5's table: an Appendix E code and a sentence on
+stderr, nothing on stdout, and an exit status in `0–9`. No release makes a
+diagnosable condition arrive as a panic, and none prints a Rust backtrace or
+suggests `RUST_BACKTRACE` — neither is addressed to the person running the
+program.
+
+A defect is not the same as a failure and does not pretend to be: a panic that
+reaches the top exits **70** (`EX_SOFTWARE`), outside §19.5's range on purpose,
+and says that the input was not at fault.
+
+*Enforced by* the `no-panic-in-cli` lint over `crates/ucal/src`, a corpus of
+malformed invocations in `hostile_input.rs` that asserts all of the above
+against the real binary, and `panic_handler.rs`, which induces a panic and
+checks what comes out.
+
+**Its limit.** The lint covers the CLI crate; the libraries beneath it keep
+`expect` on invariants they have just established, where rewriting into `Result`
+would trade a provably-unreachable branch for an error case no caller can
+trigger. The handler is the backstop for those, and a corpus is not a fuzzer.
+
+### 6. A certified enclosure never narrows silently
 
 An enclosure claims the true value provably lies inside it. Within `1.x`, an
 enclosure may widen — a correction always may — and may narrow only when the
@@ -158,8 +189,12 @@ prevent.
 
 ### The specification is not frozen
 
-UCAL-1 was superseded, not finished. `spec/SPEC-DELTAS.md` carries sixteen
-recorded amendments and D-A16 was written in 0.4.0. **1.0 freezes the API; the
+UCAL-1 was superseded, not finished. `spec/SPEC-DELTAS.md` carries seventeen
+entries — sixteen standing and one withdrawn — and D-A17 was written in 0.9.0.
+Two of them, D-A16 and D-A17, sat recorded but **unapplied** in the normative
+text until 0.9.0 went looking; `check-docs` now fails if a standing delta is not
+marked inline in `UCAL-1.1.md`, because a delta that is written and not applied
+reads as decided while the normative document still says the old thing. **1.0 freezes the API; the
 specification keeps its amendment procedure.** A delta that changes behaviour
 still produces a breaking change and still needs a major bump — the two are
 independent.

@@ -28,7 +28,7 @@ distinguishable by class without parsing the message.
     inset: (x: 5pt, y: 4.5pt),
     [*band*], [*subject*], [*exit*],
     [`E0001–E0007`], [notation and parsing], [2],
-    [`E0010–E0013`], [profile and provenance], [6],
+    [`E0010–E0014`], [profile, provenance, and names], [6],
     [`E0020–E0025`], [domain, ordering, and the claim], [3, 9],
     [`E0030–E0032`], [identifiers and encoding], [2, 3],
     [`E0040–E0043`], [the SI bridge and civil time], [2, 4],
@@ -36,6 +36,14 @@ distinguishable by class without parsing the message.
     [`E0070–E0080`], [numerics and cosmology], [3, 8],
   )
 ]
+
+Two statuses fall outside that mapping and mean different things. Exit `1` is a
+usage error, raised before any code is reached — an unknown flag, a missing
+argument. Exit `70` is `EX_SOFTWARE`: a panic that reached the top of the
+program. It is deliberately outside the `0–9` range the table uses, so that a
+defect in `ucal` cannot be mistaken for a diagnosed failure of the input. When
+it appears, the message says so, and gives the issue tracker rather than a
+stack trace.
 
 #section("Errors")
 
@@ -57,6 +65,7 @@ distinguishable by class without parsing the message.
     [`UCAL-E0011`], [duplicate name in the active locale table], [6], [12],
     [`UCAL-E0012`], [unknown key in HJSON data file], [6], [12],
     [`UCAL-E0013`], [profile lacks a datum_provenance record], [6], [12],
+    [`UCAL-E0014`], [name not found in the active locale table], [6], [12],
     [`UCAL-E0020`], [result precedes the datum], [3], [3],
     [`UCAL-E0021`], [result exceeds DOMAIN], [3], [5],
     [`UCAL-E0022`], [window inversion, lo > hi], [3], [12],

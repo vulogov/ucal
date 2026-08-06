@@ -679,3 +679,85 @@ fn markdown_files(root: &Path) -> Vec<String> {
     out.sort();
     out
 }
+
+/// Every standing spec delta is applied in the normative specification.
+///
+/// `SPEC-DELTAS.md` is the reasoning; `UCAL-1.1.md` is the normative text, and
+/// its own header says it is "RFC UCAL-1 with the standing deltas applied in
+/// place", with each amended passage marked inline by delta id.
+///
+/// That claim had been false since 0.4.0. D-A16 amended §4.3 — the SI
+/// equivalent is printed on request, not always — and the normative text still
+/// said "always" two releases later, contradicting the implementation, the
+/// release notes and `STABILITY.md` at once. D-A17 was written in 0.9.0 and was
+/// never going to be applied either, because nothing looked.
+///
+/// A delta that is recorded and not applied is the worst of both: the reasoning
+/// exists, so it reads as decided, and the normative document a conforming
+/// implementer would follow still says the old thing.
+///
+/// `WITHDRAWN` deltas are exempt by definition — D-A1 is a claim that was
+/// retracted, and applying it would be the error. Everything else must appear.
+pub fn check_deltas_are_applied(root: &Path) -> Result<usize, Vec<String>> {
+    let Ok(deltas) = std::fs::read_to_string(root.join("spec/SPEC-DELTAS.md")) else {
+        return Err(alloc_vec("spec/SPEC-DELTAS.md is unreadable".into()));
+    };
+    let Ok(spec) = std::fs::read_to_string(root.join("spec/UCAL-1.1.md")) else {
+        return Err(alloc_vec("spec/UCAL-1.1.md is unreadable".into()));
+    };
+
+    let mut bad = Vec::new();
+    let mut checked = 0;
+    for (i, line) in deltas.lines().enumerate() {
+        let Some(rest) = line.strip_prefix("## ") else {
+            continue;
+        };
+        if !rest.starts_with("D-A") {
+            continue;
+        }
+        let id: String = rest
+            .chars()
+            .take_while(|c| !c.is_whitespace())
+            .collect();
+        // The status is on the heading line or shortly after it.
+        let window: String = deltas
+            .lines()
+            .skip(i)
+            .take(4)
+            .collect::<Vec<_>>()
+            .join(" ");
+        if window.contains("WITHDRAWN") {
+            continue;
+        }
+        checked += 1;
+        // Marked inline as `[D-A16 · AMENDMENT]`, so require the bracketed form
+        // rather than a bare mention — a delta named in passing is not a delta
+        // applied.
+        if !spec.contains(&format!("[{id} ·")) {
+            bad.push(format!(
+                "{id} is a standing delta and is not applied in spec/UCAL-1.1.md"
+            ));
+        }
+    }
+
+    // And the header's count must match what is actually there.
+    let standing = checked;
+    let words = [
+        (11, "eleven"), (12, "twelve"), (13, "thirteen"), (14, "fourteen"),
+        (15, "fifteen"), (16, "sixteen"), (17, "seventeen"), (18, "eighteen"),
+        (19, "nineteen"), (20, "twenty"),
+    ];
+    if let Some((_, word)) = words.iter().find(|(n, _)| *n == standing) {
+        if !spec.contains(&format!("{word} standing deltas")) {
+            bad.push(format!(
+                "spec/UCAL-1.1.md does not say `{word} standing deltas`, and there are {standing}"
+            ));
+        }
+    }
+
+    if bad.is_empty() {
+        Ok(checked)
+    } else {
+        Err(bad)
+    }
+}
