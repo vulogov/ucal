@@ -1107,7 +1107,7 @@ mod tests {
         assert_eq!(resolve_tier_name("5^85").unwrap(), Tier::DEEP);
         assert_eq!(resolve_tier_name("T-12").unwrap(), Tier::TICK);
         assert_eq!(resolve_tier_name("5^0").unwrap(), Tier::TICK);
-        assert_eq!(resolve_tier_name("nope").unwrap_err().code, Code::E0011);
+        assert_eq!(resolve_tier_name("nope").unwrap_err().code, Code::E0014);
         // Locale names resolve too (Appendix D).
         assert_eq!(
             resolve_tier_name_in(LocaleId::Ru, "\u{431}\u{43e}\u{439}").unwrap(),

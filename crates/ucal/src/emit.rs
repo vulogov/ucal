@@ -646,8 +646,14 @@ fn render_value_json(s: &mut String, v: &Value, depth: usize, r: &Render) {
         // than wrapping every number in an object — which would change the shape
         // of every numeric field and break every consumer, to say something that
         // is only interesting for the minority of fields that are not exact.
-        Value::Text(t) | Value::Form(t) => {
+        Value::Text(t) => {
             let _ = write!(s, "\"{}\"", escape(t));
+        }
+        // `--sep` reaches JSON too. The separator is part of the form, so a
+        // consumer that asked for one wants it in the field it is reading; the
+        // default is untouched, which is what `ucal-json/1` actually promises.
+        Value::Form(t) => {
+            let _ = write!(s, "\"{}\"", escape(&crate::style::apply_form_sep(r, t)));
         }
         Value::Quantity { .. } => {
             let _ = write!(s, "\"{}\"", escape(&v.rendered(r).0));

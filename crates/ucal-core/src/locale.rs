@@ -245,7 +245,7 @@ pub fn resolve(locale: LocaleId, s: &str) -> Result<Tier> {
         }
     }
     Err(TimeError::with_context(
-        Code::E0011,
+        Code::E0014,
         "unknown tier name; try a locale name, a stable key, T<k>, or 5^e",
     ))
 }
@@ -255,7 +255,7 @@ fn tier_of_name(key: TierName) -> Result<Tier> {
         .iter()
         .find(|(_, k)| *k == key)
         .map(|(idx, _)| Tier::new(*idx))
-        .unwrap_or(Err(TimeError::new(Code::E0011)))
+        .unwrap_or(Err(TimeError::new(Code::E0014)))
 }
 
 /// Case-insensitive comparison for ASCII, exact for everything else.
@@ -309,7 +309,7 @@ pub fn validate(locale: LocaleId) -> Result<()> {
                 || a.plural == b.singular
             {
                 return Err(TimeError::with_context(
-                    Code::E0011,
+                    Code::E0014,
                     "duplicate name in the active locale table",
                 ));
             }
@@ -404,10 +404,10 @@ mod tests {
     }
 
     #[test]
-    fn unknown_names_are_e0011() {
+    fn unknown_names_are_e0014() {
         for l in LocaleId::ALL {
-            assert_eq!(resolve(*l, "aeon").unwrap_err().code, Code::E0011);
-            assert_eq!(resolve(*l, "").unwrap_err().code, Code::E0011);
+            assert_eq!(resolve(*l, "aeon").unwrap_err().code, Code::E0014);
+            assert_eq!(resolve(*l, "").unwrap_err().code, Code::E0014);
         }
         // An off-grid exponent is a tier error, not a naming one.
         assert_eq!(resolve(LocaleId::En, "5^61").unwrap_err().code, Code::E0080);

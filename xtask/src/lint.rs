@@ -333,6 +333,18 @@ fn segments(ident: &str) -> Vec<String> {
         .collect()
 }
 
+/// Every byte offset at which `needle` occurs. Unlike [`find_whole_words`],
+/// this matches punctuation-bearing tokens such as `.expect(` and `panic!`.
+fn find_substrings(hay: &str, needle: &str) -> Vec<usize> {
+    let mut out = Vec::new();
+    let mut from = 0usize;
+    while let Some(i) = hay[from..].find(needle) {
+        out.push(from + i);
+        from += i + needle.len();
+    }
+    out
+}
+
 fn find_whole_words(hay: &str, needle: &str) -> Vec<usize> {
     let mut out = Vec::new();
     let mut from = 0;
@@ -439,6 +451,25 @@ pub const LINT_NAMES: &[&str] = &[
     "public-type-is-classified",
     "no-indent-in-literal",
     "version-lockstep",
+    "no-panic-in-cli",
+];
+
+/// Constructs that abort the process instead of returning a diagnostic.
+///
+/// `unwrap` and `expect` are the obvious two. `panic!`, `unreachable!`, `todo!`
+/// and `unimplemented!` are the same thing said differently, and `assert!` in
+/// shipped code is a panic with a nicer name — a check that must hold at
+/// runtime belongs in a `Result`, because the caller is a person at a terminal.
+const PANIC_TOKENS: &[&str] = &[
+    ".unwrap()",
+    ".expect(",
+    "panic!",
+    "unreachable!",
+    "todo!",
+    "unimplemented!",
+    "assert!",
+    "assert_eq!",
+    "assert_ne!",
 ];
 
 /// A lint that exists but is not in [`LINT_NAMES`] can be suppressed silently,
@@ -523,6 +554,55 @@ pub fn run(workspace_root: &Path) -> Vec<Violation> {
                     text: line_text(&code, idx),
                     rule: "Rule E: no floating-point type anywhere in a shipped crate",
                 });
+            }
+        }
+
+        // §19.5: the CLI crate returns diagnostics, it does not abort.
+        //
+        // Only `crates/ucal`. The libraries beneath it legitimately carry
+        // `expect` on invariants they have just established — `self >= other`
+        // immediately after comparing — and rewriting those into `Result` would
+        // trade a provably-unreachable branch for an error case every caller
+        // must handle and none can trigger. What must not happen is a panic in
+        // the crate that turns a person's typo into a Rust backtrace, and that
+        // crate is this one.
+        //
+        // `main.rs`'s own panic hook is the backstop for everything below;
+        // this lint is the policy for what is above.
+        // The same trap as `rounding-is-declared`: the repository directory is
+        // also called `ucal`, so this asks which crate directory the file sits
+        // in rather than searching the path for the name.
+        let in_cli_crate = file
+            .strip_prefix(&crates_dir)
+            .ok()
+            .and_then(|rel| rel.components().next())
+            .map(|c| c.as_os_str() == "ucal")
+            .unwrap_or(false)
+            // `crates/ucal/tests/` is not shipped code either: an integration
+            // test asserting on a `Doc` cannot be reached by a user.
+            && file.components().any(|c| c.as_os_str() == "src");
+        if in_cli_crate {
+            // Shipped code only. A test asserting a value is not a panic path a
+            // user can reach, and there are six hundred of them.
+            let tests = test_module_ranges(&code);
+            let in_tests = |i: usize| tests.iter().any(|(a, b)| i >= *a && i < *b);
+            for tok in PANIC_TOKENS {
+                for idx in find_substrings(&code, tok) {
+                    if in_tests(idx) || file.file_name().is_some_and(|n| n == "tests.rs") {
+                        continue;
+                    }
+                    if suppressed(&src, line_of(&code, idx), "no-panic-in-cli") {
+                        continue;
+                    }
+                    v.push(Violation {
+                        lint: "no-panic-in-cli",
+                        file: file.clone(),
+                        line: line_of(&code, idx),
+                        text: line_text(&code, idx),
+                        rule: "§19.5: a failure in the CLI crate leaves through an \
+                               Appendix E code and an exit status, never a panic",
+                    });
+                }
             }
         }
 
@@ -729,6 +809,47 @@ pub fn run(workspace_root: &Path) -> Vec<Violation> {
 /// the extent is the whole file and the caller sees the violations it would
 /// otherwise have skipped. Over-excluding is the dangerous direction here, and
 /// this is what stops it being silent.
+/// The byte ranges occupied by `#[cfg(test)] mod ... { ... }` blocks.
+///
+/// [`shipped_extent`] answers the same question with a single cut point, which
+/// cannot express a file whose test module sits *between* two shipped items —
+/// and `crates/ucal/src/table.rs` is exactly that, with `pub fn wrap_painted`
+/// after its tests. There the cut point degrades to "scan everything", which for
+/// a lint counting `assert!` means five hundred false positives.
+///
+/// This brace-matches instead. It runs on the projected source, where strings
+/// and comments are already blanked, so a brace inside a literal cannot throw
+/// the count off.
+fn test_module_ranges(code: &str) -> Vec<(usize, usize)> {
+    let mut out = Vec::new();
+    let mut from = 0usize;
+    while let Some(i) = code[from..].find("#[cfg(test)]") {
+        let at = from + i;
+        let Some(open) = code[at..].find('{') else {
+            break;
+        };
+        let open = at + open;
+        let mut depth = 0usize;
+        let mut end = code.len();
+        for (j, c) in code[open..].char_indices() {
+            match c {
+                '{' => depth += 1,
+                '}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        end = open + j + 1;
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        out.push((at, end));
+        from = end.max(at + 1);
+    }
+    out
+}
+
 fn shipped_extent(code: &str, file: &Path) -> usize {
     if file.file_name().is_some_and(|n| n == "tests.rs") {
         return 0;

@@ -33,6 +33,14 @@ pub enum Code {
     E0012,
     /// Profile lacks a `datum_provenance` record (Rule Q.4).
     E0013,
+    /// Name not found in the active locale table (Rule N).
+    ///
+    /// Distinct from [`Code::E0011`], which Rule N pins to a *collision* —
+    /// two entries claiming one name. Until 0.9.0 a lookup miss also reported
+    /// E0011, so the diagnostic read *"duplicate name in the active locale
+    /// table (unknown tier name)"*, which states the opposite of what happened.
+    /// See `spec/SPEC-DELTAS.md` D-A17.
+    E0014,
 
     // --- domain ---
     /// Result precedes the datum (Rule Z).
@@ -116,6 +124,7 @@ impl Code {
             Code::E0011 => "UCAL-E0011",
             Code::E0012 => "UCAL-E0012",
             Code::E0013 => "UCAL-E0013",
+            Code::E0014 => "UCAL-E0014",
             Code::E0020 => "UCAL-E0020",
             Code::E0021 => "UCAL-E0021",
             Code::E0022 => "UCAL-E0022",
@@ -156,6 +165,7 @@ impl Code {
             Code::E0011 => "duplicate name in the active locale table",
             Code::E0012 => "unknown key in HJSON data file",
             Code::E0013 => "profile lacks a datum_provenance record",
+            Code::E0014 => "name not found in the active locale table",
             Code::E0020 => "result precedes the datum",
             Code::E0021 => "result exceeds DOMAIN",
             Code::E0022 => "window inversion, lo > hi",
@@ -201,7 +211,7 @@ impl Code {
             Code::E0060 | Code::E0061 | Code::E0062 | Code::E0063 | Code::E0064
             | Code::E0065 => 7,
             Code::E0070 | Code::E0071 => 8,
-            Code::E0010 | Code::E0011 | Code::E0012 | Code::E0013 => 6,
+            Code::E0010 | Code::E0011 | Code::E0012 | Code::E0013 | Code::E0014 => 6,
             Code::E0025 => 9,
         }
     }
