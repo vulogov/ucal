@@ -248,8 +248,14 @@ Release notes: [`Documentation/Release_Notes`](Documentation/Release_Notes).
 
 ## Help wanted, specifically
 
-Three things this project needs from someone who is not its author, and 1.0 does
-not ship without at least one of them —
+Three things this project needs from someone who is not its author.
+
+1.0 was supposed to wait for one of them. It did not — the asks went three
+cycles without being taken up and 1.0 shipped anyway, which is recorded rather
+than tidied away in
+[`STABILITY.md`](Documentation/STABILITY.md). They are still open, and they are
+worth **more** now, not less: a finding that arrives today costs a major version
+instead of a minor one, and it is still better to know —
 [`Documentation/CONTACT.md`](Documentation/CONTACT.md).
 
 The cheapest is thirty minutes in any language, with no Rust and nothing to

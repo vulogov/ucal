@@ -1,8 +1,18 @@
 # Three things this project needs from someone who is not its author
 
-Everything else on the way to 1.0 is a matter of sitting down. These three are
-not, and 1.0 does not ship without at least one of them —
-[`ROAD-TO-1.0.md`](Proposals/ROAD-TO-1.0.md) says so and means it.
+These three need someone who is not the author. Everything else was a matter of
+sitting down.
+
+**1.0 was gated on them and shipped without them.** The asks below went three
+cycles unanswered and 1.0.0 was released anyway, by the author's decision; the
+argument against doing that is left standing in
+[`STABILITY.md`](STABILITY.md) and [`ROAD-TO-1.0.md`](Proposals/ROAD-TO-1.0.md)
+rather than revised to agree with the outcome.
+
+That makes these **more** valuable now, not less. Until 1.0 a finding cost a
+minor version; now it costs a major one — and it is still much better to know.
+If something here is wrong, the useful moment to say so has not passed, it has
+only become more expensive to act on.
 
 The asks below are specific on purpose. "Contributions welcome" gets nothing,
 and deserves to.
@@ -158,9 +168,11 @@ notes carry four gated experiments whose kill criteria fired and were written
 down rather than worked around; a fifth was dropped in 0.4.0 after a measurement
 contradicted the reason for doing it.
 
-Contact findings are expected to break things, and 0.8.0 exists specifically to
-spend the breaking changes 0.7.0 earns. A finding that arrives after 1.0 is a
-finding that has to wait for 2.0, which is the whole reason to ask now.
+Contact findings are expected to break things. Before 1.0 there was a cycle set
+aside to spend them cheaply; that window has closed, and a finding now waits for
+`2.0`. This is exactly the cost the ordering was meant to avoid, and it was
+accepted knowingly — which is a reason to report something, not a reason to
+assume it is too late.
 
 ## Where to send it
 
