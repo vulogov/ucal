@@ -235,12 +235,16 @@ cargo run -p xtask -- verify-vectors  # conformance vectors re-derive
 
 ## Status
 
-Released **0.8.0** on crates.io, all six crates. `main` carries the released line;
-`0.9.0` is where development happens. The API is **not yet stable** — a `0.x` bump
-may break it.
+Released **1.0.0** on crates.io, all six crates.
+
+The API is **stable**: within `1.x` no public item is removed, no signature
+changes, and nothing that compiled stops compiling. What is promised above the
+semver floor, and what is not, is in
+[`Documentation/STABILITY.md`](Documentation/STABILITY.md) — including the two
+1.0 exit criteria that were **not** met, which is that nobody outside this
+repository has used the API.
 
 Release notes: [`Documentation/Release_Notes`](Documentation/Release_Notes).
-What 1.0 will promise: [`Documentation/STABILITY.md`](Documentation/STABILITY.md).
 
 ## Help wanted, specifically
 

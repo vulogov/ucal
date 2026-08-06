@@ -9,9 +9,9 @@ the RFC is evidence about the past.
 |---|---|
 | commit | `96d673cee03246deb12b00bd52c0ca0317f8a8d2` |
 | short | `96d673c` |
-| branch | `0.9.0` |
+| branch | `1.0.0` |
 | date | 2026-08-05 |
-| released | 0.8.0 on crates.io (six crates); this tree is 0.9.0, in development |
+| released | 1.0.0 on crates.io (six crates) |
 
 ## Toolchain
 

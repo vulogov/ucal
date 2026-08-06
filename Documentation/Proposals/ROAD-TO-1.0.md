@@ -1,5 +1,19 @@
 # The road to 1.0
 
+> **Outcome, 2026-08-06.** 1.0.0 shipped with the contact gate open. C1, C2 and
+> C3 were never taken up, and the criterion *the conformance apparatus has been
+> used by someone else* is unmet. The decision to ship anyway was the author's,
+> taken with the argument below in front of him.
+>
+> This plan is left as written rather than revised to fit what happened. A plan
+> edited after the fact to agree with the outcome records nothing; this one
+> records that the gate was set, held for three cycles, and then overridden —
+> which is the more useful thing for a reader to know, and the only version of
+> events that is true.
+>
+> What it costs is stated in `STABILITY.md`: a finding that arrives from outside
+> now needs `2.0`.
+
 Three questions were asked at 0.4.0, and the answers are what this plan is built
 from. They are answered first, with evidence, because a plan that starts from a
 flattering assessment plans the wrong work.

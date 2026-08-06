@@ -3,18 +3,18 @@
 Written before 1.0 rather than after, so that the promise is a decision rather
 than a description of whatever happened to be true on the day.
 
-**Status: this document describes an intention. The crates are `0.x` and promise
-nothing yet.** Every `0.x` release is permitted to break anything, and four of
-the eight so far did — 0.1.1, 0.3.0, 0.4.0 and 0.6.0.
+**Status: in force from 1.0.0.** These are promises now, not intentions. Five of
+the nine `0.x` releases broke something — 0.1.1, 0.3.0, 0.4.0, 0.6.0 and the
+release that became 1.0.0. None of the remaining `1.x` line may.
 
-**0.7.0 and 0.8.0 broke nothing, and that proves less than it looks.** The 1.0
-exit criteria ask for *two consecutive releases with no breaking change*, and on
-a literal reading those two satisfy it. They should not be allowed to: both were
-quiet for the same reason the contact gate is still open — nobody outside this
-repository has used the API, so nothing pushed back on it. A counter of quiet
-releases measures attention, not stability, and there has been none. The
-criterion is kept because a surface that stops moving *while being used* is
-evidence; the same surface unused is only a surface nobody looked at.
+**Two of the exit criteria were not met, and 1.0 shipped anyway.** The
+[road to 1.0](Proposals/ROAD-TO-1.0.md) made contact the gate: an external
+implementation reproducing the conformance vectors, and a surface that had
+survived meeting someone. Neither happened in three cycles of asking. The
+criteria are left standing rather than rewritten, and what follows is a promise
+about a design **no one outside this repository has ever used**. The section at
+the end of this file, *What would make 1.0 dishonest*, still opens with
+"shipping before contact", and it is left there on purpose.
 
 ---
 
@@ -264,6 +264,27 @@ happen is a `#[deprecated]` attribute, which is a signal and not a removal:
 A deprecation that removed something would be a breaking change wearing a
 warning, which is worse than either.
 
+### Coexistence with another library that chose the other backend
+
+**It does not work, and 1.0 freezes that.** `u512` and `bigint` are mutually
+exclusive. If two libraries in one dependency graph each depend on `ucal-core`
+having chosen different backends, cargo unifies the features, the guard fires,
+and *nothing in the graph builds*. Neither library author can fix it; only the
+end user can, by making one of them change.
+
+Demonstrated rather than assumed, in 0.9.0: two crates, one on each backend, and
+an application depending on both fails with the guard's own message.
+
+It also breaks tooling that expects features to be additive —
+`cargo semver-checks` enables all features by default and cannot build this
+crate without `--default-features`.
+
+**Why it is here and not fixed.** Removing it needs either a generic integer
+parameter through the whole API or the withdrawal of one backend from the public
+surface. Both are breaking changes, and this is the release after which there
+are none. It is recorded as a known limitation of `1.x` rather than left for a
+downstream user to discover at link time.
+
 ### An enumerated set of feature combinations
 
 **Supported**, and each built by CI on every push:
@@ -319,12 +340,17 @@ and carry no compatibility promise.
 Recorded here because the pressure to ship a version number is real and arrives
 without an argument attached.
 
-**Shipping before contact.** The API has never been used by anyone but its
-author. Every breaking change so far cost nothing, which means none of them
-tested whether the surface is *right* — only that it could be changed. A promise
-made in that state is a promise about a guess, and
-[`ROAD-TO-1.0.md`](Proposals/ROAD-TO-1.0.md) makes 0.7.0 the gate for exactly
-this reason.
+**Shipping before contact — which is what happened.** The API has never been
+used by anyone but its author. Every breaking change up to 1.0 cost nothing,
+which means none of them tested whether the surface is *right* — only that it
+could be changed. A promise made in that state is a promise about a guess.
+
+This paragraph is kept, unedited in substance, because the argument did not stop
+being true when the decision went the other way. 1.0.0 shipped with the gate
+open, by the author's decision, after three cycles in which the asks in
+[`CONTACT.md`](CONTACT.md) were stated, made cheap, and not taken up. What that
+costs is specific and now unavoidable: **a finding that arrives from outside
+needs a major version.** `2.0` is where it goes.
 
 **Freezing a surface nobody has enumerated.** At the opening of 0.6.0, thirty-
 nine public types carried public fields or variants and no `#[non_exhaustive]`.
