@@ -387,7 +387,10 @@ mod tests {
         let mars = data::mars();
         for b in [&earth, &mars] {
             assert!(!b.id().is_empty());
-            assert!(b.rotation_period().value_at_epoch().numer() > &ucal_core::Ticks::from(false));
+            assert!(
+                b.rotation_period().value_at_epoch().numer()
+                    > &<ucal_core::Ticks as ucal_core::backend::TickInt>::zero()
+            );
             assert!(b.solar_day().value_at_epoch().is_integer() || true);
             assert!(!b.citations().is_empty());
             // Every parameter carries what Rule C requires.

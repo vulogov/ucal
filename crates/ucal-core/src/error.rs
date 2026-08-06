@@ -33,14 +33,6 @@ pub enum Code {
     E0012,
     /// Profile lacks a `datum_provenance` record (Rule Q.4).
     E0013,
-    /// Name not found in the active locale table (Rule N).
-    ///
-    /// Distinct from [`Code::E0011`], which Rule N pins to a *collision* —
-    /// two entries claiming one name. Until 0.9.0 a lookup miss also reported
-    /// E0011, so the diagnostic read *"duplicate name in the active locale
-    /// table (unknown tier name)"*, which states the opposite of what happened.
-    /// See `spec/SPEC-DELTAS.md` D-A17.
-    E0014,
 
     // --- domain ---
     /// Result precedes the datum (Rule Z).
@@ -107,6 +99,24 @@ pub enum Code {
     // --- tier grid ---
     /// Tier index outside the profile's grid.
     E0080,
+
+    // --- appended, not inserted ---
+    /// Name not found in the active locale table (Rule N).
+    ///
+    /// Distinct from [`Code::E0011`], which Rule N pins to a *collision* — two
+    /// entries claiming one name. Until 0.9.0 a lookup miss also reported
+    /// E0011, so the diagnostic read *"duplicate name in the active locale
+    /// table (unknown tier name)"*, which states the opposite of what happened.
+    /// See `spec/SPEC-DELTAS.md` D-A17.
+    ///
+    /// **Declared here rather than beside `E0013` on purpose.** The variants
+    /// carry implicit discriminants and the enum derives `PartialOrd`, so
+    /// inserting one in the middle shifts every later variant's value and
+    /// reorders the enum — both breaking changes for a caller who casts or
+    /// compares. It was inserted in the middle first, and
+    /// `cargo semver-checks` caught it within minutes of being installed.
+    /// Reading order is a style preference; a discriminant is an ABI.
+    E0014,
 }
 
 impl Code {

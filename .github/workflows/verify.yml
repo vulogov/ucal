@@ -67,6 +67,33 @@ jobs:
           cargo build -p ucal-core --target wasm32-unknown-unknown \
             --no-default-features --features u512
 
+  semver:
+    name: the semver floor, checked
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: obi1kenobi/cargo-semver-checks-action@v2
+        with:
+          # `--default-features` is not a preference. Without it the tool
+          # enables every feature at once, which trips the `u512`/`bigint`
+          # guard and it cannot build the crate at all.
+          feature-group: default-features
+      # What this does and does not prove, so a green run is not over-read.
+      #
+      # Under `0.x` a minor bump already permits breaking changes, so the tool
+      # skips the breaking-change lints entirely and this job passes on any
+      # diff. It is here now so that it is *installed and exercised* before
+      # 1.0, at which point it becomes the mechanism for the one promise in
+      # STABILITY.md that had none — the semver floor itself.
+      #
+      # It already earned its place: run against a patch-level baseline during
+      # 0.9.0 it found a `Code` variant inserted mid-enum, which shifts every
+      # later discriminant and reorders a `PartialOrd` derive. Nobody had
+      # noticed, in a cycle whose entire product is an empty Breaking section.
+      - run: echo "In 0.x this job checks only what a minor bump permits; see the comment above."
+
   msrv:
     name: the declared MSRV actually builds
     runs-on: ubuntu-latest

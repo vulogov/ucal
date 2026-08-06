@@ -100,10 +100,32 @@ malformed invocations in `hostile_input.rs` that asserts all of the above
 against the real binary, and `panic_handler.rs`, which induces a panic and
 checks what comes out.
 
-**Its limit.** The lint covers the CLI crate; the libraries beneath it keep
-`expect` on invariants they have just established, where rewriting into `Result`
-would trade a provably-unreachable branch for an error case no caller can
-trigger. The handler is the backstop for those, and a corpus is not a fuzzer.
+**Its limit, and it is a large one: this promise is about the binary, not the
+libraries.** A caller who links `ucal-core`, `ucal-civil`, `ucal-events` or
+`ucal-cosmo` gets neither the lint nor the handler. Those crates carry twenty-two `expect` calls on invariants they have just established — `self >=
+other` immediately after comparing — and a caller who trips one gets a panic in
+their process, with no diagnostic and no exit code, because there is no process
+of ours to exit.
+
+That is stated here rather than left for a reader to infer from "the command
+line never aborts", because the natural reading of a stability document that
+promises no aborts is that the library does not abort either, and it does not
+promise that.
+
+Why the libraries are not held to the same rule: rewriting a provably
+unreachable branch into a `Result` gives every caller an error case that no
+input can produce, on a path where the alternative is not a wrong answer but no
+answer. A caller who wants the guarantee anyway can have it today by catching
+unwinds at their own boundary, which is where the decision belongs.
+
+**What a `1.x` release will not do** is make a *reachable* condition arrive as a
+panic in any crate. An `expect` guarding an established invariant is allowed to
+stay; an `expect` on something a caller's input can reach is a defect, and gets
+fixed rather than documented.
+
+The lint's own limits are narrower: it covers `crates/ucal/src` and not the
+integration tests, and the hostile corpus is forty hand-chosen invocations
+rather than a fuzzer.
 
 ### 6. A certified enclosure never narrows silently
 

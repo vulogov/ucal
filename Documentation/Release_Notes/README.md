@@ -102,7 +102,22 @@ one-line version and links to it.
    It cannot tell you the page still *says* what was cited. Nothing mechanical
    can.
 
-6. `cargo run -p xtask -- publish` for the dry run, then
+6. `cargo semver-checks check-release --default-features`, against the last
+   published version.
+
+   `--default-features` is not a preference: without it the tool enables every
+   feature at once, trips the `u512`/`bigint` guard, and cannot build the crate.
+
+   **Under `0.x` this proves less than it looks.** A minor bump already permits
+   breaking changes, so the breaking-change lints are all skipped and the run
+   passes on any diff. To make it say something before 1.0, run it against a
+   baseline in the same minor line — or temporarily set the version to a patch
+   bump, which is how the `Code` discriminant defect was found in 0.9.0.
+
+   **At 1.0 it stops being advisory.** It is the mechanism for the semver floor,
+   which was the one promise in `STABILITY.md` with none.
+
+7. `cargo run -p xtask -- publish` for the dry run, then
    `cargo run -p xtask -- publish --execute` for real.
 
    It derives the order from the dependency graph rather than repeating a list,
@@ -127,5 +142,5 @@ one-line version and links to it.
    only for its float oracle, and cargo still resolves it when verifying the
    package — so the edge is real even though nothing in the shipped code uses
    it.
-7. Tag `vX.Y.Z`, annotated and signed, and push the tag.
-8. Open the next file.
+8. Tag `vX.Y.Z`, annotated and signed, and push the tag.
+9. Open the next file.

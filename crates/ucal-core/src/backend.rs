@@ -175,6 +175,10 @@ mod imp {
     /// The tick count type on the default backend.
     pub type Ticks = bnum::types::U512;
 
+    /// Tick 0, as a `const`. `MIN` rather than a trait method: a trait method
+    /// cannot be `const`, and `U512`'s own zero constant is private.
+    pub const ZERO: Ticks = Ticks::MIN;
+
     /// Parse a decimal literal in a `const` context.
     ///
     /// §3.3 requires the profile constants to be `const` on the default backend.
@@ -439,7 +443,135 @@ mod imp {
     }
 }
 
-pub use imp::{konst, Ticks};
+/// The tick count type.
+///
+/// # Why this is a newtype and not a re-export
+///
+/// Until 0.10.0 this was `pub type Ticks = bnum::types::U512`, so every public
+/// signature that mentioned a tick count was publishing a third-party type.
+/// Two things followed, and both would have been frozen by 1.0:
+///
+/// **The crate would have been married to one version of `bnum` for the whole
+/// of `1.x`.** A `bnum` major release changes `U512`, which changes this
+/// crate's public API, which under semver needs a major bump — so the choice of
+/// integer library, an implementation detail by every other measure, would have
+/// become a compatibility commitment.
+///
+/// **And the identity of the type changed with a feature.** `Ticks` was
+/// `bnum::types::U512` under `u512` and `num_bigint::BigUint` under `bigint`, so
+/// a downstream crate naming the concrete type in *its* API had a signature that
+/// changed shape with a feature it did not control.
+///
+/// The wrapper costs nothing at runtime — it is `#[repr(transparent)]` over the
+/// backend value — and it means the backend is what it always should have been:
+/// something this crate can change without asking anyone.
+///
+/// # What it does not fix
+///
+/// The `u512` and `bigint` features remain mutually exclusive, so two libraries
+/// that each chose a backend still cannot appear in one dependency graph. That
+/// is a separate problem with a separate answer; see `Documentation/STABILITY.md`.
+#[cfg_attr(feature = "u512", derive(Copy))]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default)]
+#[repr(transparent)]
+pub struct Ticks(imp::Ticks);
+
+impl Ticks {
+    /// Wrap a backend value. Crate-internal: the backend does not escape.
+    pub(crate) const fn new(v: imp::Ticks) -> Ticks {
+        Ticks(v)
+    }
+
+    /// Tick 0, in a `const` context.
+    ///
+    /// [`TickInt::zero`] is the portable form; this exists because §3.3 wants
+    /// the profile constants and [`crate::Instant::ZERO`] to be `const`, and a
+    /// trait method cannot be. Only available on the fixed-width backend, for
+    /// the same reason `konst` is: a heap value has no `const` form.
+    #[cfg(feature = "u512")]
+    pub const ZERO: Ticks = Ticks(imp::ZERO);
+}
+
+/// Parse a decimal literal in a `const` context (§3.3).
+///
+/// `const` only on the fixed-width backend, as it always was: a heap-allocated
+/// integer has no `const` form, which is the reason `u512` is the default.
+#[cfg(feature = "u512")]
+pub const fn konst(s: &str) -> Ticks {
+    Ticks::new(imp::konst(s))
+}
+
+/// Parse a decimal literal (§3.3). Not `const` on this backend.
+#[cfg(feature = "bigint")]
+pub fn konst(s: &str) -> Ticks {
+    Ticks::new(imp::konst(s))
+}
+
+impl TickInt for Ticks {
+    type Wide = <imp::Ticks as TickInt>::Wide;
+
+    fn zero() -> Self {
+        Ticks(<imp::Ticks as TickInt>::zero())
+    }
+    fn one() -> Self {
+        Ticks(<imp::Ticks as TickInt>::one())
+    }
+    fn domain_max() -> Self {
+        Ticks(<imp::Ticks as TickInt>::domain_max())
+    }
+    fn wide_mul(&self, other: &Self) -> Self::Wide {
+        self.0.wide_mul(&other.0)
+    }
+    fn wide_quot_rem(wide: &Self::Wide, divisor: &Self) -> (Self::Wide, Self) {
+        let (q, r) = <imp::Ticks as TickInt>::wide_quot_rem(wide, &divisor.0);
+        (q, Ticks(r))
+    }
+    fn narrow(wide: &Self::Wide) -> Option<Self> {
+        <imp::Ticks as TickInt>::narrow(wide).map(Ticks)
+    }
+    fn wide_is_zero(wide: &Self::Wide) -> bool {
+        <imp::Ticks as TickInt>::wide_is_zero(wide)
+    }
+    fn from_u64(v: u64) -> Self {
+        Ticks(<imp::Ticks as TickInt>::from_u64(v))
+    }
+    fn from_dec_str(s: &str) -> Option<Self> {
+        <imp::Ticks as TickInt>::from_dec_str(s).map(Ticks)
+    }
+    fn try_add(&self, other: &Self) -> Option<Self> {
+        self.0.try_add(&other.0).map(Ticks)
+    }
+    fn try_sub(&self, other: &Self) -> Option<Self> {
+        self.0.try_sub(&other.0).map(Ticks)
+    }
+    fn try_mul(&self, other: &Self) -> Option<Self> {
+        self.0.try_mul(&other.0).map(Ticks)
+    }
+    fn quot_rem(&self, divisor: &Self) -> (Self, Self) {
+        let (q, r) = self.0.quot_rem(&divisor.0);
+        (Ticks(q), Ticks(r))
+    }
+    fn bit_len(&self) -> u32 {
+        self.0.bit_len()
+    }
+    fn to_canonical_bytes(&self) -> [u8; CANONICAL_BYTES] {
+        self.0.to_canonical_bytes()
+    }
+    fn from_canonical_bytes(bytes: &[u8; CANONICAL_BYTES]) -> Option<Self> {
+        <imp::Ticks as TickInt>::from_canonical_bytes(bytes).map(Ticks)
+    }
+    fn is_odd(&self) -> bool {
+        self.0.is_odd()
+    }
+    #[cfg(feature = "alloc")]
+    fn to_dec_string(&self) -> alloc::string::String {
+        self.0.to_dec_string()
+    }
+    #[cfg(feature = "alloc")]
+    fn to_radix_string(&self, radix: u32) -> alloc::string::String {
+        self.0.to_radix_string(radix)
+    }
+}
 
 /// Whether the active backend makes the public value types `Copy` (§3.2).
 pub const TICKS_IS_COPY: bool = cfg!(feature = "u512");
