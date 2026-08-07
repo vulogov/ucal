@@ -24,6 +24,8 @@ clap = { version = "4", features = ["derive", "wrap_help"] }
 # does. That property is the reason for the dependency; the feature is a
 # by-product of it.
 clap_complete = "4"
+# The man page, generated from the same definition for the same reason.
+clap_mangen = "0.2"
 # Already in the tree through clap: making it direct adds a line to this
 # manifest and nothing to the dependency graph. Only the SGR value types are
 # used -- the tty test is std's `IsTerminal` and the choice logic is ours.
