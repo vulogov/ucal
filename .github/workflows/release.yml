@@ -160,9 +160,13 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      # Deliberately *not* `ref: inputs.tag`. This job needs the artefact notes,
+      # which live with the workflow, and a tag cut before the workflow existed
+      # does not have them. The first dispatch against v1.0.0 checked out the tag,
+      # found no notes file, and appended an empty string to the release body
+      # without failing — which is why the step below now refuses to continue if
+      # the file is missing.
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.tag || github.ref }}
 
       - uses: actions/download-artifact@v4
         with:
@@ -182,6 +186,8 @@ jobs:
         run: |
           set -eu
           tag="${{ inputs.tag || github.ref_name }}"
+          notes=.github/release-artefacts.md
+          test -s "$notes" || { echo "$notes is missing or empty"; exit 1; }
           gh release view "$tag" >/dev/null 2>&1 \
             || gh release create "$tag" --title "$tag" --notes "Release $tag"
           gh release upload "$tag" dist/* --clobber
@@ -189,6 +195,6 @@ jobs:
           body=$(gh release view "$tag" --json body --jq .body)
           case "$body" in
             *"## Prebuilt binaries"*) echo "release body already describes the binaries" ;;
-            *) printf '%s\n%s\n' "$body" "$(cat .github/release-artefacts.md)" \
+            *) printf '%s\n%s\n' "$body" "$(cat "$notes")" \
                  | gh release edit "$tag" --notes-file - ;;
           esac
