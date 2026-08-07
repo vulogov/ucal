@@ -720,7 +720,7 @@ pub fn cmd_verify() -> CmdResult {
     }
 
     let ok = disagreements.is_empty();
-    let mut doc = Doc::new()
+    let doc = Doc::new()
         .title("ucal verify")
         .field("profile", Value::text(UC1::TAG))
         .field(
@@ -754,11 +754,25 @@ pub fn cmd_verify() -> CmdResult {
             ),
         );
     if !ok {
-        doc = doc.note(format!(
-            "This build does NOT reproduce the declared constants: {}. That is a \
+        // Exit non-zero, not merely say so in a note.
+        //
+        // Until 1.0.1 this returned `Ok`, so a build that did not reproduce its
+        // own constants printed `agrees false` and exited **0** — a verification
+        // command whose failure a script could not see, which is the exact class
+        // of defect the 0.9.0 stability pass existed to remove and which this
+        // command had all along. Found by writing the release workflow, whose
+        // whole purpose is to refuse to package a binary that fails this.
+        //
+        // `E0015` and not a code borrowed for its exit value. The first attempt
+        // used `E0025` — "BIG_BANG_CLAIM used as a computational operand" —
+        // because it carried the right *number*, which is precisely the defect
+        // D-A17 was written to fix one cycle earlier: a code whose canonical
+        // meaning describes something that did not happen.
+        return Err(TimeError::with_context(
+            Code::E0015,
+            "this build does not reproduce the declared constants; that is a \
              defect in the build or the install, not a difference of opinion — \
-             every quantity above is an exact integer. Please report it.",
-            disagreements.join(", ")
+             every quantity involved is an exact integer. Please report it.",
         ));
     }
     Ok(doc)

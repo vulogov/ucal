@@ -244,6 +244,10 @@ semver floor, and what is not, is in
 1.0 exit criteria that were **not** met, which is that nobody outside this
 repository has used the API.
 
+**Prebuilt binaries** for Linux, macOS and Windows are attached to each
+[release](https://github.com/vulogov/ucal/releases) — unpack and run, no
+toolchain needed. `cargo install ucal` if you have one.
+
 Release notes: [`Documentation/Release_Notes`](Documentation/Release_Notes).
 
 ## Help wanted, specifically

@@ -829,3 +829,48 @@ reader might check it.
 CLI's hostile-input corpus asserts that `ucal between 0 100 --at nope` exits with
 a §19.5 code and a message; `crates/ucal-core/src/locale.rs` is the only site
 that raises it.
+
+---
+
+## D-A18 — `UCAL-E0015`, a build that does not reproduce its own constants
+
+**Status: AMENDMENT.** Appendix E gains one code.
+
+### What was missing
+
+§3.3 requires a conforming implementation's declared constants to be
+reproducible, and `ucal verify` re-derives them to check that this binary does.
+Appendix E named no code for the answer being *no*.
+
+### Why that mattered more than it looks
+
+The first implementation of the check reported the disagreement in a note and
+**exited 0**. A verification command whose failure a caller cannot detect is
+worse than no command, because it is read as a passing check — and the release
+workflow that packages prebuilt binaries relies on exactly this exit status to
+refuse to ship a binary that fails it.
+
+The second attempt fixed the exit code by borrowing `UCAL-E0025`, which carries
+§19.5's exit 9 and means *"BIG_BANG_CLAIM used as a computational operand"* —
+a code chosen for its number, describing something that had not happened. That
+is the defect [D-A17](#d-a17--ucal-e0014-a-name-that-is-not-found) was written
+to remove one cycle earlier, reintroduced within the hour.
+
+### The amendment
+
+| code | meaning | exit |
+|---|---|---|
+| `UCAL-E0015` | this build does not reproduce the declared constants (§3.3) | 9 |
+
+Raised by `ucal verify` and by nothing else. Exit 9 is §19.5's *internal
+invariant violation*, which is what a binary disagreeing with its own declared
+constants is: not a user error, and not a difference of opinion, since every
+quantity involved is an exact integer.
+
+### Enforcement
+
+`Code` is `#[non_exhaustive]` and the variant is **appended**, so no
+discriminant shifts and no exhaustive match breaks — `cargo semver-checks`
+verifies this. The release workflow runs `ucal verify` on every artefact before
+packaging it, so the code has a caller that acts on it rather than only a
+definition.

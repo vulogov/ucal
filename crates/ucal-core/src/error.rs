@@ -117,6 +117,14 @@ pub enum Code {
     /// `cargo semver-checks` caught it within minutes of being installed.
     /// Reading order is a style preference; a discriminant is an ABI.
     E0014,
+
+    /// This build does not reproduce the profile's declared constants (§3.3).
+    ///
+    /// Raised by `ucal verify`, and by nothing else: it says the arithmetic in
+    /// *this binary* disagrees with the constants the profile declares, which is
+    /// a defect in the build or the install rather than anything the caller did.
+    /// Appended for the same reason as [`Code::E0014`]. See D-A18.
+    E0015,
 }
 
 impl Code {
@@ -135,6 +143,7 @@ impl Code {
             Code::E0012 => "UCAL-E0012",
             Code::E0013 => "UCAL-E0013",
             Code::E0014 => "UCAL-E0014",
+            Code::E0015 => "UCAL-E0015",
             Code::E0020 => "UCAL-E0020",
             Code::E0021 => "UCAL-E0021",
             Code::E0022 => "UCAL-E0022",
@@ -176,6 +185,7 @@ impl Code {
             Code::E0012 => "unknown key in HJSON data file",
             Code::E0013 => "profile lacks a datum_provenance record",
             Code::E0014 => "name not found in the active locale table",
+            Code::E0015 => "this build does not reproduce the declared constants",
             Code::E0020 => "result precedes the datum",
             Code::E0021 => "result exceeds DOMAIN",
             Code::E0022 => "window inversion, lo > hi",
@@ -222,7 +232,7 @@ impl Code {
             | Code::E0065 => 7,
             Code::E0070 | Code::E0071 => 8,
             Code::E0010 | Code::E0011 | Code::E0012 | Code::E0013 | Code::E0014 => 6,
-            Code::E0025 => 9,
+            Code::E0025 | Code::E0015 => 9,
         }
     }
 }

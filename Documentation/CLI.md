@@ -107,7 +107,7 @@ A tier is written `T<k>`, `5^e`, or a locale name — `T4`, `5^80`, `drift`,
 | 6 | data or config error, including missing provenance (Rule Q.4) |
 | 7 | calendar derivation or anchor error (Rules K, J, C) |
 | 8 | cosmology model or enclosure error (Rule X) |
-| 9 | internal invariant violation, including metadata used as an operand (Rule Q.3) |
+| 9 | internal invariant violation: metadata used as an operand (Rule Q.3), or a build that does not reproduce its declared constants (`UCAL-E0015`) |
 | 70 | **a panic reached the top.** `EX_SOFTWARE` from `sysexits.h`, outside §19.5's range on purpose so it cannot be mistaken for a diagnosed failure |
 
 **Every failure leaves through this table.** A diagnosed one prints an Appendix E
@@ -624,6 +624,11 @@ which the answer was "clone a repository first".
 | `invariants.tier_grid_is_five_powers` | Every one of the 45 rungs recomputed as `5^(60+5k)` and compared with the table. |
 | `compare_with` | Where the published values live. |
 | `what_this_does_not_establish` | Read it. |
+
+**Exit status is the check.** `ucal verify` exits 0 when everything agrees and
+fails with `UCAL-E0015` — §19.5's exit 9 — when it does not, so a script or a
+build pipeline can act on it. The release workflow runs it on every prebuilt
+binary before packaging, and refuses to ship one that fails.
 
 **What a green run means, and what it does not.** Every number is computed by one
 implementation from one specification, so agreement means this build's arithmetic

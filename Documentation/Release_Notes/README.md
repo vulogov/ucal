@@ -143,4 +143,13 @@ one-line version and links to it.
    package — so the edge is real even though nothing in the shipped code uses
    it.
 8. Tag `vX.Y.Z`, annotated and signed, and push the tag.
+
+   Pushing the tag triggers `.github/workflows/release.yml`, which builds `ucal`
+   for five targets, runs `ucal verify` on each artefact before packaging it,
+   and attaches them to the release with a `SHA256SUMS.txt`. That checksum file
+   is **not** signed and says so in the release body — it is produced by the job
+   that produced the files.
+
+   If a runner outage eats the run, re-dispatch it with the tag rather than
+   moving the tag.
 9. Open the next file.
