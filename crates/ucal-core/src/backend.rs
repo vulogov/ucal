@@ -502,7 +502,12 @@ pub const fn konst(s: &str) -> Ticks {
 }
 
 /// Parse a decimal literal (§3.3). Not `const` on this backend.
-#[cfg(feature = "bigint")]
+///
+/// Gated on `not(u512)` as the `imp` module is, so that enabling both backends
+/// produces the guard's sentence rather than a duplicate-definition error ahead
+/// of it. That defect was fixed for `imp` in 0.6.0 and
+/// reintroduced here by the 1.0 newtype, which needed a second definition.
+#[cfg(all(feature = "bigint", not(feature = "u512")))]
 pub fn konst(s: &str) -> Ticks {
     Ticks::new(imp::konst(s))
 }
