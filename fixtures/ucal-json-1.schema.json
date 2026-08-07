@@ -1,0 +1,803 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/vulogov/ucal/blob/main/fixtures/ucal-json-1.schema.json",
+  "title": "ucal-json/1",
+  "description": "Generated from fixtures/json-surface.txt by `cargo run -p xtask -- gen-schema`; do not edit. 335 field paths across 21 commands. `--json` output is per-command: validate `ucal datum --json` against #/$defs/datum. Every object permits additional properties, because ucal-json/1 promises that new fields may appear and existing ones never change name, shape or meaning; a consumer must ignore what it does not recognise. Fields shown only under `--bridge` are described but not required. An object whose keys are data - a tier, a body, an event id - is expressed as additionalProperties rather than named properties, so adding one changes no schema.",
+  "$defs": {
+    "between": {
+      "type": "object",
+      "properties": {
+        "at": {
+          "type": "object",
+          "properties": {
+            "remainder_ticks": { "type": "string" },
+            "tier": { "type": "string" },
+            "whole": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "direction": { "type": "string" },
+        "from": { "type": "string" },
+        "natural_tier": { "type": "string" },
+        "on_the_ladder": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "si_bridge": {
+          "type": "object",
+          "properties": {
+            "seconds": { "type": "string" },
+            "unit": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "ticks": { "type": "string" },
+        "to": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "cal-anchor": {
+      "type": "object",
+      "properties": {
+        "calendar": { "type": "string" },
+        "determination": {
+          "type": "object",
+          "properties": {
+            "citation": { "type": "string" },
+            "method": { "type": "string" },
+            "uncertainty": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "phase": { "type": "string" },
+        "revision": { "type": "string" },
+        "tick": { "type": "string" },
+        "window": {
+          "type": "object",
+          "properties": {
+            "hi": { "type": "string" },
+            "lo": { "type": "string" },
+            "width_ticks": { "type": "string" }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "cal-list": {
+      "type": "object",
+      "properties": {
+        "calendars": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "anchor_revision": { "type": "string" },
+              "arbitrary": { "type": "string" },
+              "body": { "type": "string" },
+              "cycles": { "type": "string" },
+              "kind": { "type": "string" },
+              "leap_rule": { "type": "string" },
+              "status": { "type": "string" }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "cal-show": {
+      "type": "object",
+      "properties": {
+        "anchor": {
+          "type": "object",
+          "properties": {
+            "citation": { "type": "string" },
+            "method": { "type": "string" },
+            "phase": { "type": "string" },
+            "revision": { "type": "string" },
+            "uncertainty": { "type": "string" },
+            "window_ticks": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "body": { "type": "string" },
+        "calendar": { "type": "string" },
+        "cycles": {
+          "type": "object",
+          "properties": {
+            "convergents": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "cycles_per_year": { "type": "string" },
+            "satellite": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "fields": {
+          "type": "object",
+          "properties": {
+            "anchor_revision": { "type": "string" },
+            "day": { "type": "string" },
+            "day_fraction": { "type": "string" },
+            "window_ticks": { "type": "string" },
+            "year": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "intercalation": {
+          "type": "object",
+          "properties": {
+            "bound": { "type": "string" },
+            "rule": { "type": "string" },
+            "walked": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "whole_days_per_year": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "kind": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "cosmo-age": {
+      "type": "object",
+      "properties": {
+        "citation": { "type": "string" },
+        "enclosure": {
+          "type": "object",
+          "properties": {
+            "at_drift": { "type": "string" },
+            "hi_ticks": { "type": "string" },
+            "hi_years": { "type": "string" },
+            "lo_ticks": { "type": "string" },
+            "lo_years": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "model": { "type": "string" },
+        "parameters": { "type": "string" },
+        "quadrature": {
+          "type": "object",
+          "properties": {
+            "depth": { "type": "string" },
+            "panels": { "type": "string" },
+            "sqrt_scale_digits": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "warning": { "type": "string" },
+        "widths": {
+          "type": "object",
+          "properties": {
+            "arithmetic_drifts": { "type": "string" },
+            "arithmetic_ticks": { "type": "string" },
+            "arithmetic_years": { "type": "string" },
+            "note": { "type": "string" },
+            "parameter_drifts": { "type": "string" },
+            "parameter_ticks": { "type": "string" },
+            "parameter_years": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "year": { "type": "string" },
+        "z": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "cosmo-age-interval": {
+      "type": "object",
+      "properties": {
+        "audit": {
+          "type": "object",
+          "properties": {
+            "0": {
+              "type": "object",
+              "properties": {
+                " how to read this": { "type": "string" }
+              },
+              "additionalProperties": true
+            },
+            "1": {
+              "type": "object",
+              "properties": {
+                " substitution": { "type": "string" }
+              },
+              "additionalProperties": true
+            },
+            "10": {
+              "type": "object",
+              "properties": {
+                " quantise to ticks": { "type": "string" }
+              },
+              "additionalProperties": true
+            },
+            "11": {
+              "type": "object",
+              "properties": {
+                " an interval input": { "type": "string" }
+              },
+              "additionalProperties": true
+            },
+            "2": {
+              "type": "object",
+              "properties": {
+                " integrand": { "type": "string" }
+              },
+              "additionalProperties": true
+            },
+            "3": {
+              "type": "object",
+              "properties": {
+                " why not endpoints": { "type": "string" }
+              },
+              "additionalProperties": true
+            },
+            "4": {
+              "type": "object",
+              "properties": {
+                " panels": { "type": "string" }
+              },
+              "additionalProperties": true
+            },
+            "5": {
+              "type": "object",
+              "properties": {
+                " panel bound": { "type": "string" }
+              },
+              "additionalProperties": true
+            },
+            "6": {
+              "type": "object",
+              "properties": {
+                " densities": { "type": "string" }
+              },
+              "additionalProperties": true
+            },
+            "7": {
+              "type": "object",
+              "properties": {
+                " square roots": { "type": "string" }
+              },
+              "additionalProperties": true
+            },
+            "8": {
+              "type": "object",
+              "properties": {
+                " accumulation": { "type": "string" }
+              },
+              "additionalProperties": true
+            },
+            "9": {
+              "type": "object",
+              "properties": {
+                " Hubble time": { "type": "string" }
+              },
+              "additionalProperties": true
+            },
+            "conclusion": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "citation": { "type": "string" },
+        "enclosure": {
+          "type": "object",
+          "properties": {
+            "at_drift": { "type": "string" },
+            "hi_ticks": { "type": "string" },
+            "hi_years": { "type": "string" },
+            "lo_ticks": { "type": "string" },
+            "lo_years": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "input_width": {
+          "type": "object",
+          "properties": {
+            "drifts": { "type": "string" },
+            "note": { "type": "string" },
+            "ticks": { "type": "string" },
+            "years": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "model": { "type": "string" },
+        "parameters": { "type": "string" },
+        "quadrature": {
+          "type": "object",
+          "properties": {
+            "depth": { "type": "string" },
+            "panels": { "type": "string" },
+            "sqrt_scale_digits": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "warning": { "type": "string" },
+        "widths": {
+          "type": "object",
+          "properties": {
+            "arithmetic_drifts": { "type": "string" },
+            "arithmetic_ticks": { "type": "string" },
+            "arithmetic_years": { "type": "string" },
+            "note": { "type": "string" },
+            "parameter_drifts": { "type": "string" },
+            "parameter_ticks": { "type": "string" },
+            "parameter_years": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "year": { "type": "string" },
+        "z": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "cosmo-model": {
+      "type": "object",
+      "properties": {
+        "as_published": {
+          "type": "object",
+          "properties": {
+            "H0": { "type": "string" },
+            "Omega_Lambda": { "type": "string" },
+            "Omega_m": { "type": "string" },
+            "Omega_r": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "citation": { "type": "string" },
+        "ge1": { "type": "string" },
+        "ge2": { "type": "string" },
+        "hubble_time": {
+          "type": "object",
+          "properties": {
+            "gyr": { "type": "string" },
+            "note": { "type": "string" },
+            "ticks_lo": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "model": { "type": "string" },
+        "monotonicity": {
+          "type": "object",
+          "properties": {
+            "note": { "type": "string" },
+            "turns_at_u": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "year": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "cosmo-z": {
+      "type": "object",
+      "properties": {
+        "citation": { "type": "string" },
+        "instant_ticks": { "type": "string" },
+        "model": { "type": "string" },
+        "tolerance_years": { "type": "string" },
+        "year": { "type": "string" },
+        "years_after_datum": { "type": "string" },
+        "z": {
+          "type": "object",
+          "properties": {
+            "hi": { "type": "string" },
+            "lo": { "type": "string" }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "datum": {
+      "type": "object",
+      "properties": {
+        "big_bang_claim": {
+          "type": "object",
+          "properties": {
+            "citation": { "type": "string" },
+            "half_width_drifts": { "type": "string" },
+            "half_width_ticks": { "type": "string" },
+            "locator": { "type": "string" },
+            "status": { "type": "string" },
+            "window": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "datum": { "type": "string" },
+        "datum_provenance": {
+          "type": "object",
+          "properties": {
+            "chain": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "citation": { "type": "string" },
+            "input": { "type": "string" },
+            "unit_defs": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          },
+          "additionalProperties": true
+        },
+        "earth_dependency": { "type": "string" },
+        "frame": { "type": "string" },
+        "implied_age": {
+          "type": "object",
+          "properties": {
+            "note": { "type": "string" },
+            "seconds": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "rounding": {
+          "type": "object",
+          "properties": {
+            "mode": { "type": "string" },
+            "rationale": { "type": "string" },
+            "residual_rendered": { "type": "string" },
+            "residual_ticks": { "type": "string" },
+            "to": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "tick_zero": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "doctor": {
+      "type": "object",
+      "properties": {
+        "backend": { "type": "string" },
+        "datum_provenance": {
+          "type": "object",
+          "properties": {
+            "note": { "type": "string" },
+            "present": { "type": "boolean" }
+          },
+          "additionalProperties": true
+        },
+        "domain_bits": { "type": "string" },
+        "domain_max_ticks": { "type": "string" },
+        "features": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "frame": { "type": "string" },
+        "leap_seconds": {
+          "type": "object",
+          "properties": {
+            "complete_through": { "type": "string" },
+            "entries": { "type": "string" },
+            "network": { "type": "string" },
+            "pre_1972": { "type": "string" },
+            "table_version": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "profile": { "type": "string" },
+        "spec": {
+          "type": "object",
+          "properties": {
+            "deltas": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "rfc": { "type": "string" }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "events-list": {
+      "type": "object",
+      "properties": {
+        "citation_set": { "type": "string" },
+        "events": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "as_published": { "type": "string" },
+              "citation": { "type": "string" },
+              "label": { "type": "string" },
+              "warning": { "type": "string" },
+              "window_ticks": { "type": "string" }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "events-show": {
+      "type": "object",
+      "properties": {
+        "as_published": { "type": "string" },
+        "citation": { "type": "string" },
+        "description": { "type": "string" },
+        "label": { "type": "string" },
+        "midpoint": {
+          "type": "object",
+          "properties": {
+            "at_drift": { "type": "string" },
+            "note": { "type": "string" },
+            "ticks": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "stated_as": { "type": "string" },
+        "warning": { "type": "string" },
+        "window": {
+          "type": "object",
+          "properties": {
+            "hi": { "type": "string" },
+            "lo": { "type": "string" },
+            "width_ticks": { "type": "string" },
+            "width_years": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "year": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "explain": {
+      "type": "object",
+      "properties": {
+        "beats_since_datum": {
+          "type": "object",
+          "properties": {
+            "note": { "type": "string" },
+            "remainder_ticks": { "type": "string" },
+            "whole": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "claim": {
+          "type": "object",
+          "properties": {
+            "citation": { "type": "string" },
+            "status": { "type": "string" },
+            "window": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "digit5": { "type": "string" },
+        "human": { "type": "string" },
+        "precision": { "type": "string" },
+        "si_bridge": {
+          "type": "object",
+          "properties": {
+            "epoch": { "type": "string" },
+            "seconds_from_epoch": { "type": "string" },
+            "unit": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "ticks": { "type": "string" },
+        "tiers": {
+          "type": "object",
+          "properties": {
+            "T0 beat": { "type": "string" },
+            "T1 arc": { "type": "string" },
+            "T2 sweep": { "type": "string" },
+            "T3 span": { "type": "string" },
+            "T4 drift": { "type": "string" },
+            "T5 deep": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "ucid": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "from-civil": {
+      "type": "object",
+      "properties": {
+        "human": { "type": "string" },
+        "input": {
+          "type": "object",
+          "properties": {
+            "calendar": { "type": "string" },
+            "exactness": { "type": "string" },
+            "label": { "type": "string" },
+            "scale": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "ticks": { "type": "string" },
+        "ucid": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "ladder": {
+      "type": "object",
+      "properties": {
+        "locale": { "type": "string" },
+        "note": { "type": "string" },
+        "tiers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "beats": { "type": "string" },
+              "exponent": { "type": "string" },
+              "name": { "type": "string" },
+              "seconds (bridge)": { "type": "string" },
+              "ticks": { "type": "string" }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "now": {
+      "type": "object",
+      "properties": {
+        "human": { "type": "string" },
+        "precision": { "type": "string" },
+        "rendered": { "type": "string" },
+        "source": {
+          "type": "object",
+          "properties": {
+            "clock": { "type": "string" },
+            "leap_table": { "type": "string" },
+            "network": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "ticks": { "type": "string" },
+        "ucid": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "ruler": {
+      "type": "object",
+      "properties": {
+        "from": { "type": "string" },
+        "marks": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "step": { "type": "string" },
+        "to": { "type": "string" },
+        "whole_steps": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "show": {
+      "type": "object",
+      "properties": {
+        "calendars": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "anchor_revision": { "type": "string" },
+              "day_is_ambiguous": { "type": "boolean" },
+              "error": { "type": "string" },
+              "kind": { "type": "string" },
+              "note": { "type": "string" },
+              "rendered": { "type": "string" },
+              "warning": { "type": "string" },
+              "window_ticks": { "type": "string" }
+            },
+            "additionalProperties": true
+          }
+        },
+        "human": { "type": "string" },
+        "ticks": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "timeline": {
+      "type": "object",
+      "properties": {
+        "events": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "as_published": { "type": "string" },
+              "at": { "type": "string" },
+              "tiers_since_datum": { "type": "string" },
+              "warning": { "type": "string" }
+            },
+            "additionalProperties": true
+          }
+        },
+        "tier": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "to-civil": {
+      "type": "object",
+      "properties": {
+        "calendar_id": { "type": "string" },
+        "fields": {
+          "type": "object",
+          "properties": {
+            "day": { "type": "string" },
+            "hour": { "type": "string" },
+            "minute": { "type": "string" },
+            "month": { "type": "string" },
+            "second": { "type": "string" },
+            "weekday": { "type": "string" },
+            "year": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "kind": { "type": "string" },
+        "lossy": { "type": "boolean" },
+        "qualified": { "type": "string" },
+        "rounding": { "type": "string" },
+        "ticks": { "type": "string" },
+        "warning": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "verify": {
+      "type": "object",
+      "properties": {
+        "agrees": { "type": "boolean" },
+        "backend": { "type": "string" },
+        "compare_with": { "type": "string" },
+        "constants": {
+          "type": "object",
+          "properties": {
+            "BEAT": {
+              "type": "object",
+              "properties": {
+                "agrees": { "type": "boolean" },
+                "derived": { "type": "string" },
+                "from": { "type": "string" },
+                "value": { "type": "string" }
+              },
+              "additionalProperties": true
+            },
+            "ORIGIN_OFFSET": {
+              "type": "object",
+              "properties": {
+                "agrees": { "type": "boolean" },
+                "derived": { "type": "string" },
+                "from": { "type": "string" },
+                "value": { "type": "string" }
+              },
+              "additionalProperties": true
+            },
+            "SECOND": {
+              "type": "object",
+              "properties": {
+                "agrees": { "type": "boolean" },
+                "derived": { "type": "string" },
+                "from": { "type": "string" },
+                "value": { "type": "string" }
+              },
+              "additionalProperties": true
+            }
+          },
+          "additionalProperties": true
+        },
+        "invariants": {
+          "type": "object",
+          "properties": {
+            "bridge_divisibility_is_exact": { "type": "boolean" },
+            "origin_offset_is_whole_beats": { "type": "boolean" },
+            "tier_grid_is_five_powers": { "type": "boolean" }
+          },
+          "additionalProperties": true
+        },
+        "profile": { "type": "string" },
+        "what_this_does_not_establish": { "type": "string" }
+      },
+      "additionalProperties": true
+    }
+  }
+}

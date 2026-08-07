@@ -23,6 +23,7 @@ mod derivation;
 mod gendocs;
 mod links;
 mod lint;
+mod schema;
 mod route_bigint;
 mod route_bnum;
 
@@ -105,6 +106,18 @@ fn main() {
     }
     if mode == "gen-docs" || mode == "check-docs" {
         std::process::exit(run_docs(&mode));
+    }
+    if mode == "gen-schema" {
+        std::process::exit(match schema::write(&workspace_root()) {
+            Ok(p) => {
+                println!("wrote {}", p.display());
+                0
+            }
+            Err(e) => {
+                eprintln!("failed to write the schema: {e}");
+                6
+            }
+        });
     }
     if mode == "check-links" {
         std::process::exit(links::run(&workspace_root()));
@@ -969,6 +982,16 @@ fn run_docs(mode: &str) -> i32 {
         // Copies that disagree for an innocent reason destroy exactly that.
         // A delta recorded and never applied reads as decided while the
         // normative text still says the old thing.
+        // A generated artefact that is committed must be regenerable, or it is
+        // a copy that has started to drift — the same rule §13.5 applies to the
+        // tier tables.
+        match schema::check(&root) {
+            Ok(n) => println!("  ok    the ucal-json/1 schema matches the surface ({n} lines)"),
+            Err(e) => {
+                eprintln!("  FAIL  {e}");
+                code = 6;
+            }
+        }
         match citations::check_deltas_are_applied(&root) {
             Ok(n) => println!("  ok    every standing spec delta is applied ({n})"),
             Err(bad) => {

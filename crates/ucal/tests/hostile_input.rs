@@ -107,6 +107,8 @@ const HOSTILE: &[&[&str]] = &[
     &["--sep", "1", "explain", "0"],
     &["--tick-sep", "aa", "explain", "0"],
     &["--profile", "UC-2", "datum"],
+    &["completions", "nope"],
+    &["completions"],
 ];
 
 /// Inputs that must succeed, so the suite cannot pass by rejecting everything.
@@ -126,6 +128,11 @@ const BENIGN: &[&[&str]] = &[
     &["between", "0", "100"],
     &["between", "0", "100", "--at", "beat"],
     &["--json", "verify"],
+    &["completions", "bash"],
+    &["completions", "zsh"],
+    &["completions", "fish"],
+    &["completions", "powershell"],
+    &["completions", "elvish"],
 ];
 
 /// Nothing panics, whatever it is given.

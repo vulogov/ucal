@@ -35,7 +35,8 @@ disagree, the source is right.
   [`to-civil`](#ucal-to-civil) · [`ladder`](#ucal-ladder) ·
   [`cal`](#ucal-cal) · [`show`](#ucal-show) · [`events`](#ucal-events) ·
   [`timeline`](#ucal-timeline) · [`ruler`](#ucal-ruler) ·
-  [`cosmo`](#ucal-cosmo) · [`verify`](#ucal-verify) · [`doctor`](#ucal-doctor)
+  [`cosmo`](#ucal-cosmo) · [`verify`](#ucal-verify) · [`doctor`](#ucal-doctor) ·
+  [`completions`](#ucal-completions)
 - [Recurring fields](#recurring-fields)
 
 ---
@@ -574,6 +575,43 @@ at `z = 1100` the arithmetic width is 251 years against a parameter width of
 10 917 years. The quadrature is already forty times sharper than the
 measurement it is integrating. Merging them would hide which one matters.
 
+#### Choosing `--depth`, with the cost measured
+
+`--depth d` subdivides the integral into `2^d` panels. Each step of two doubles
+the panel count twice and quarters the arithmetic width — and multiplies the
+time by about four. Measured, not estimated, on an Apple M5 Pro in a release
+build, for `cosmo age --z 1100`:
+
+| `--depth` | wall time | arithmetic width | as a share of the total |
+|---|---|---|---|
+| 4 | 0.01 s | 64 251 yr | 85% |
+| 8 | 0.03 s | 4 012 yr | 26% |
+| **12** (default) | **0.53 s** | **251 yr** | **2.2%** |
+| 16 | 9.7 s | 15.7 yr | 0.14% |
+| 18 | 41 s | 3.9 yr | 0.03% |
+| 20 | 2 min 56 s | 1.0 yr | 0.01% |
+| 22 | 12 min 54 s | 0.2 yr | 0.002% |
+
+Depth 24 was not measured. On the trend above it is about an hour, which is
+what GE-1 found when it fired its kill criterion.
+
+**The column that matters is the last one.** The enclosure has two widths and
+only one of them responds to `--depth`. The *parameter* width — 11 353 years at
+`z = 1100`, from the published uncertainty on the Planck 2018 constants — does
+not move at any depth, because no amount of subdivision improves a measurement
+somebody else made.
+
+So past about depth 16 the arithmetic contributes under a fifth of one per cent
+of the total and each further step costs four times as much to narrow something
+already invisible. **The default of 12 is not a compromise; it is roughly where
+the two widths stop being comparable.** Going deeper is for demonstrating that
+the quadrature converges, which is a different question from wanting a better
+answer.
+
+No release promises any of these timings, and a future release may be slower if
+being slower is more correct — [`STABILITY.md`](STABILITY.md) says so. The table
+is here so a depth can be *chosen* rather than discovered.
+
 ### `cosmo z`
 
 | option | default | notes |
@@ -643,6 +681,37 @@ transcription error.
 The check that would establish more is an independent implementation reproducing
 these constants. That has never been done, it is the cheapest of the three asks
 in [`CONTACT.md`](CONTACT.md), and it takes about thirty minutes in any language.
+
+---
+
+## `ucal completions`
+
+Shell completions, written to stdout.
+
+```
+ucal completions <SHELL>
+```
+
+`SHELL` is `bash`, `zsh`, `fish`, `powershell` or `elvish`.
+
+| shell | where it goes |
+|---|---|
+| bash | `ucal completions bash > /etc/bash_completion.d/ucal` — or source it from `~/.bashrc` |
+| zsh | `ucal completions zsh > "${fpath[1]}/_ucal"` |
+| fish | `ucal completions fish > ~/.config/fish/completions/ucal.fish` |
+| powershell | `ucal completions powershell >> $PROFILE` |
+| elvish | `ucal completions elvish >> ~/.elvish/rc.elv` |
+
+**Generated, not written.** The script is produced from the same argument parser
+the program itself uses, at the moment you run the command — so it cannot offer
+a command that does not exist, or miss one that does. A completion file checked
+into a repository would be a second description of the CLI, and this project has
+spent several cycles removing second descriptions.
+
+It is the one command whose output is not a document: a completion script is a
+shell program, and there is nothing in it to style, group, round or convert.
+`--json` does not apply to it and neither does anything else in
+[Global options](#global-options).
 
 ---
 
@@ -778,6 +847,33 @@ None of this is floating point. Rule E forbids a float token in any shipped
 crate; a decimal is produced by one integer multiply-divide,
 `mul_div_rounded(numerator, 10^digits, denominator, mode)`, with a decimal point
 inserted into the result's digits.
+
+### A schema for `--json`
+
+[`fixtures/ucal-json-1.schema.json`](../fixtures/ucal-json-1.schema.json), JSON
+Schema draft 2020-12, one `$defs` entry per command. Validating the output of
+`ucal datum --json` means validating against `#/$defs/datum`.
+
+It is **generated** from `fixtures/json-surface.txt` — the committed baseline of
+every field path and its JSON kind, which `json_surface.rs` checks on every
+push — so the schema and the surface cannot disagree. `check-docs` fails if the
+committed schema is stale.
+
+Three things it encodes, each of which is a property of the promise rather than
+a convenience:
+
+- **Every object permits additional properties.** New fields may appear, and a
+  consumer must ignore what it does not recognise.
+- **Nothing is `required`.** The baseline is a union over documents, not a
+  per-document contract: `explain.claim` appears only under `--claim`, a legacy
+  calendar row has no `anchor_revision`, an event without a warning has no
+  `warning` field. The promise is that a field never changes name, shape or
+  meaning — not that it is always emitted. The first generated schema did mark
+  fields required and rejected this program's own output, which is how the
+  distinction was found.
+- **Row keys are data.** A calendar id or an event id is
+  `additionalProperties`, never a property name, so adding a body changes no
+  schema — as adding four in 0.8.0 did not.
 
 ### The `--json` contract
 
