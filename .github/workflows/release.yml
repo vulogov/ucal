@@ -56,9 +56,18 @@ jobs:
             packer: tar
           # macOS, both architectures. No universal binary: two files that each
           # say what they are beats one that needs explaining.
+          #
+          # The Intel build is cross-compiled from an Apple-silicon runner,
+          # because the `macos-13` image that would have run it natively has
+          # been retired — a dispatch against it sat queued indefinitely rather
+          # than failing. The runner cannot execute what it produced (no Rosetta
+          # by default), so this is the one artefact `ucal verify` does not run
+          # on, and `verify: false` says so here rather than the step quietly
+          # not happening.
           - target: x86_64-apple-darwin
-            os: macos-13
+            os: macos-latest
             packer: tar
+            verify: false
           - target: aarch64-apple-darwin
             os: macos-latest
             packer: tar
@@ -90,14 +99,16 @@ jobs:
         run: cargo build --release --locked -p ucal --target ${{ matrix.target }}
 
       # A binary that cannot re-derive its own constants is not worth shipping.
-      # Every target here is built on a runner of its own architecture, so the
-      # artefact can be executed rather than merely linked.
+      # Every target but one is built on a runner of its own architecture, so
+      # the artefact can be executed rather than merely linked; the exception is
+      # marked `verify: false` in the matrix above and named in the release body.
       #
       # The exit status is the check: `ucal verify` fails with `UCAL-E0015` and
       # §19.5's exit 9 when the build disagrees with the profile. It reported
       # the disagreement and exited 0 until this workflow was written, which is
       # why the check is the status and not a grep for a word in the output.
       - name: the binary reproduces the declared constants
+        if: matrix.verify != false
         shell: bash
         run: |
           bin="target/${{ matrix.target }}/release/ucal"
