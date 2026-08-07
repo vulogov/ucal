@@ -5,7 +5,8 @@
 
 use std::io::IsTerminal as _;
 
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
+use clap_complete::Shell;
 use ucal::style::{parse_group_sep, resolve_for_output, ColorChoice, Render, Role, Style};
 use ucal_core::Rounding;
 use ucal::{
@@ -205,6 +206,16 @@ enum Command {
     },
     /// Re-derive the declared constants and check this build reproduces them.
     Verify,
+    /// Shell completions, generated from this program's own argument parser.
+    Completions {
+        /// bash, zsh, fish, powershell or elvish.
+        shell: Shell,
+    },
+    /// The manual page, in roff, generated from this program's own argument parser.
+    Man {
+        /// A subcommand, for its own page. Without one, the top-level page.
+        command: Option<String>,
+    },
     /// Profile, backend, domain ceiling, leap table, features, provenance.
     Doctor,
 }
@@ -421,6 +432,53 @@ fn main() {
         }
     };
 
+    // Handled before the rendering machinery, because it is the one command
+    // whose output is not a `Doc`: a completion script is a shell program, and
+    // there is nothing in it to style, group, round or convert.
+    if let Command::Completions { shell } = &cli.command {
+        let mut cmd = Cli::command();
+        let name = cmd.get_name().to_string();
+        clap_complete::generate(*shell, &mut cmd, name, &mut std::io::stdout());
+        return;
+    }
+    if let Command::Man { command } = &cli.command {
+        // roff on stdout, for the same reason as the completions above: a page
+        // written by hand is a second description of the CLI, and this one comes
+        // out of the parser that will actually reject the arguments.
+        //
+        // The top-level page's SUBCOMMANDS section cross-references `ucal-now(1)`
+        // and its siblings, which is roff convention and was a dangling promise
+        // until this took an argument: `ucal man now` is that page.
+        let top = Cli::command();
+        let page = match command {
+            None => clap_mangen::Man::new(top),
+            Some(name) => match top.find_subcommand(name) {
+                Some(sub) => {
+                    // `Command::name` wants a `&'static str`. Leaking one
+                    // short string in a process that is about to write a manual
+                    // page and exit is cheaper than threading a lifetime, and it
+                    // is bounded by the single call site.
+                    let titled: &'static str =
+                        Box::leak(format!("ucal-{name}").into_boxed_str());
+                    let sub = sub.clone().name(titled);
+                    clap_mangen::Man::new(sub)
+                }
+                None => {
+                    eprintln!(
+                        "UCAL-E0001: malformed timestamp (no subcommand `{name}`; \
+                         `ucal --help` lists them)"
+                    );
+                    std::process::exit(2);
+                }
+            },
+        };
+        if let Err(e) = page.render(&mut std::io::stdout()) {
+            eprintln!("ucal: could not write the manual page: {e}");
+            std::process::exit(1);
+        }
+        return;
+    }
+
     let result = match &cli.command {
         Command::Datum => cmd_datum(),
         Command::Doctor => cmd_doctor(),
@@ -472,6 +530,18 @@ fn main() {
             LocaleId::parse(&cli.locale).and_then(|l| cmd_ladder(l, *named_only))
         }
         Command::Verify => ucal::cmd_verify(),
+        // Handled by the early return above; this arm exists only because a
+        // `match` must be exhaustive. A diagnostic rather than `unreachable!()`
+        // — the CLI crate carries no panicking construct (`no-panic-in-cli`),
+        // and if that early return is ever deleted this becomes a message and
+        // an exit code instead of an abort.
+        Command::Completions { .. } | Command::Man { .. } => {
+            Err(ucal_core::TimeError::with_context(
+                ucal_core::Code::E0001,
+                "internal: this command is handled before dispatch and should \
+                 not have reached it",
+            ))
+        }
         Command::Explain { instant, claim } => cmd_explain(instant, *claim),
         Command::Between { from, to, at } => match at {
             Some(a) => LocaleId::parse(&cli.locale)

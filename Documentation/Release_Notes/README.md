@@ -12,6 +12,7 @@ knows only what it did.
 
 | version | date | state |
 |---|---|---|
+| [1.1.0](1.1.0.md) | 2026-08-07 | released — make it cheap to try |
 | [1.0.0](1.0.0.md) | 2026-08-06 | released — **the promise, made**, with the contact gate open |
 | [0.8.0](0.8.0.md) | 2026-08-05 | released — the last breaking window, spent on additions |
 | [0.7.0](0.7.0.md) | 2026-08-05 | released — the asks made specific, then the waiting |
@@ -108,14 +109,11 @@ one-line version and links to it.
    `--default-features` is not a preference: without it the tool enables every
    feature at once, trips the `u512`/`bigint` guard, and cannot build the crate.
 
-   **Under `0.x` this proves less than it looks.** A minor bump already permits
-   breaking changes, so the breaking-change lints are all skipped and the run
-   passes on any diff. To make it say something before 1.0, run it against a
-   baseline in the same minor line — or temporarily set the version to a patch
-   bump, which is how the `Code` discriminant defect was found in 0.9.0.
-
-   **At 1.0 it stops being advisory.** It is the mechanism for the semver floor,
-   which was the one promise in `STABILITY.md` with none.
+   **From 1.1.0 it is load-bearing.** Under `0.x` a minor bump already permitted
+   breaking changes, so the lints were skipped and the run passed on any diff;
+   with 1.0.0 as a baseline it runs 196 checks per crate and a failure means the
+   release is not a minor one. It is the mechanism for the semver floor, which
+   was the one promise in `STABILITY.md` with none.
 
 7. `cargo run -p xtask -- publish` for the dry run, then
    `cargo run -p xtask -- publish --execute` for real.

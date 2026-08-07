@@ -80,19 +80,20 @@ jobs:
           # enables every feature at once, which trips the `u512`/`bigint`
           # guard and it cannot build the crate at all.
           feature-group: default-features
-      # What this does and does not prove, so a green run is not over-read.
+      # Load-bearing from 1.1.0 onward.
       #
-      # Under `0.x` a minor bump already permits breaking changes, so the tool
-      # skips the breaking-change lints entirely and this job passes on any
-      # diff. It is here now so that it is *installed and exercised* before
-      # 1.0, at which point it becomes the mechanism for the one promise in
-      # STABILITY.md that had none — the semver floor itself.
+      # Under `0.x` a minor bump already permitted breaking changes, so the tool
+      # skipped its breaking-change lints and this job passed on any diff. It
+      # was installed anyway, so that it would be exercised before it mattered.
+      # With 1.0.0 published as a baseline it runs 196 checks per crate and is
+      # the mechanism for the one promise in STABILITY.md that had none — the
+      # semver floor itself.
       #
-      # It already earned its place: run against a patch-level baseline during
-      # 0.9.0 it found a `Code` variant inserted mid-enum, which shifts every
-      # later discriminant and reorders a `PartialOrd` derive. Nobody had
-      # noticed, in a cycle whose entire product is an empty Breaking section.
-      - run: echo "In 0.x this job checks only what a minor bump permits; see the comment above."
+      # It earned its place before it was load-bearing: run against a
+      # patch-level baseline during 0.9.0 it found a `Code` variant inserted
+      # mid-enum, shifting every later discriminant and reordering a
+      # `PartialOrd` derive. Nobody had noticed, in the cycle whose entire
+      # product was supposed to be an empty Breaking section.
 
   msrv:
     name: the declared MSRV actually builds
