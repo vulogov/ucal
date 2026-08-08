@@ -514,7 +514,7 @@ fn split_tag(s: &str) -> core::result::Result<(&str, &str), ParseError> {
     match s.split_once(char::is_whitespace) {
         None => Err(TimeError::with_context(
             Code::E0001,
-            "missing profile tag; every serialised form carries one (Rule P)",
+            "missing profile tag; every serialised form carries one (Rule P). Try `UC1 0031\u{00b7}0687\u{00b7}2481\u{00b7}2999\u{00b7}3108\u{00b7}2437:1104` or a plain decimal tick count",
         )),
         Some((tag, rest)) => Ok((tag, rest.trim())),
     }
@@ -544,7 +544,7 @@ fn parse_human<P: Profile>(
 
     let whole_parts = split_groups(whole_str, ctx);
     if whole_parts.is_empty() {
-        return Err(TimeError::new(Code::E0001));
+        return Err(TimeError::with_context(Code::E0001, "a UC1 form is groups of base-5 digits separated by \u{00b7}, e.g. `UC1 0031\u{00b7}0687\u{00b7}2481:1104`"));
     }
     let mut groups: Vec<u16> = Vec::new();
     for p in &whole_parts {
@@ -597,7 +597,7 @@ fn parse_human_group(p: &str) -> core::result::Result<u16, ParseError> {
         ));
     }
     if p.is_empty() || !p.bytes().all(|b| b.is_ascii_digit()) {
-        return Err(TimeError::new(Code::E0001));
+        return Err(TimeError::with_context(Code::E0001, "a UC1 form is groups of base-5 digits separated by \u{00b7}, e.g. `UC1 0031\u{00b7}0687\u{00b7}2481:1104`"));
     }
     // Parse before checking the width, so that an out-of-range group reports
     // E0004 ("group value out of range") rather than the vaguer E0001. Extra
@@ -623,7 +623,7 @@ fn parse_digit5<P: Profile>(
     }
     let parts = split_groups(rest, ctx);
     if parts.is_empty() {
-        return Err(TimeError::new(Code::E0001));
+        return Err(TimeError::with_context(Code::E0001, "a UC1 form is groups of base-5 digits separated by \u{00b7}, e.g. `UC1 0031\u{00b7}0687\u{00b7}2481:1104`"));
     }
     if parts.len() > TIER_COUNT {
         return Err(TimeError::with_context(
@@ -668,7 +668,7 @@ fn parse_named<P: Profile>(
         let count: u64 = n_str
             .trim()
             .parse()
-            .map_err(|_| TimeError::new(Code::E0001))?;
+            .map_err(|_| TimeError::with_context(Code::E0001, "a UC1 form is groups of base-5 digits separated by \u{00b7}, e.g. `UC1 0031\u{00b7}0687\u{00b7}2481:1104`"))?;
         if count >= GROUP_BASE as u64 {
             return Err(TimeError::new(Code::E0004));
         }

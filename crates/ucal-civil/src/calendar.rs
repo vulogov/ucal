@@ -170,12 +170,15 @@ pub const fn civil_from_days(days: i64, cal: CivilCalendar) -> (i64, u8, u8) {
 /// the stated calendar.
 pub fn check_date(year: i64, month: u8, day: u8, cal: CivilCalendar) -> Result<(), TimeError> {
     let Some(len) = month_length(year, month, cal) else {
-        return Err(TimeError::with_context(Code::E0041, "month out of range"));
+        return Err(TimeError::with_context(
+            Code::E0041,
+            "month out of range: expected 1 to 12, in a date like 2026-08-07 or 2026-08-07T12:34:56",
+        ));
     };
     if day == 0 || day as i64 > len {
         return Err(TimeError::with_context(
             Code::E0041,
-            "day out of range for this month",
+            "day out of range for this month; expected 1 to the length of that month, in a date like 2026-08-07",
         ));
     }
     Ok(())
@@ -187,7 +190,7 @@ pub fn check_time(hour: u8, minute: u8, second: u8) -> Result<(), TimeError> {
     if hour > 23 || minute > 59 || second > 60 {
         return Err(TimeError::with_context(
             Code::E0041,
-            "clock reading out of range",
+            "clock reading out of range; expected 00:00:00 to 23:59:60, in a date like 2026-08-07T12:34:56",
         ));
     }
     Ok(())

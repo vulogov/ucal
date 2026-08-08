@@ -70,7 +70,7 @@ pub fn parse_instant(s: &str) -> Result<(Instant<UC1>, Precision), TimeError> {
     }
     Err(TimeError::with_context(
         Code::E0001,
-        "expected a UC1 text form, a 52-character UCID, or a decimal tick count",
+        "expected a decimal tick count like 8070205189123984864657505252035637180530466139316558837890625, a UC1 text form like `UC1 0031\u{00b7}0687\u{00b7}...`, or a 52-character UCID. `ucal now` prints one of each; `ucal tour` shows what to do with them",
     ))
 }
 
@@ -386,6 +386,29 @@ pub fn cmd_doctor() -> CmdResult {
 // ucal explain (§19)
 // ---------------------------------------------------------------------------
 
+/// Why each field of `explain` is there, by the rule or section that requires it.
+///
+/// T3. `explain` is the densest output in the program and every field of it is
+/// defensible; none of them says *why* it is present. A reader meeting
+/// `precision`, `digit5` and `beats_since_datum` at once has no way to tell
+/// which are consequences of the model and which are conveniences — and the
+/// answer is that almost none are conveniences.
+///
+/// Opt-in, so the ordinary output is unchanged, and additive to `ucal-json/1`.
+const WHY_EXPLAIN: &[(&str, &str)] = &[
+    ("ticks", "Rule Z: the value itself, an unsigned integer count from the datum. Everything else on this page is a rendering of this number."),
+    ("precision", "Rule T: a form printed to a coarser tier denotes an interval, not a point with trailing zeros. This says which one you are holding."),
+    ("human", "§6: the text form anchored at T0, for reading aloud."),
+    ("digit5", "§6 and Rule S: fixed-width, so lexicographic order equals chronological order. That is why it opens with 27 groups of zeros."),
+    ("ucid", "§6.5: a sortable identifier for an instant, or a statement that this one is outside the 2^256 UCID range."),
+    ("tiers", "§4.2: the instant decomposed onto the universal ladder. It reassembles to `ticks` exactly, because every tier is a power of five."),
+    ("window", "Rule T again: present only when the input was stated to a tier, because then it named an interval, and this is that interval."),
+    ("beats_since_datum", "§0.5: the beat is the universe second, 5^60 ticks. This count carries no Earth content, which is the point of having it."),
+    ("si_bridge", "Rule A.5 and D-A16: an SI second is an Earth unit, so the conversion is shown on request with --bridge and never unasked."),
+    ("claim", "Rule Q.3: BIG_BANG_CLAIM is metadata. Printed with --claim, and it can never enter a computation; three compile-fail tests hold that."),
+    ("warning", "§10.6: set when the instant lies inside the claim's own half-width, where the datum's identification is larger than the thing being discussed."),
+];
+
 /// `ucal explain <T> [--claim]` — what an instant is, in several registers.
 pub fn cmd_explain(input: &str, show_claim: bool) -> CmdResult {
     let (t, precision) = parse_instant(input)?;
@@ -529,6 +552,27 @@ pub fn cmd_explain(input: &str, show_claim: bool) -> CmdResult {
     }
 
     Ok(doc)
+}
+
+/// `ucal explain <instant> --why` — the same document, annotated.
+///
+/// Built by asking the document what fields it has and looking each up, so a
+/// field added to `explain` without a reason appears as a gap here rather than
+/// going quietly undocumented. `tour.rs` checks that there are no gaps.
+pub fn cmd_explain_why(input: &str, show_claim: bool) -> CmdResult {
+    let doc = cmd_explain(input, show_claim)?;
+    let mut rows: Vec<(String, Value)> = Vec::new();
+    for (name, _) in doc.fields() {
+        let why = WHY_EXPLAIN
+            .iter()
+            .find(|(k, _)| k == name)
+            .map(|(_, v)| *v)
+            .unwrap_or("— (no reason recorded for this field; please report it, because every field of this command is supposed to have one)");
+        rows.push((name.clone(), Value::text(why)));
+    }
+    Ok(doc.field("why", Value::rows("field", rows)).note(
+        "Each line names the rule or section that requires the field above it. Almost none is a convenience: this command's output is dense because the model is, not because more seemed better.",
+    ))
 }
 
 // ---------------------------------------------------------------------------
@@ -1795,7 +1839,7 @@ pub fn cmd_ruler(from: &str, to: &str, step: Tier) -> CmdResult {
     if a > b {
         return Err(TimeError::with_context(
             Code::E0022,
-            "the ruler's start must not follow its end",
+            "the ruler's start must not follow its end; swap `--from` and `--to`",
         ));
     }
     let span = b.since(&a)?;
@@ -1861,13 +1905,28 @@ fn ticks_in_years(t: &Ticks, digits: u32) -> String {
 #[cfg(feature = "cosmo")]
 fn parse_redshift(s: &str) -> Result<RatInterval, TimeError> {
     let t = s.trim();
+    // A negative redshift reached the decimal parser and came back "not an
+    // exact decimal", which is false: -1 is an exact decimal and simply not a
+    // redshift. Saying so here means the reader is told what is wrong with
+    // their input rather than something that is wrong about it.
+    if t.starts_with('-') {
+        return Err(TimeError::with_context(
+            Code::E0001,
+            "a redshift is not negative: z = 0 is now and larger is earlier. Try `--z 1100` for recombination, or `--z 0.5`",
+        ));
+    }
     match t.split_once("..") {
         Some((lo, hi)) => {
             let (lo, hi) = (
                 Ratio::from_decimal_str(lo.trim())?,
                 Ratio::from_decimal_str(hi.trim())?,
             );
-            RatInterval::new(lo, hi)
+            RatInterval::new(lo, hi).map_err(|_| {
+                TimeError::with_context(
+                    Code::E0022,
+                    "a redshift interval is written low..high, e.g. `--z 1090..1110`",
+                )
+            })
         }
         None => Ok(RatInterval::exact(Ratio::from_decimal_str(t)?)),
     }
@@ -2199,4 +2258,157 @@ pub fn cmd_cosmo_model() -> CmdResult {
              fires. The default depth is 12 and --depth is the high-precision mode.",
         ))
         .field("ge2", Value::text(ucal_cosmo::GE2_ACHIEVABLE_WIDTH)))
+}
+
+// ---------------------------------------------------------------------------
+// ucal tour — the first five minutes
+// ---------------------------------------------------------------------------
+
+/// One step of the tour: what to type, what it shows, and why it looks like that.
+///
+/// `shows` is not a transcript. It is pulled out of the command by **running
+/// it**, here, now — so a step cannot advertise output the program does not
+/// produce. Two documents in this repository drifted from the code in 2026 and
+/// both were copies of something generated; a tour is the worst possible place
+/// for a third, because its whole audience is people with no way to tell.
+struct Step {
+    command: &'static str,
+    shows: String,
+    why: &'static str,
+}
+
+/// The shortest path from *installed* to *I see what this is*.
+///
+/// # What this is not
+///
+/// Not the manual: [`Documentation/CLI.md`] answers *what does this field mean*
+/// for a reader who already knows which command to run. Not the book, which is
+/// the argument at length. This answers **what should I type first**, which
+/// nothing did — a stranger arriving with the binary in front of them had
+/// `--help`, a reference, and ninety pages, in ascending order of commitment.
+///
+/// # Why it is a guess, and says so
+///
+/// Every step here is a choice about a reader who has never existed. Four
+/// cycles of asking (`Documentation/CONTACT.md`) have produced nobody, so this
+/// is not informed by use — it is the author's best guess at which five things
+/// make the point, and the closing note says as much rather than presenting
+/// itself as a considered curriculum.
+///
+/// [`Documentation/CLI.md`]: https://github.com/vulogov/ucal/blob/main/Documentation/CLI.md
+pub fn cmd_tour() -> CmdResult {
+    let t = "8070205189123984864657505252035637180530466139316558837890625";
+
+    // Each `shows` is read out of a real document, by field, so it is the value
+    // the command actually prints today.
+    let field_of = |doc: &Doc, key: &str| -> String {
+        doc.fields()
+            .iter()
+            .find(|(k, _)| k == key)
+            .map(|(_, v)| v.rendered_text().trim().to_string())
+            .unwrap_or_default()
+    };
+
+    let datum = cmd_datum()?;
+    let explain = cmd_explain(t, false)?;
+    let between = cmd_between("0", t, Some(Tier::BEAT))?;
+    let verify = cmd_verify()?;
+    let ladder = cmd_ladder(LocaleId::En, true)?;
+
+    let steps = [
+        Step {
+            command: "ucal datum",
+            shows: field_of(&datum, "datum"),
+            why: "Start here. Tick 0 is stipulated, not measured — the command \
+                  says so itself, and prints the chain of published values that \
+                  fixed it. Everything else in the program is counting from a \
+                  point this command refuses to overclaim.",
+        },
+        Step {
+            command: "ucal explain <instant>",
+            shows: field_of(&explain, "ticks"),
+            why: "Sixty-one digits, exact. Not a float, not a truncation, not a \
+                  timestamp with a resolution — an integer count of Planck \
+                  times. The forms below it are the same integer written for \
+                  different readers.",
+        },
+        Step {
+            command: "ucal between 0 <instant> --at beat",
+            shows: field_of(&between, "natural_tier"),
+            why: "A duration's home is the tier ladder, not a number of \
+                  seconds. This is the one command that answers `how far \
+                  apart`, and it answers in the grid's own units before it \
+                  answers in anybody else's.",
+        },
+        Step {
+            command: "ucal ladder --named-only",
+            shows: field_of(&ladder, "note"),
+            why: "Forty-five rungs, each 3125 times the last. The names are \
+                  decoration — a tier's identity is its exponent — and nothing \
+                  on the ladder is near an hour, which is the cost of leaving \
+                  the Earth paradigm rather than an oversight.",
+        },
+        Step {
+            command: "ucal verify",
+            shows: field_of(&verify, "agrees"),
+            why: "The binary re-derives the constants it ships with and says \
+                  whether it reproduces them. It also says, in the output, that \
+                  agreeing with itself is not verification — which is the ask in \
+                  CONTACT.md and the one thing this project cannot do alone.",
+        },
+    ];
+
+    // A step whose `shows` is empty reads a field that no longer exists. The
+    // first draft omitted the row, silently, after exactly that happened — the
+    // failure the design was meant to prevent, in the one document written for
+    // readers who cannot tell.
+    //
+    // Not a runtime error. Whether these fields resolve is a property of the
+    // build, fixed at compile time and checked by `tour.rs` on every push, so
+    // it cannot reach a release; raising an Appendix E code for it would mean
+    // borrowing one whose meaning is something else, which this project has
+    // done twice and corrected twice. What ships instead is a marker that is
+    // impossible to mistake for output.
+    const MISSING: &str = "— (this step's source field is missing; please report it)";
+
+    let rows: Vec<(String, Value)> = steps
+        .iter()
+        .map(|s| {
+            (
+                s.command.to_string(),
+                Value::Section(vec![
+                    (
+                        "shows".into(),
+                        Value::text(if s.shows.is_empty() {
+                            MISSING.to_string()
+                        } else {
+                            s.shows.clone()
+                        }),
+                    ),
+                    ("why".into(), Value::text(s.why)),
+                ]),
+            )
+        })
+        .collect();
+
+    Ok(Doc::new()
+        .title("ucal tour")
+        .field("start", Value::text(
+            "Five commands, in order. Each line below is one you can type; the \
+             `shows` beside it was produced by running that command just now, \
+             not copied from a transcript.",
+        ))
+        .field("instant", Value::number(t))
+        .field("steps", Value::rows("command", rows))
+        .field("next", Value::text(
+            "`ucal --help` lists everything. `ucal man` is the manual page and \
+             `ucal completions <shell>` the completions. Documentation/CLI.md \
+             explains every field of every command.",
+        ))
+        .note(
+            "This tour is a guess. Nobody outside this repository has used the \
+             program, so which five commands make the point is the author's \
+             opinion and not a finding — see Documentation/CONTACT.md, where \
+             saying it is the wrong five would be a useful thing to report.",
+        ))
 }

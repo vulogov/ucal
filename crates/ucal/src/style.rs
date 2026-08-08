@@ -431,13 +431,13 @@ pub fn parse_group_sep(s: &str) -> Result<char, ucal_core::TimeError> {
     let (Some(c), None) = (it.next(), it.next()) else {
         return Err(ucal_core::TimeError::with_context(
             ucal_core::Code::E0001,
-            "the group separator must be exactly one character",
+            "the group separator must be exactly one character, e.g. `--tick-sep _`",
         ));
     };
     if c.is_ascii_digit() {
         return Err(ucal_core::TimeError::with_context(
             ucal_core::Code::E0001,
-            "the group separator must not be a digit (§6.3)",
+            "the group separator must not be a digit (§6.3); try `--sep _` or `--sep :`",
         ));
     }
     Ok(c)

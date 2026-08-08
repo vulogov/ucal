@@ -125,6 +125,21 @@ pub enum Code {
     /// a defect in the build or the install rather than anything the caller did.
     /// Appended for the same reason as [`Code::E0014`]. See D-A18.
     E0015,
+
+    /// No such entry in a declared catalogue (§17, §19.4, Rule K).
+    ///
+    /// An event id, a calendar id, a body — a name the caller supplied that the
+    /// catalogue does not contain. Distinct from [`Code::E0062`], which is a
+    /// calendar that *exists* and has no anchor: those are different answers
+    /// and were reported identically until 1.2.0.
+    ///
+    /// General on purpose, and the last of its kind. Three separate "not found"
+    /// conditions had been reported with codes meaning something else — a
+    /// duplicate locale name, an unknown key in an HJSON file — because each
+    /// time it was cheaper to borrow one than to name the condition. One code
+    /// for the whole class ends that; a fourth borrowed code would not have
+    /// been an accident. See D-A19.
+    E0016,
 }
 
 impl Code {
@@ -144,6 +159,7 @@ impl Code {
             Code::E0013 => "UCAL-E0013",
             Code::E0014 => "UCAL-E0014",
             Code::E0015 => "UCAL-E0015",
+            Code::E0016 => "UCAL-E0016",
             Code::E0020 => "UCAL-E0020",
             Code::E0021 => "UCAL-E0021",
             Code::E0022 => "UCAL-E0022",
@@ -186,6 +202,7 @@ impl Code {
             Code::E0013 => "profile lacks a datum_provenance record",
             Code::E0014 => "name not found in the active locale table",
             Code::E0015 => "this build does not reproduce the declared constants",
+            Code::E0016 => "no such entry in a declared catalogue",
             Code::E0020 => "result precedes the datum",
             Code::E0021 => "result exceeds DOMAIN",
             Code::E0022 => "window inversion, lo > hi",
@@ -231,7 +248,8 @@ impl Code {
             Code::E0060 | Code::E0061 | Code::E0062 | Code::E0063 | Code::E0064
             | Code::E0065 => 7,
             Code::E0070 | Code::E0071 => 8,
-            Code::E0010 | Code::E0011 | Code::E0012 | Code::E0013 | Code::E0014 => 6,
+            Code::E0010 | Code::E0011 | Code::E0012 | Code::E0013 | Code::E0014
+            | Code::E0016 => 6,
             Code::E0025 | Code::E0015 => 9,
         }
     }

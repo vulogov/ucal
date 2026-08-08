@@ -23,6 +23,7 @@ mod derivation;
 mod gendocs;
 mod links;
 mod lint;
+mod examples;
 mod schema;
 mod route_bigint;
 mod route_bnum;
@@ -106,6 +107,18 @@ fn main() {
     }
     if mode == "gen-docs" || mode == "check-docs" {
         std::process::exit(run_docs(&mode));
+    }
+    if mode == "gen-examples" {
+        std::process::exit(match examples::write(&workspace_root()) {
+            Ok(p) => {
+                println!("wrote {}", p.display());
+                0
+            }
+            Err(e) => {
+                eprintln!("failed to write the examples: {e}");
+                6
+            }
+        });
     }
     if mode == "gen-schema" {
         std::process::exit(match schema::write(&workspace_root()) {
@@ -985,6 +998,19 @@ fn run_docs(mode: &str) -> i32 {
         // A generated artefact that is committed must be regenerable, or it is
         // a copy that has started to drift — the same rule §13.5 applies to the
         // tier tables.
+        // Needs a built binary, so it reports when it could not run rather
+        // than passing quietly — a check that silently skips is how a stale
+        // file survives.
+        match examples::check(&root) {
+            Ok(Some(n)) => println!("  ok    the worked examples match a fresh run ({n})"),
+            Ok(None) => println!(
+                "  --    worked examples not checked: target/release/ucal is absent"
+            ),
+            Err(e) => {
+                eprintln!("  FAIL  {e}");
+                code = 6;
+            }
+        }
         match schema::check(&root) {
             Ok(n) => println!("  ok    the ucal-json/1 schema matches the surface ({n} lines)"),
             Err(e) => {

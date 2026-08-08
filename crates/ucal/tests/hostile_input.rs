@@ -219,3 +219,47 @@ fn the_benign_corpus_succeeds() {
         assert!(!r.stdout.trim().is_empty(), "ucal {} printed nothing", args.join(" "));
     }
 }
+
+/// T4: a rejection tells the reader what a good input looks like.
+///
+/// Every diagnostic was already an Appendix E code and a sentence — and the
+/// sentences were written for somebody who knows the specification. *"month out
+/// of range"* is true and leaves a stranger to guess whether months are
+/// zero-based; *"no such event in the catalogue"* does not mention that
+/// `ucal events list` prints the catalogue.
+///
+/// A remedy is one of: a concrete example, a command that lists the valid
+/// values, or a stated range. The check is deliberately crude — it looks for
+/// the shapes those take — because the alternative is a list of approved
+/// messages, which is a second copy of the messages.
+///
+/// Two exemptions, both for clap's own argument errors, which this program does
+/// not write: a missing required argument and an unknown flag already print a
+/// usage block, which is the remedy.
+#[test]
+fn every_rejection_names_a_remedy() {
+    const CLAP_OWNS_THESE: &[&str] = &["error: unexpected argument", "error: the following required"];
+    let hints = [
+        "try ", "Try ", "expected ", "e.g.", "like ", "ucal ", "`--", "1 to ", "outside [",
+    ];
+
+    let mut bare = Vec::new();
+    for args in HOSTILE {
+        let r = run(args);
+        if r.code == 0 {
+            continue;
+        }
+        let msg = r.stderr.trim();
+        if msg.is_empty() || CLAP_OWNS_THESE.iter().any(|c| msg.starts_with(c)) {
+            continue;
+        }
+        if !hints.iter().any(|h| msg.contains(h)) {
+            bare.push(format!("ucal {} -> {}", args.join(" "), msg.lines().next().unwrap_or("")));
+        }
+    }
+    assert!(
+        bare.is_empty(),
+        "these diagnostics say what is wrong and not what would be right:\n  {}",
+        bare.join("\n  ")
+    );
+}

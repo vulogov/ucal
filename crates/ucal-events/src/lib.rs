@@ -324,8 +324,10 @@ pub fn by_id(id: &str) -> Result<Event, TimeError> {
         .into_iter()
         .find(|e| e.id == id)
         .ok_or(TimeError::with_context(
-            Code::E0012,
-            "no such event in the catalogue",
+            // E0016, not E0012. E0012 is an unknown key in an HJSON data file,
+            // which is not what happened and not a file the caller supplied.
+            Code::E0016,
+            "no such event; `ucal events list` names every event in the catalogue",
         ))
 }
 
@@ -479,6 +481,6 @@ mod tests {
 
     #[test]
     fn unknown_ids_are_an_error_not_a_default() {
-        assert_eq!(by_id("nonexistent").unwrap_err().code, Code::E0012);
+        assert_eq!(by_id("nonexistent").unwrap_err().code, Code::E0016);
     }
 }

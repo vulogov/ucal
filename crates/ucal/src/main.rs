@@ -143,6 +143,9 @@ enum Command {
         /// Also print BIG_BANG_CLAIM (metadata; never an operand).
         #[arg(long)]
         claim: bool,
+        /// Annotate each field with the rule or section that requires it.
+        #[arg(long)]
+        why: bool,
     },
     /// How far apart two instants are, on the tier ladder.
     Between {
@@ -206,6 +209,8 @@ enum Command {
     },
     /// Re-derive the declared constants and check this build reproduces them.
     Verify,
+    /// The first five minutes: what to type, what it shows, and why.
+    Tour,
     /// Shell completions, generated from this program's own argument parser.
     Completions {
         /// bash, zsh, fish, powershell or elvish.
@@ -224,6 +229,7 @@ enum Command {
 #[derive(Subcommand)]
 enum CosmoCommand {
     /// The age of the universe at a redshift, as a certified enclosure.
+    #[command(allow_negative_numbers = true)]
     Age {
         /// Redshift, as an exact decimal, e.g. `1100` or `0.5`.
         #[arg(long)]
@@ -404,7 +410,7 @@ fn main() {
 
     if cli.profile != "UC-1" && cli.profile != "UC1" {
         eprintln!(
-            "UCAL-E0002: unknown profile tag `{}`. Only UC-1 exists (Rule P).",
+            "UCAL-E0002: unknown profile tag `{}`. Only UC-1 exists (Rule P); try `--profile UC-1`, which is the default.",
             cli.profile
         );
         std::process::exit(5);
@@ -530,6 +536,7 @@ fn main() {
             LocaleId::parse(&cli.locale).and_then(|l| cmd_ladder(l, *named_only))
         }
         Command::Verify => ucal::cmd_verify(),
+        Command::Tour => ucal::cmd_tour(),
         // Handled by the early return above; this arm exists only because a
         // `match` must be exhaustive. A diagnostic rather than `unreachable!()`
         // — the CLI crate carries no panicking construct (`no-panic-in-cli`),
@@ -542,7 +549,13 @@ fn main() {
                  not have reached it",
             ))
         }
-        Command::Explain { instant, claim } => cmd_explain(instant, *claim),
+        Command::Explain { instant, claim, why } => {
+            if *why {
+                ucal::cmd_explain_why(instant, *claim)
+            } else {
+                cmd_explain(instant, *claim)
+            }
+        }
         Command::Between { from, to, at } => match at {
             Some(a) => LocaleId::parse(&cli.locale)
                 .and_then(|l| parse_tier_in(l, a))
