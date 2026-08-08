@@ -12,6 +12,7 @@ knows only what it did.
 
 | version | date | state |
 |---|---|---|
+| [1.3.0](1.3.0.md) | — | **unreleased** — find the defects nobody is going to report |
 | [1.2.0](1.2.0.md) | 2026-08-08 | released — the questions a stranger asks first |
 | [1.1.0](1.1.0.md) | 2026-08-07 | released — make it cheap to try |
 | [1.0.0](1.0.0.md) | 2026-08-06 | released — **the promise, made**, with the contact gate open |
