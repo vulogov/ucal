@@ -224,6 +224,28 @@ events-show.window.lo	string
 events-show.window.width_ticks	string
 events-show.window.width_years	string (--bridge)
 events-show.year	string (--bridge)
+explain-why.beats_since_datum	object
+explain-why.beats_since_datum.note	string
+explain-why.beats_since_datum.remainder_ticks	string
+explain-why.beats_since_datum.whole	string
+explain-why.digit5	string
+explain-why.human	string
+explain-why.precision	string
+explain-why.si_bridge	object (--bridge)
+explain-why.si_bridge.epoch	string
+explain-why.si_bridge.seconds_from_epoch	string
+explain-why.si_bridge.unit	string
+explain-why.ticks	string
+explain-why.tiers	object
+explain-why.tiers.T0 beat	string
+explain-why.tiers.T1 arc	string
+explain-why.tiers.T2 sweep	string
+explain-why.tiers.T3 span	string
+explain-why.tiers.T4 drift	string
+explain-why.tiers.T5 deep	string
+explain-why.ucid	string
+explain-why.why	object
+explain-why.why.*	string
 explain.beats_since_datum	object
 explain.beats_since_datum.note	string
 explain.beats_since_datum.remainder_ticks	string
@@ -314,6 +336,13 @@ to-civil.qualified	string
 to-civil.rounding	string
 to-civil.ticks	string
 to-civil.warning	string
+tour.instant	string
+tour.next	string
+tour.start	string
+tour.steps	object
+tour.steps.*	object
+tour.steps.*.shows	string
+tour.steps.*.why	string
 verify.agrees	bool
 verify.backend	string
 verify.compare_with	string

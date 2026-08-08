@@ -252,7 +252,7 @@ impl Ratio {
     /// `0.5` are all exact rationals, and there is no float path in or out.
     /// Rejects anything that is not digits with at most one decimal point.
     pub fn from_decimal_str(s: &str) -> Result<Ratio> {
-        let malformed = TimeError::with_context(Code::E0001, "not an exact decimal");
+        let malformed = TimeError::with_context(Code::E0001, "not an exact decimal; expected digits with at most one point, like `1100` or `0.5`");
         let (int, frac) = match s.split_once('.') {
             None => (s, ""),
             Some((i, f)) => (i, f),

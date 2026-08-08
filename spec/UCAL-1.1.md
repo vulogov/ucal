@@ -1,7 +1,7 @@
 <!--
   NORMATIVE. This is the corrected specification.
 
-  It is RFC UCAL-1 with the seventeen standing deltas applied in place. The
+  It is RFC UCAL-1 with the eighteen standing deltas applied in place. The
   original is kept verbatim at RFC-UCAL-1.md; the reasoning behind each change
   is in SPEC-DELTAS.md. Section and rule numbering is unchanged from the
   original and MUST NOT be renumbered: the implementation cites it 494 times.
@@ -9,13 +9,13 @@
 
 > ## UCAL-1.1 — the normative specification
 >
-> RFC UCAL-1 with the **seventeen standing deltas applied in place**. Every
+> RFC UCAL-1 with the **eighteen standing deltas applied in place**. Every
 > amended passage is marked inline with the delta that changed it and its class:
 >
 > | class | meaning | count |
 > |---|---|---|
 > | **CORRECTION** | the original is wrong | 6 |
-> | **AMENDMENT** | a normative change adopted by decision | 6 |
+> | **AMENDMENT** | a normative change adopted by decision | 7 |
 > | **EDITORIAL** | no behavioural effect | 5 |
 >
 > The original text is preserved at [`RFC-UCAL-1.md`](RFC-UCAL-1.md) — a
@@ -355,6 +355,8 @@ The present epoch is 31.22 deeps. For scale, `BIG_BANG_CLAIM`'s half-width is 14
 
 **Rule N (Names are display-only).** The canonical identity of a tier is its exponent. Names come from a locale table (Appendix D). Implementations MUST accept `T[k]` and `5^e` notation wherever a name is accepted. A name collision within an active table is `UCAL-E0011`; a name **not found** in it is `UCAL-E0014`.
 
+> **[D-A19 · AMENDMENT]** **A name that is not in a catalogue needs a code.** §17 declares an event catalogue and §19.4 a set of calendars, and Appendix E named no code for *the name you gave is not in one*. Implementations borrowed three times, each borrowing describing something that had not happened. `UCAL-E0016`, exit 6, general across every declared catalogue. `UCAL-E0062` keeps its meaning: a calendar that exists and has no anchor.
+>
 > **[D-A18 · AMENDMENT]** **A build that does not reproduce its own constants needs a code.** §3.3 requires the declared constants to be reproducible and Appendix E named no code for the answer being *no*. `UCAL-E0015`, exit 9. Raised by `ucal verify` and by nothing else.
 >
 > **[D-A17 · AMENDMENT]** **A lookup miss needs its own code.** The original defined `UCAL-E0011` for a *collision* and named nothing for a *miss*, which is the far commoner event — a person types a tier name that does not exist. An implementation had to invent a code or misuse one, and misusing one is worse: a misused code looks correct in every place a reader might check it.
@@ -1250,6 +1252,7 @@ Canonical identity is `exp`; `id` is a stable key; locale strings are display an
 | UCAL-E0013 | profile lacks a `datum_provenance` record (Rule Q.4) |
 | UCAL-E0014 | name not found in the active locale table (Rule N) — D-A17 |
 | UCAL-E0015 | this build does not reproduce the declared constants (§3.3) — D-A18 |
+| UCAL-E0016 | no such entry in a declared catalogue (§17, §19.4, Rule K) — D-A19 |
 | UCAL-E0020 | result precedes the datum (Rule Z) |
 | UCAL-E0021 | result exceeds DOMAIN (Rules O, W) |
 | UCAL-E0022 | window inversion, lo > hi (Rule U) |

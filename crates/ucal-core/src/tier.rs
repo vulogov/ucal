@@ -81,7 +81,7 @@ impl Tier {
         if exponent % DIGITS_PER_TIER != 0 {
             return Err(TimeError::with_context(
                 Code::E0080,
-                "exponent is not a multiple of 5, so it is not on the 5^(5k) grid",
+                "exponent is not a multiple of 5, so it is not on the 5^(5k) grid. Try `5^60` (the beat) or an index like `T0`; `ucal ladder` lists every rung",
             ));
         }
         // (exponent - 60) / 5, computed without going negative in unsigned space.

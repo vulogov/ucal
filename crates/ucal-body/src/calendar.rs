@@ -426,11 +426,23 @@ pub fn by_id(id: &str) -> Result<BodyCalendar> {
         .into_iter()
         .find(|c| c.id == id)
         .ok_or_else(|| {
-            TimeError::with_context(
-                Code::E0062,
-                "no such derived calendar, or it has no anchor and so cannot \
-                 produce local fields (Rule J.3)",
-            )
+            // Two different answers, reported identically until 1.2.0: a
+            // calendar that does not exist, and one that exists with no anchor.
+            // A reader who typed a typo and a reader who asked Titan for local
+            // fields were told the same thing.
+            if ids().contains(&id) {
+                TimeError::with_context(
+                    Code::E0062,
+                    "this calendar has no anchor, so local fields cannot be produced \
+                     (Rule J.3). Its units, intercalation and cycles are complete: \
+                     `ucal cal list` shows them",
+                )
+            } else {
+                TimeError::with_context(
+                    Code::E0016,
+                    "no such calendar; `ucal cal list` names every one that exists",
+                )
+            }
         })
 }
 

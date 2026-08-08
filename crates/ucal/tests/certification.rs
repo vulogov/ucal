@@ -29,6 +29,8 @@ fn documents() -> Vec<(&'static str, Doc)> {
         ("explain", ucal::cmd_explain(T, false).unwrap()),
 ("between", ucal::cmd_between(T, T2, Some(ucal_core::Tier::BEAT)).unwrap()),
         ("verify", ucal::cmd_verify().unwrap()),
+        ("tour", ucal::cmd_tour().unwrap()),
+        ("explain-why", ucal::cmd_explain_why(T, false).unwrap()),
         ("explain --claim", ucal::cmd_explain(T, true).unwrap()),
         (
             "ladder",

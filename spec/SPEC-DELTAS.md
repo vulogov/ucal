@@ -874,3 +874,57 @@ discriminant shifts and no exhaustive match breaks — `cargo semver-checks`
 verifies this. The release workflow runs `ucal verify` on every artefact before
 packaging it, so the code has a caller that acts on it rather than only a
 definition.
+
+---
+
+## D-A19 — `UCAL-E0016`, a name that is not in a catalogue
+
+**Status: AMENDMENT.** Appendix E gains one code, and it is the last of its kind.
+
+### What was missing
+
+§17 declares an event catalogue and §19.4 a set of calendars. Appendix E named
+no code for *the name you gave is not in one* — a typo, a body that does not
+ship, an event id that does not exist.
+
+### What implementations did instead
+
+Borrowed, three times, and each borrowing described something that had not
+happened:
+
+| condition | code used | what that code means |
+|---|---|---|
+| unknown tier name | `UCAL-E0011` | duplicate name in the active locale table |
+| unknown event id | `UCAL-E0012` | unknown key in an HJSON data file |
+| unknown calendar id | `UCAL-E0062` | the calendar has no anchor |
+
+The first was corrected by [D-A17](#d-a17--ucal-e0014-a-name-that-is-not-found),
+which added a code for a locale-table miss specifically. The other two remained,
+and the third is the worst of them: `ucal cal show nope` and `ucal cal show
+titan-d` were **the same diagnostic**, though one is a typo and the other is the
+central fact about Titan in this specification.
+
+### The amendment
+
+| code | meaning | exit |
+|---|---|---|
+| `UCAL-E0016` | no such entry in a declared catalogue (§17, §19.4, Rule K) | 6 |
+
+Deliberately general, covering every declared catalogue rather than one per
+kind. `UCAL-E0062` keeps its meaning exactly: a calendar that **exists** and has
+no anchor, which is a different answer and now reads as one.
+
+### Why the generality is the point
+
+Each previous borrowing was individually cheap and collectively a pattern: it
+was always easier to reach for a code with the right exit status than to name
+the condition. A fourth would not have been an accident. One code for the whole
+class removes the incentive.
+
+### Enforcement
+
+`Code` is `#[non_exhaustive]` and the variant is **appended**, so no discriminant
+shifts — `cargo semver-checks` verifies that against the published 1.1.0. The
+CLI's hostile-input corpus asserts that every rejection carries a §19.5 exit code
+and names a remedy, so a "not found" diagnostic has to say which command lists
+the valid names.
