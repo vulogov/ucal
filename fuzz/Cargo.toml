@@ -1,0 +1,43 @@
+# F1 — the fuzzer.
+#
+# Separate from the workspace on purpose: `cargo-fuzz` needs a nightly toolchain
+# and links libFuzzer, and neither belongs in a build the MSRV job pins to 1.87.
+# `[workspace]` below detaches it, so `cargo build --workspace` at the root does
+# not try to compile any of this.
+
+[package]
+name = "ucal-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[workspace]
+
+[dependencies]
+libfuzzer-sys = "0.4"
+ucal-core = { path = "../crates/ucal-core", features = ["u512", "std"] }
+ucal = { path = "../crates/ucal", default-features = false, features = ["u512", "std"] }
+
+[[bin]]
+name = "parse_instant"
+path = "fuzz_targets/parse_instant.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parse_forms"
+path = "fuzz_targets/parse_forms.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "decode_bytes"
+path = "fuzz_targets/decode_bytes.rs"
+test = false
+doc = false
+bench = false

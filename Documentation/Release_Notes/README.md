@@ -12,6 +12,7 @@ knows only what it did.
 
 | version | date | state |
 |---|---|---|
+| [1.3.0](1.3.0.md) | 2026-08-09 | released — find the defects nobody is going to report |
 | [1.2.0](1.2.0.md) | 2026-08-08 | released — the questions a stranger asks first |
 | [1.1.0](1.1.0.md) | 2026-08-07 | released — make it cheap to try |
 | [1.0.0](1.0.0.md) | 2026-08-06 | released — **the promise, made**, with the contact gate open |
@@ -85,7 +86,15 @@ one-line version and links to it.
    passes locally and fails in CI — which is exactly what happened on the first
    CI run, because the workflow sets `RUSTFLAGS` globally and `cargo test`
    inherits it.
-5. `cargo run -p xtask -- check-links`, which asks the network whether the
+5. `cargo +nightly fuzz run parse_instant fuzz/corpus/parse_instant -- -max_total_time=600`
+   and the other two targets, if anything touched a parser.
+
+   Not in CI, for the reason `fuzz/README.md` gives: a fuzz job either has a
+   time budget and proves less as the code grows, or it has none and is not a
+   CI job. Anything it finds goes into the committed corpus, and what has been
+   run is recorded in that README rather than summarised as "fuzzed".
+
+6. `cargo run -p xtask -- check-links`, which asks the network whether the
    cited URLs still reach the cited documents.
 
    **Deliberately not in CI**, and deliberately not in the verification block
@@ -104,7 +113,7 @@ one-line version and links to it.
    It cannot tell you the page still *says* what was cited. Nothing mechanical
    can.
 
-6. `cargo semver-checks check-release --default-features`, against the last
+7. `cargo semver-checks check-release --default-features`, against the last
    published version.
 
    `--default-features` is not a preference: without it the tool enables every
@@ -116,7 +125,7 @@ one-line version and links to it.
    release is not a minor one. It is the mechanism for the semver floor, which
    was the one promise in `STABILITY.md` with none.
 
-7. `cargo run -p xtask -- publish` for the dry run, then
+8. `cargo run -p xtask -- publish` for the dry run, then
    `cargo run -p xtask -- publish --execute` for real.
 
    It derives the order from the dependency graph rather than repeating a list,
@@ -141,7 +150,7 @@ one-line version and links to it.
    only for its float oracle, and cargo still resolves it when verifying the
    package — so the edge is real even though nothing in the shipped code uses
    it.
-8. Tag `vX.Y.Z`, annotated and signed, and push the tag.
+9. Tag `vX.Y.Z`, annotated and signed, and push the tag.
 
    Pushing the tag triggers `.github/workflows/release.yml`, which builds `ucal`
    for five targets, runs `ucal verify` on each artefact before packaging it,
@@ -151,4 +160,4 @@ one-line version and links to it.
 
    If a runner outage eats the run, re-dispatch it with the tag rather than
    moving the tag.
-9. Open the next file.
+10. Open the next file.
