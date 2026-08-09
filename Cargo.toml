@@ -9,6 +9,9 @@ members = [
     "crates/ucal-cosmo",
     "xtask",
 ]
+# The fuzz targets need nightly and libFuzzer; excluding them keeps
+# `cargo build --workspace` and the 1.87 MSRV job away from both.
+exclude = ["fuzz"]
 
 [workspace.package]
 version = "1.3.0"

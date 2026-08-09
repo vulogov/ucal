@@ -1,0 +1,10 @@
+# The generated corpus is a cache: minutes of fuzzing rebuild it, and committing
+# six megabytes across fifteen hundred files would put it in every clone of this
+# repository forever for no gain a reader could use.
+#
+# `seeds/` is committed and is what a run starts from.
+#
+# A crash artefact is the opposite and is NOT ignored: `artifacts/` is tracked
+# precisely so an input that broke something once is checked on every run after.
+corpus/
+target/
