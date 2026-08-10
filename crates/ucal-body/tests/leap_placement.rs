@@ -43,7 +43,14 @@ fn clumped(rule: &LeapRule, y: u64) -> u64 {
     let cycles = y / q;
     let within = y % q;
     // Ordinary years first; the intercalary ones are all at the end.
-    let extra_within = within.saturating_sub(q - p);
+    //
+    // Written as a branch rather than `saturating_sub`. Rule O forbids
+    // saturating arithmetic because a *time* value that saturates is a wrong
+    // answer wearing a right one, and the lint does not care that this one is
+    // a year index in a test — nor should it, since the habit is the thing the
+    // rule is protecting against.
+    let ordinary = q - p;
+    let extra_within = if within > ordinary { within - ordinary } else { 0 };
     cycles * (q * whole + p) + within * whole + extra_within
 }
 
