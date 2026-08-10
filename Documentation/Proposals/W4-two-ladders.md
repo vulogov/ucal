@@ -1,6 +1,9 @@
 # W4 — two ladders, aligned, with a local unit ladder for the body
 
-**Status: research proposal. Not built, and the kill criterion is written first.**
+**Status: step 1 run. The result argues against building the rest — see
+[Outcome](#outcome-step-1-run) at the end. Kept in full, unedited above that
+section, because a proposal rewritten to agree with its own result records
+nothing.**
 
 A gated experiment in the shape the RFC uses for GE-1…GE-6 and this repository
 has used for GE-U4 and D5: a question, a thing that would answer it, and a
@@ -171,3 +174,81 @@ full, with its derivation), `ucal explain` (the universal decomposition),
 [`GE-U4-walk.sh`](GE-U4-walk.sh) (the grid, travelled). Each shows one side.
 None shows both at once, which is either the gap this proposal names or evidence
 that nobody needed it.
+
+
+---
+
+## Outcome: step 1 run
+
+`crates/ucal-body/tests/ladder_alignment.rs`, an afternoon, no public API. It
+places every unit of every shipped body on the universal ladder by exact
+rational arithmetic and prints the table.
+
+```
+  body / unit                       rung        above the rung
+  ────────────────────────────────  ──────────  ──────────────
+  earth-d solar day                 T1 arc           591.3
+  earth-d year                      T2 sweep          69.1
+  mars-d solar day                  T1 arc           607.5
+  mars-d year                       T2 sweep         130.0
+  titan-d solar day                 T2 sweep           3.0
+  titan-d year                      T2 sweep        2035.7
+  luna-d solar day                  T2 sweep           5.6
+  luna-d year                       T2 sweep          69.1
+  mercury-d solar day               T2 sweep          33.3
+  mercury-d year                    T2 sweep          16.6
+  venus-d solar day                 T2 sweep          22.1
+  venus-d year                      T2 sweep          42.5
+  jupiter-d solar day               T1 arc           244.5
+  jupiter-d year                    T2 sweep         819.7
+  earth-d synodic month             T2 sweep           5.6
+```
+
+### Three things it found
+
+**The arithmetic is right.** Earth's day places at 591.3 arcs, against §4.3's
+published `1 d = 591.25 arc` — a figure nobody writing the probe chose.
+
+**Earth and Mars put their day on the same rung**, 591 and 607, on a ladder
+whose steps are a factor of 3125. Two separate planets, two separate
+measurements, and a grid built from powers of five with no knowledge of either.
+That is real, and it is exactly the kind of thing only a common scale shows.
+
+**Two independently derived quantities agree.** `earth-d`'s synodic month comes
+from `derive_cycles` expanding a continued fraction over two orbital periods;
+`luna-d`'s solar day comes from a published figure on a fact sheet. Different
+code, different data, same rung and the same residual to within a per cent.
+Found by running the probe, not by looking for it.
+
+### And the one that decides it
+
+**Every unit of every body lands on `T1` or `T2`.** Fifteen units, seven
+calendars, two adjacent rungs out of forty-five.
+
+The right-hand column is not sparse. It is **degenerate**. Forty-three rungs
+hold nothing, for any body, ever — and the "alignment" the view exists to
+display is a pair of tick marks in the middle of a very long ruler. Zooming does
+not help: zoom in far enough to separate `T1` from `T2` and there are two rows
+and no ladder.
+
+This is a fact about the model, not about a rendering. The prediction written
+before the work was that the right column would stop at the day; what it
+actually does is stop at the day *and* start one rung above it.
+
+### Recommendation
+
+**Do not build steps 2 and 3.** The kill criterion said the view must show the
+right column stopping rather than fill the space; it stops after two rungs, and
+a display whose entire content is two adjacent rows does not need forty-five.
+
+What is worth keeping is what the probe already produced: **the table itself**.
+Three findings, on one screen, in a test that runs in a millisecond. If any of
+this belongs in the program, it is as a row or two in `ucal cal show` — *this
+body's day is 591.3 arcs* — and not as a view.
+
+The sub-day question is answered and the answer is the one the proposal
+predicted, for a reason worth restating: intercalation is derivable because two
+independent periods exist, and sub-day structure is not, because nothing below
+the day is a period of the body at all. There is no local second. The universal
+ladder is what a body has instead, which was Route C's honest form and turns out
+to be the whole answer.
