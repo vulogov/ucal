@@ -1,40 +1,96 @@
 // A body file (§15.1), read by `ucal cal derive`.
 //
-// Europa is not one of the seven calendars this program ships, which is the
-// point: this file adds one without editing the crate.
-//
 // Every parameter carries Rule C's obligations — the published value verbatim,
 // its unit, a citation, and the half-width of the window it is valid over.
 // A file that omits any of them is refused rather than defaulted.
+//
+// # This example ships as a body, deliberately
+//
+// It did not, until 1.5.0 added Europa to the catalogue, and the collision was
+// worth keeping rather than avoiding: it makes the file checkable. Deriving
+// this file must produce the same intercalation as `ucal cal show europa-d`,
+// and a test asserts it. An example nobody can check is a claim with no
+// mechanism, which is the thing this project refuses everywhere else.
+//
+// # Read the solar day before copying this file
+//
+// It is not a measurement. No source publishes a solar day for a tidally
+// locked moon, for the reason `data::titan` gives: tidal lock fixes Europa's
+// face towards Jupiter, not towards the Sun, so a solar day is the synodic
+// period of the rotation and the year, and it follows exactly from two figures
+// that *are* published:
+//
+//     solar_day = 1 / (1/P_rotation - 1/P_year) = 3.554094092244058... d
+//
+// The compiled-in body carries that exactly, as a ratio. A file cannot: §15.1's
+// format has no way to say "derive this", so the value has to be written down,
+// and writing it down means rounding it.
+//
+// Rounding it changes the calendar. Not subtly — the intercalation rule this
+// program derives from this same file at each precision, measured rather than
+// reasoned about:
+//
+//      2 decimals  3.55            -> 47/105
+//      3 decimals  3.554           ->   2/27
+//      4 decimals  3.5541          ->  5/126
+//      5 decimals  3.55409         ->  5/116
+//      6 decimals  3.554094        ->   1/24   <- settles here
+//      9 decimals  3.554094092     ->   1/24
+//     12 decimals  3.554094092244  ->   1/24
+//
+// Twelve are written below so there is margin, and a test fails if five would
+// have done — otherwise this paragraph is decoration and someone shortens the
+// digits.
+//
+// Six decimals suffice here and that is a fact about Europa, not a rule. The
+// chosen convergent is an early one, so the rule is reached before the far
+// terms of the continued fraction start moving. A body whose rule sits deeper
+// needs more, and the only way to know is to try it: `ucal cal derive` prints
+// the rule, so shorten the value until it changes and then put a digit back.
+//
+// # Precision is not the only way to get this wrong
+//
+// An earlier version of this file stated `3.552106` — six decimals, so precision
+// was never the problem — and cited the NASA fact sheet for it. That source does
+// not publish a solar day for a tidally locked moon at all, and the figure was
+// wrong in the third decimal. It derived 202/279 against the shipped body's
+// 1/24: a different calendar, in the file that documents how to write one.
+//
+// It loaded perfectly, and survived a full release cycle, because the only
+// check on it was that it loaded. A wrong number with a citation attached is
+// worse than a wrong number, and it is invisible until something compares it to
+// an independent computation of the same quantity. Y3 shipped `europa-d` and
+// the comparison finally existed.
 
 id: europa
 primary: jupiter
 
-// Tidally locked, so the rotation equals the orbit about Jupiter.
+// Sidereal rotation. Synchronous with the orbit about Jupiter — the fact sheet
+// prints `S` in the rotation column — so this figure is both.
 rotation_period: {
   value: 3.551181
   unit: d
-  citation: NASA Planetary Fact Sheets (Williams, D. R.), NASA Space Science Data Coordinated Archive
-  locator: https://web.archive.org/web/2024/https://nssdc.gsfc.nasa.gov/planetary/factsheet/
+  citation: NASA Planetary Fact Sheets (Williams, D. R.), Jovian satellite fact sheet; the original document is available in the Internet Archive
+  locator: https://web.archive.org/web/2020/https://nssdc.gsfc.nasa.gov/planetary/factsheet/joviansatfact.html
   valid_years: 10000
 }
 
-// The synodic day: tidal lock fixes Europa's face towards Jupiter, not towards
-// the Sun, so the Sun moves relative to the pair as Jupiter orbits. Derived the
-// same way Titan's is, and stated here as the published-style figure it implies.
+// Derived, not measured, and rounded because the format requires a decimal.
+// See the note above before changing the number of digits.
 solar_day: {
-  value: 3.552106
+  value: 3.554094092244
   unit: d
-  citation: NASA Planetary Fact Sheets (Williams, D. R.), NASA Space Science Data Coordinated Archive
-  locator: https://web.archive.org/web/2024/https://nssdc.gsfc.nasa.gov/planetary/factsheet/
+  citation: derived as 1 / (1/P_rotation - 1/P_orbital_period) from the two published figures cited in this file, then written to twelve decimals; no source publishes a solar day for a tidally locked moon
   valid_years: 10000
 }
 
-// The year is Jupiter's orbit, as Titan's is Saturn's.
+// Rule K.2: a satellite's year is its primary's orbit about the Sun, not its
+// own about the primary. Its own is the cycle, and Europa has no moon, so it
+// has no cycle at all (§15.3 forbids supplying one).
 orbital_period: {
   value: 4332.589
   unit: d
-  citation: NASA Planetary Fact Sheets (Williams, D. R.), NASA Space Science Data Coordinated Archive
+  citation: NASA Planetary Fact Sheets (Williams, D. R.), Jupiter fact sheet; the original document is available in the Internet Archive
   locator: https://web.archive.org/web/2024/https://nssdc.gsfc.nasa.gov/planetary/factsheet/
   valid_years: 10000
 }

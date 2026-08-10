@@ -295,16 +295,78 @@ fn a_derived_calendar_states_that_it_has_no_phase() {
     assert!(text.contains("never derived"), "{text}");
 }
 
+/// The example file in the documentation derives the body it names.
+///
+/// It used to only have to *load*, and that was too weak a check. The file
+/// stated a solar day of `3.552106` and cited the NASA fact sheet for it — a
+/// figure that source does not publish, wrong in the third decimal — and it
+/// loaded perfectly for a full release cycle. Y3 added `europa-d` to the
+/// catalogue and the two could finally be compared: `202/279` against `1/24`.
+///
+/// So the check is now that the documented example and the compiled-in body
+/// agree on the calendar. An example nobody can check is a claim with no
+/// mechanism.
+#[test]
+fn the_documented_example_derives_the_body_it_names() {
+    let body = body_file::load(&example_path()).expect("the documented example loads");
+    let from_file = rule_of(&body);
+    let shipped = rule_of(&ucal_body::data::europa());
+    assert_eq!(
+        (
+            from_file.chosen.value.numer().to_dec_string(),
+            from_file.chosen.value.denom().to_dec_string()
+        ),
+        (
+            shipped.chosen.value.numer().to_dec_string(),
+            shipped.chosen.value.denom().to_dec_string()
+        ),
+        "Documentation/examples/europa.hjson derives a different calendar from \
+         the europa this program ships"
+    );
+}
+
+/// Rounding the example's solar day less finely breaks that agreement.
+///
+/// Twelve decimals are written in the file and six are the fewest that work.
+/// This trims to five. If five also worked, the paragraph in the file
+/// explaining why the digits matter would be decoration, and someone would
+/// eventually shorten them.
+///
+/// The first version of this test trimmed to eight and passed for the wrong
+/// reason: it had read the *fourth* convergent out of a table instead of the
+/// convergent the derivation chooses, which for Europa is the second and is
+/// reached long before the far terms start moving. The threshold is measured
+/// now, by the binary, and the file's table is the measurement.
+#[test]
+fn fewer_digits_in_the_example_would_change_its_calendar() {
+    let text = std::fs::read_to_string(example_path()).expect("read");
+    let short = text.replace("value: 3.554094092244", "value: 3.55409");
+    assert!(short != text, "the example no longer states the value this test trims");
+    let (_d, p) = tmp("example-trimmed", &short);
+    let trimmed = rule_of(&body_file::load(&p).expect("loads"));
+    let shipped = rule_of(&ucal_body::data::europa());
+    assert_ne!(
+        trimmed.chosen.value.denom().to_dec_string(),
+        shipped.chosen.value.denom().to_dec_string(),
+        "five decimals reproduce the shipped calendar, so the file's warning \
+         about precision is no longer true"
+    );
+}
+
 /// The example file in the documentation is a file this loader accepts.
 #[test]
 fn the_documented_example_loads() {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(|p| p.parent())
-        .expect("workspace root")
-        .join("Documentation/examples/europa.hjson");
-    let body = body_file::load(&path).unwrap_or_else(|e| {
+    let body = body_file::load(&example_path()).unwrap_or_else(|e| {
         panic!("the documented example does not load: {e}");
     });
     assert_eq!(body.id(), "europa");
+}
+
+/// The one documented example file.
+fn example_path() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(|p| p.parent())
+        .expect("workspace root")
+        .join("Documentation/examples/europa.hjson")
 }

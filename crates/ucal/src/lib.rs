@@ -2513,8 +2513,32 @@ pub fn cmd_tour() -> CmdResult {
 /// an anchor is cited and determined, never derived, and D5's literature search
 /// established what one costs to establish honestly. A body file therefore
 /// produces a calendar that is complete in units, intercalation and cycles and
-/// incomplete in phase — the ordinary case, and the state five of the seven
-/// shipped calendars are in.
+/// incomplete in phase — the ordinary case, and the state most shipped calendars
+/// are in. The count is taken from the registry rather than written down: it was
+/// written down once, said "five of the seven", and was wrong the moment Y3
+/// added five bodies.
+/// What "no anchor" means, with the count taken from the registry.
+///
+/// The count was a literal — "five of the seven shipped calendars" — and Y3
+/// added five bodies, at which point the program was telling the user something
+/// false about itself in the middle of a paragraph about not asserting things
+/// without a mechanism. Counted here so it cannot go stale again.
+#[cfg(feature = "body")]
+fn anchorless_note() -> String {
+    let derived = ucal_body::calendar::registered();
+    let total = derived.len();
+    let anchorless = derived
+        .iter()
+        .filter(|(id, _, _)| ucal_body::anchors::for_calendar(id).is_none())
+        .count();
+    format!(
+        "none. Phase is empirical (Rule J): it is determined and cited, never derived and \
+         never borrowed from another body. Without one this calendar is complete in units, \
+         intercalation and cycles and incomplete in phase, which is the ordinary case — \
+         {anchorless} of the {total} derived calendars that ship are in it"
+    )
+}
+
 #[cfg(feature = "body")]
 pub fn cmd_cal_derive(path: &str) -> CmdResult {
     let body = body_file::load(std::path::Path::new(path))?;
@@ -2597,15 +2621,7 @@ pub fn cmd_cal_derive(path: &str) -> CmdResult {
     );
 
     Ok(doc
-        .field(
-            "anchor",
-            Value::text(
-                "none. Phase is empirical (Rule J): it is determined and cited, never derived \
-                 and never borrowed from another body. Without one this calendar is complete \
-                 in units, intercalation and cycles and incomplete in phase, which is the \
-                 ordinary case — five of the seven shipped calendars are in it",
-            ),
-        )
+        .field("anchor", Value::text(anchorless_note()))
         .note(
             "Loaded by the binary, not by ucal-body. §15.1 puts the loader in the library and \
              D-A20 records that it is not there: every string in the data model is a \

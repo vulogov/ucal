@@ -107,7 +107,7 @@ periods alone.
 If a calendar names no grouping satellite, it has no months. Not a default month, not
 a synthesised one, not a fallback to Earth's. None.
 
-#terminal(caption: "ucal cal list — seven derived calendars, two of them anchored")[
+#terminal(caption: "ucal cal list — twelve derived calendars, two of them anchored")[
 ```
 earth-d      earth    anchor 1   31/128 (convergent 4)   cycles from moon
 mars-d       mars     anchor 1   45/76  (convergent 6)   no grouping satellite
@@ -116,21 +116,31 @@ luna-d       luna     —          31/84  (convergent 5)   no anchor
 mercury-d    mercury  —          1/2    (convergent 1)   no anchor
 venus-d      venus    —          135/146 (convergent 5)  no anchor
 jupiter-d    jupiter  —          68/81  (convergent 4)   no anchor
+io-d         io       —          58/59  (convergent 2)   no anchor
+europa-d     europa   —          1/24   (convergent 2)   no anchor
+ganymede-d   ganymede —          149/261 (convergent 4)  no anchor
+callisto-d   callisto —          17/28  (convergent 6)   no anchor
+enceladus-d  enceladus —         28/151 (convergent 5)   no anchor
 
   no anchor: complete in units, intercalation and cycles, incomplete in
   phase. Asking for local fields is UCAL-E0062.
 ```
 ]
 
-#callout(label: "Five of the seven have no anchor, and that is the ordinary case")[
-  It would be easy to read that table as five failures beside two successes. It is
+#callout(label: "Ten of the twelve have no anchor, and that is the ordinary case")[
+  It would be easy to read that table as ten failures beside two successes. It is
   the other way round.
 
   Earth and Mars have anchors because they have had landers, orbiters, and
-  centuries of argument about where their prime meridians are. The other five have
+  centuries of argument about where their prime meridians are. The other ten have
   not. That is a fact about where the instruments are, not about the mechanism —
-  and every one of the seven derives its intercalation from its own periods by the
+  and every one of the twelve derives its intercalation from its own periods by the
   identical code path.
+
+  The ratio moved once already. It was five of seven until 1.5.0 added Io, Europa,
+  Ganymede, Callisto and Enceladus, and adding them moved no code: they are five
+  more rows in one list. The sentence you are reading had to be edited and the
+  derivation did not, which is the distinction the whole chapter is about.
 
   Mercury is the one worth staring at. Its solar day is about twice its year, so
   the derived rule is `1/2`: a Mercurian year is *half a Mercurian day*. Nothing in
