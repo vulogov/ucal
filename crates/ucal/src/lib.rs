@@ -14,6 +14,10 @@
 #![warn(missing_docs)]
 
 pub mod cert;
+// Needs `ucal-body`: the file it loads declares a `Body`. Gated for the same
+// reason every other body-dependent item here is — `ucal` builds without that
+// feature, and the features workflow catches it when it does not.
+#[cfg(feature = "body")]
 pub mod body_file;
 pub mod emit;
 pub mod style;
