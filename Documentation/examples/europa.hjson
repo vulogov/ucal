@@ -12,43 +12,37 @@
 // and a test asserts it. An example nobody can check is a claim with no
 // mechanism, which is the thing this project refuses everywhere else.
 //
-// # Read the solar day before copying this file
+// # The solar day is derived, and this is why that matters
 //
 // It is not a measurement. No source publishes a solar day for a tidally
-// locked moon, for the reason `data::titan` gives: tidal lock fixes Europa's
-// face towards Jupiter, not towards the Sun, so a solar day is the synodic
-// period of the rotation and the year, and it follows exactly from two figures
-// that *are* published:
+// locked moon: tidal lock fixes Europa's face towards Jupiter, not towards the
+// Sun, so a solar day is the synodic period of the rotation and the year, and
+// it follows exactly from two figures that *are* published:
 //
 //     solar_day = 1 / (1/P_rotation - 1/P_year) = 3.554094092244058... d
 //
-// The compiled-in body carries that exactly, as a ratio. A file cannot: §15.1's
-// format has no way to say "derive this", so the value has to be written down,
-// and writing it down means rounding it.
-//
-// Rounding it changes the calendar. Not subtly — the intercalation rule this
-// program derives from this same file at each precision, measured rather than
-// reasoned about:
+// `derived: synodic` computes that in ticks, exactly, from the two parameters
+// in this file. Until 1.5.0 the format had no way to say it, and the value had
+// to be written down — and writing it down means rounding it, which changes the
+// calendar. The intercalation rule this program derives from this same file at
+// each precision, measured rather than reasoned about:
 //
 //      2 decimals  3.55            -> 47/105
 //      3 decimals  3.554           ->   2/27
 //      4 decimals  3.5541          ->  5/126
 //      5 decimals  3.55409         ->  5/116
-//      6 decimals  3.554094        ->   1/24   <- settles here
-//      9 decimals  3.554094092     ->   1/24
+//      6 decimals  3.554094        ->   1/24
 //     12 decimals  3.554094092244  ->   1/24
+//      derived: synodic            ->   1/24, and no digits to get wrong
 //
-// Twelve are written below so there is margin, and a test fails if five would
-// have done — otherwise this paragraph is decoration and someone shortens the
-// digits.
-//
-// Six decimals suffice here and that is a fact about Europa, not a rule. The
-// chosen convergent is an early one, so the rule is reached before the far
+// Six decimals happen to settle Europa, and that is a fact about Europa rather
+// than a rule: its chosen convergent is the second, reached before the far
 // terms of the continued fraction start moving. A body whose rule sits deeper
-// needs more, and the only way to know is to try it: `ucal cal derive` prints
-// the rule, so shorten the value until it changes and then put a digit back.
+// needs more, and there is no way to know in advance which. That is the
+// argument for the derived form — not convenience, but that the right number of
+// digits is not knowable before deriving the calendar you were trying to write.
 //
-// # Precision is not the only way to get this wrong
+// # Rounding is not the only way to get this wrong
 //
 // An earlier version of this file stated `3.552106` — six decimals, so precision
 // was never the problem — and cited the NASA fact sheet for it. That source does
@@ -75,12 +69,14 @@ rotation_period: {
   valid_years: 10000
 }
 
-// Derived, not measured, and rounded because the format requires a decimal.
-// See the note above before changing the number of digits.
+// Derived, not measured. A derived parameter states no value and no unit — it
+// is computed in ticks from the parameters it names — and still carries a
+// citation, because a derived value is not an uncited one: it is cited to the
+// derivation and to the figures underneath it, and `ucal cal derive` prints all
+// three.
 solar_day: {
-  value: 3.554094092244
-  unit: d
-  citation: derived as 1 / (1/P_rotation - 1/P_orbital_period) from the two published figures cited in this file, then written to twelve decimals; no source publishes a solar day for a tidally locked moon
+  derived: synodic
+  citation: derived as 1 / (1/P_rotation - 1/P_orbital_period) from the two published figures cited in this file; no source publishes a solar day for a tidally locked moon
   valid_years: 10000
 }
 

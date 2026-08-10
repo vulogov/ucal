@@ -2542,6 +2542,21 @@ pub fn cmd_cal_derive(path: &str) -> CmdResult {
 
     let solar = body.solar_day().value_at_epoch();
     let year = body.orbital_period().value_at_epoch();
+    // Z1.3: a year that is a whole number of solar days needs no intercalation,
+    // and that is an answer rather than a failure. The derivation reports it as
+    // UCAL-E0061 — *no convergent meets the drift bound* — advising a wider
+    // bound or a greater depth, neither of which can help: there is no
+    // fractional part to approximate. Checked here because it can only arise
+    // from a file; no shipped body is in this state.
+    let days_per_year = year.div(solar)?;
+    if days_per_year.is_integer() {
+        return Err(TimeError::with_context(
+            Code::E0060,
+            "this body's year is a whole number of its solar days, so its calendar needs no \
+             intercalation at all: there is no fractional day to distribute, and Rule K has \
+             nothing to derive. That is the answer, not a gap",
+        ));
+    }
     let rule = ucal_body::derive_leap_rule(solar, year, ucal_body::DriftBound::DEFAULT, 32)?;
 
     let mut doc = Doc::new()
@@ -2553,7 +2568,7 @@ pub fn cmd_cal_derive(path: &str) -> CmdResult {
         )
         .field(
             "days_per_year",
-            Value::quantity(&year.div(solar)?, 6, Rounding::HalfEven),
+            Value::quantity(&days_per_year, 6, Rounding::HalfEven),
         )
         .field(
             "leap_rule",

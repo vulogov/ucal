@@ -50,18 +50,27 @@ use serde::Deserialize;
 use ucal_body::param::{Measured, MeasuredUnit, RatedParam};
 use ucal_body::Body;
 use ucal_core::backend::TickInt;
-use ucal_core::{Citation, Code, Delta, Instant, Ticks, TimeError, Window, UC1};
+use ucal_core::{Citation, Code, Delta, Instant, Ratio, Ticks, TimeError, Window, UC1};
 
 type Result<T> = core::result::Result<T, TimeError>;
 
-/// One measured parameter, as it appears in a file.
+/// One parameter, as it appears in a file: measured, or derived (Z1.1).
+///
+/// `value` and `derived` are alternatives and exactly one must be present. A
+/// measured parameter states a published figure and its unit; a derived one
+/// names a relation over the file's other parameters and states neither.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ParamFile {
-    /// The published figure, verbatim, as a decimal string.
-    value: String,
-    /// `s`, `d` or `yr` — SI second, SI day of 86 400 s, Julian year.
-    unit: String,
+    /// The published figure, verbatim, as a decimal string. Measured only.
+    #[serde(default)]
+    value: Option<String>,
+    /// `s`, `d` or `yr` — SI second, SI day of 86 400 s, Julian year. Measured only.
+    #[serde(default)]
+    unit: Option<String>,
+    /// A named relation over this file's other parameters. Derived only.
+    #[serde(default)]
+    derived: Option<String>,
     /// Full source reference.
     citation: String,
     /// DOI, bibcode or URL, where one exists.
@@ -69,6 +78,87 @@ struct ParamFile {
     locator: Option<String>,
     /// Half-width of the validity window, in Julian years about J2000.0.
     valid_years: u64,
+}
+
+/// The relations a file may name in a `derived:` parameter.
+///
+/// # Why there is exactly one
+///
+/// Six of the twelve derived calendars that ship do not state a solar day. They
+/// compute it, because no source publishes a solar day for a tidally locked
+/// body and one follows exactly from two figures that are published:
+///
+/// ```text
+///   solar_day = 1 / (1/P_rotation - 1/P_orbital_period)
+/// ```
+///
+/// Until 1.5.0 a file could not say that. It could only write the result down,
+/// and writing it down means rounding it, and rounding it changes the calendar:
+/// Europa's rule moves through `47/105`, `2/27`, `5/126`, `5/116` and `1/24`
+/// across the first six decimals. The documented example file paid that cost in
+/// full — it stated a solar day the cited source does not publish, wrong in the
+/// third decimal, and derived `202/279` where the body derives `1/24`.
+///
+/// One relation, because one is what the shipped data uses six times. A
+/// vocabulary of derivations is a thing to add when a second is needed, not in
+/// advance; §15.1 does not name any, so every entry here is an extension and
+/// each should have to earn itself.
+#[derive(Clone, Copy)]
+enum Relation {
+    /// The synodic day of a body whose rotation and year are both stated.
+    Synodic,
+}
+
+impl Relation {
+    fn parse(s: &str) -> Result<Relation> {
+        match s {
+            "synodic" => Ok(Relation::Synodic),
+            _ => Err(TimeError::with_context(
+                Code::E0060,
+                "the only derivation a body file may name is `synodic`: \
+                 1 / (1/rotation_period - 1/orbital_period)",
+            )),
+        }
+    }
+
+    /// The formula, verbatim, for the provenance record §15.2 requires.
+    const fn relation(self) -> &'static str {
+        match self {
+            Relation::Synodic => "1 / (1/P_rotation - 1/P_orbital_period)",
+        }
+    }
+
+    const fn because(self) -> &'static str {
+        match self {
+            Relation::Synodic => {
+                "tidal lock fixes the body's face towards its primary, not towards the Sun; \
+                 the Sun moves relative to the pair as the primary orbits, so a solar day is \
+                 the synodic period. No source publishes it, and it follows exactly from two \
+                 that are published."
+            }
+        }
+    }
+
+    /// Evaluate over the file's other parameters, exactly.
+    fn eval(self, rotation: &RatedParam, year: &RatedParam) -> Result<Ratio> {
+        match self {
+            Relation::Synodic => {
+                let a = rotation.value_at_epoch().recip()?;
+                let b = year.value_at_epoch().recip()?;
+                let d = a.abs_diff(&b)?;
+                if d.is_zero() {
+                    return Err(TimeError::with_context(
+                        Code::E0060,
+                        "this body's rotation period equals its orbital period, so it is \
+                         tidally locked to its primary and its solar day is unbounded: the \
+                         star does not move in its sky, and it has no day for a calendar to \
+                         count",
+                    ));
+                }
+                d.recip()
+            }
+        }
+    }
 }
 
 /// A satellite, for the grouping cycle a calendar may name.
@@ -167,13 +257,69 @@ fn unit_of(u: &str) -> Result<MeasuredUnit> {
 }
 
 impl ParamFile {
+    /// Which of the two kinds of parameter this is, refusing anything ambiguous.
+    fn relation(&self) -> Result<Option<Relation>> {
+        match (&self.derived, &self.value) {
+            (Some(_), Some(_)) => Err(TimeError::with_context(
+                Code::E0060,
+                "a parameter is measured or derived, not both: it has `value` and `derived`",
+            )),
+            (None, None) => Err(TimeError::with_context(
+                Code::E0060,
+                "a parameter needs `value` and `unit`, or `derived`",
+            )),
+            (Some(d), None) => {
+                if self.unit.is_some() {
+                    return Err(TimeError::with_context(
+                        Code::E0060,
+                        "a derived parameter has no unit: it is computed in ticks from the \
+                         parameters it names, and a unit here would be a second statement of \
+                         a quantity that already has one",
+                    ));
+                }
+                Relation::parse(d).map(Some)
+            }
+            (None, Some(_)) => Ok(None),
+        }
+    }
+
+    /// A measured parameter. Rule C's obligations are all required fields.
     fn build(self) -> Result<RatedParam> {
-        let (mantissa, decimals) = mantissa_of(&self.value)?;
+        let value = self.value.ok_or_else(|| {
+            TimeError::with_context(Code::E0060, "a measured parameter needs `value`")
+        })?;
+        let unit = self.unit.ok_or_else(|| {
+            TimeError::with_context(Code::E0060, "a measured parameter needs `unit`")
+        })?;
+        let (mantissa, decimals) = mantissa_of(&value)?;
         let citation = Citation::new(leak(self.citation), self.locator.map(leak));
         RatedParam::new(
-            Measured::new(mantissa, decimals, unit_of(&self.unit)?, citation),
+            Measured::new(mantissa, decimals, unit_of(&unit)?, citation),
             j2000()?,
             window(self.valid_years)?,
+        )
+    }
+
+    /// A derived parameter, evaluated exactly over two that are not.
+    ///
+    /// The citation is still required and still carried: a derived value is not
+    /// uncited, it is cited to the derivation and to the parameters underneath
+    /// it, which is what `RatedParam::derived` records for §15.2.
+    fn build_derived(
+        self,
+        r: Relation,
+        rotation: &RatedParam,
+        year: &RatedParam,
+    ) -> Result<RatedParam> {
+        let value = r.eval(rotation, year)?;
+        let citation = Citation::new(leak(self.citation), self.locator.map(leak));
+        RatedParam::derived(
+            value,
+            j2000()?,
+            window(self.valid_years)?,
+            r.relation(),
+            r.because(),
+            Box::leak(Box::new([citation])),
         )
     }
 }
@@ -214,12 +360,18 @@ pub fn load(path: &std::path::Path) -> Result<Body> {
         }
     })?;
 
-    let mut body = Body::new(
-        leak(file.id),
-        file.rotation_period.build()?,
-        file.solar_day.build()?,
-        file.orbital_period.build()?,
-    );
+    // Order matters: a derived solar day is evaluated over the other two, so
+    // they are built first and the derivation reads the values they hold rather
+    // than the decimals the file wrote.
+    let solar_relation = file.solar_day.relation()?;
+    let rotation = file.rotation_period.build()?;
+    let year = file.orbital_period.build()?;
+    let solar_day = match solar_relation {
+        Some(r) => file.solar_day.build_derived(r, &rotation, &year)?,
+        None => file.solar_day.build()?,
+    };
+
+    let mut body = Body::new(leak(file.id), rotation, solar_day, year);
     if let Some(p) = file.primary {
         body = body.orbiting(leak(p));
     }

@@ -436,6 +436,35 @@ window in Julian years. A file omitting any of them is refused rather than
 defaulted, because a format that let them be optional would be a second and
 laxer way of declaring a body.
 
+**A parameter may be derived instead of measured.** `derived: synodic` computes
+the solar day as `1 / (1/rotation_period - 1/orbital_period)`, exactly, in ticks:
+
+```hjson
+solar_day: {
+  derived: synodic
+  citation: derived from the two published figures cited in this file
+  valid_years: 10000
+}
+```
+
+A derived parameter states no `value` and no `unit` — it has neither, and a file
+giving both a `value` and a `derived` is refused. It still needs a citation: a
+derived value is not an uncited one, it is cited to the derivation and to the
+figures underneath it, and `ucal cal derive` prints all three.
+
+`synodic` is the only relation, because it is the only one the shipped data
+needs — six of the twelve derived calendars use it. It exists for the reason
+below: no source publishes a solar day for a tidally locked body, and the exact
+value cannot be written as a decimal without choosing a calendar by choosing a
+precision.
+
+**A body tidally locked to its primary has no solar day at all.** `derived:
+synodic` on a body whose rotation equals its year says so rather than dividing
+by zero: the star does not move in that sky, there is no noon, and there is no
+sequence of days to count. A body whose year is a whole number of its solar days
+is told that too — it needs no intercalation, which is an answer and not a
+failure to find one.
+
 **One key per line.** HJSON runs an unquoted string to the end of the line, so
 `citation: NASA fact sheet` must be alone on its line.
 
@@ -446,6 +475,13 @@ derivation by 3.9 × 10⁻⁷ days, and the continued fraction diverges at the f
 term: `[1, 3, 35, 1, 1, 1, 5, 1]` becomes `[1, 3, 35, 1, 106, 6, 3, 1]`, and the
 chosen convergent changes with it. That is Rule K working, not a defect — but it
 means a rounded parameter is a different calendar.
+
+Europa's rule moves through `47/105`, `2/27`, `5/126`, `5/116` and then `1/24`
+across the first six decimals of its solar day. Six settle it, and that is a
+fact about Europa rather than a rule anyone can apply to a body they have not
+tried. Use `derived:` where the quantity is derivable, and where it is not,
+shorten the value until `ucal cal derive` reports a different rule and then put
+a digit back.
 
 **Loaded by the binary, not by `ucal-body`.** §15.1 puts the loader in the
 library; [D-A20](../spec/SPEC-DELTAS.md) records that it is not there. Every
