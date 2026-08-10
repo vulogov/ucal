@@ -58,7 +58,9 @@ evidence presented as strong more often than almost anything else in software.
 | `parse_forms` | 12.8M in 121 s | nothing |
 | `decode_bytes` | 162.6M in 121 s | nothing |
 
-Run on an Apple M5 Pro, seeded from `seeds/`, on the 1.3.0 tree.
+Run on an Apple M5 Pro, seeded from `seeds/`, on the 1.3.0 tree. Re-run at the
+1.4.0 cut against the body-file and `cal derive` additions: another 28.1M
+executions of `parse_instant`, nothing found.
 
 **Nothing found is not the same as nothing there.** These ran for minutes on one
 machine against three entry points; they say the parsers do not crash on

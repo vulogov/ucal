@@ -8,18 +8,34 @@ const SI_EPOCH: &str = "80702040028955965159443430856356371805304661393165588378
 const NOW_ISH: &str = "8070205189123984864657505252035637180530466139316558837890625";
 
 #[test]
-fn the_timeline_fits_on_one_screen() {
-    // §20's "one-screen demo": the whole of absolute time, from inflation to the
-    // bridge epoch, at a single tier.
+fn the_timeline_spans_the_whole_of_time() {
+    // §20 calls this the one-screen demo, and it was one screen when the
+    // catalogue held eleven events. 1.4.0 doubled it, and twenty-two events with
+    // their published figures and warnings is around a hundred and twenty lines.
+    //
+    // The fields were not trimmed to get back under a line count: `as_published`
+    // is a `ucal-json/1` path and promise 4 forbids removing one because a
+    // *terminal* rendering grew. So the demo is no longer one screen, and the
+    // claim is what changed — `ucal events show <id>` is the per-event view and
+    // `--tier` coarsens the placement.
+    //
+    // What the test asserts instead is the thing that actually mattered about
+    // "one screen": that the whole of time is present in one document, from the
+    // first entry to the last.
     let doc = cmd_timeline(Tier::DEEP).unwrap();
     let text = doc.to_text();
-    let lines = text.lines().count();
-    assert!(lines < 60, "the demo must fit a screen; got {lines} lines");
 
-    // And it must actually span the whole of time.
     assert!(text.contains("inflationary epoch"));
     assert!(text.contains("bridge epoch"));
     assert!(text.contains("Cretaceous"));
+    // And, since 1.4.0, past the present: the upper half of the ladder held
+    // nothing at all when every event was inside the first ten tiers.
+    assert!(text.contains("the last black holes evaporate"));
+    assert!(text.contains("big bang nucleosynthesis"));
+
+    // Still bounded. A timeline that grows without limit is a list.
+    let lines = text.lines().count();
+    assert!(lines < 200, "the timeline has stopped being a timeline; {lines} lines");
 }
 
 #[test]

@@ -14,6 +14,11 @@
 #![warn(missing_docs)]
 
 pub mod cert;
+// Needs `ucal-body`: the file it loads declares a `Body`. Gated for the same
+// reason every other body-dependent item here is — `ucal` builds without that
+// feature, and the features workflow catches it when it does not.
+#[cfg(feature = "body")]
+pub mod body_file;
 pub mod emit;
 pub mod style;
 pub mod table;
@@ -1696,6 +1701,12 @@ pub fn cmd_events_list() -> CmdResult {
     for e in events::chronological() {
         let mut fields = vec![
             ("label".into(), Value::text(e.label)),
+            // Kept, though doubling the catalogue in 1.4.0 pushed the text
+            // rendering past one screen. Dropping this field would have fixed
+            // that and removed a `ucal-json/1` path, which promise 4 forbids —
+            // the fields a consumer reads are not free to move because a
+            // *terminal* rendering grew. §20's "one-screen demo" was written
+            // against eleven events; the claim is what changed, not the data.
             ("as_published".into(), Value::text(e.as_published)),
             (
                 "window_ticks".into(),
@@ -1792,9 +1803,15 @@ pub fn cmd_events_show(id: &str) -> CmdResult {
 
 /// `ucal timeline` — the catalogue against the tier ladder (§19).
 ///
-/// A one-screen view of the whole of absolute time: each milestone placed at a
-/// stated tier, with the tier's own name, so the ladder and the catalogue are
-/// read together.
+/// The whole of absolute time in one document: each milestone placed at a stated
+/// tier, with the tier's own name, so the ladder and the catalogue are read
+/// together.
+///
+/// §20 called this the one-screen demo and it was, at eleven events. The 1.4.0
+/// catalogue is twenty-two and reaches T31, so it no longer fits a screen —
+/// which is the claim changing, not the data: trimming a field to fit would
+/// have removed a `ucal-json/1` path, and promise 4 does not bend for a
+/// terminal.
 #[cfg(feature = "events")]
 pub fn cmd_timeline(tier: Tier) -> CmdResult {
     let mut rows: Vec<(String, Value)> = Vec::new();
@@ -1812,6 +1829,12 @@ pub fn cmd_timeline(tier: Tier) -> CmdResult {
                 "tiers_since_datum".to_string(),
                 Value::number(mid.ticks().quot_rem(&tier.ticks()).0.to_dec_string()),
             ),
+            // Kept, though doubling the catalogue in 1.4.0 pushed the text
+            // rendering past one screen. Dropping this field would have fixed
+            // that and removed a `ucal-json/1` path, which promise 4 forbids —
+            // the fields a consumer reads are not free to move because a
+            // *terminal* rendering grew. §20's "one-screen demo" was written
+            // against eleven events; the claim is what changed, not the data.
             ("as_published".into(), Value::text(e.as_published)),
         ];
         if e.warning().is_some() {
@@ -2410,5 +2433,121 @@ pub fn cmd_tour() -> CmdResult {
              program, so which five commands make the point is the author's \
              opinion and not a finding — see Documentation/CONTACT.md, where \
              saying it is the wrong five would be a useful thing to report.",
+        ))
+}
+
+// ---------------------------------------------------------------------------
+// ucal cal derive — X1.4: what calendar does this body imply?
+// ---------------------------------------------------------------------------
+
+/// `ucal cal derive <file>` — read a body file and show the calendar it derives.
+///
+/// The answer to `X1-authoring-local-calendars.md`'s question: somebody who is
+/// not the author can now write a body and see what falls out of it, without
+/// editing this crate.
+///
+/// What falls out is the intercalation and the cycles. What does not is the
+/// **phase**, and this command says so rather than leaving it to be discovered:
+/// an anchor is cited and determined, never derived, and D5's literature search
+/// established what one costs to establish honestly. A body file therefore
+/// produces a calendar that is complete in units, intercalation and cycles and
+/// incomplete in phase — the ordinary case, and the state five of the seven
+/// shipped calendars are in.
+#[cfg(feature = "body")]
+pub fn cmd_cal_derive(path: &str) -> CmdResult {
+    let body = body_file::load(std::path::Path::new(path))?;
+
+    let solar = body.solar_day().value_at_epoch();
+    let year = body.orbital_period().value_at_epoch();
+    let rule = ucal_body::derive_leap_rule(solar, year, ucal_body::DriftBound::DEFAULT, 32)?;
+
+    let mut doc = Doc::new()
+        .title("ucal cal derive")
+        .field("body", Value::text(body.id()))
+        .field(
+            "primary",
+            Value::text(body.primary().unwrap_or("— (orbits nothing this file names)")),
+        )
+        .field(
+            "days_per_year",
+            Value::quantity(&year.div(solar)?, 6, Rounding::HalfEven),
+        )
+        .field(
+            "leap_rule",
+            Value::Section(vec![
+                (
+                    "rule".into(),
+                    Value::text(format!(
+                        "{}/{}",
+                        rule.chosen.value.numer().to_dec_string(),
+                        rule.chosen.value.denom().to_dec_string()
+                    )),
+                ),
+                ("convergent".into(), Value::number(rule.depth.to_string())),
+                (
+                    "whole_days_per_year".into(),
+                    Value::number(rule.whole_days.numer().to_dec_string()),
+                ),
+                (
+                    "placement".into(),
+                    Value::text(
+                        "even: days_before_year(y) = y x whole + floor(y x p / q), declared by D-A21",
+                    ),
+                ),
+            ]),
+        );
+
+    // Cycles, or the statement that there are none. §15.3 forbids a fallback.
+    //
+    // The grouping satellite is the *calendar's* declaration, not the body's —
+    // D-A5 made cycles declared per body rather than admitted by a global
+    // bracket, because "month-like" is an Earth predicate. A file that lists
+    // satellites gets the first as the grouping one; a file that lists none
+    // gets no cycle, which is the correct output and not a gap.
+    let grouping = body.satellites().first().map(|s| s.id());
+    let cycles = ucal_body::derive_cycles(&body, grouping, 32)?;
+    doc = doc.field(
+        "cycles",
+        match cycles.first() {
+            None => Value::text(
+                "none — this body names no grouping satellite, so its calendar has no month. \
+                 That is the output, not a gap (§15.3 forbids a fallback structure)",
+            ),
+            Some(c) => Value::Section(vec![
+                ("satellite".into(), Value::text(c.satellite)),
+                (
+                    "cycles_per_year".into(),
+                    Value::quantity(&c.ratio, 6, Rounding::HalfEven),
+                ),
+                (
+                    "chosen".into(),
+                    Value::text(match c.convergents.last() {
+                        Some(v) => format!(
+                            "{}/{}",
+                            v.value.numer().to_dec_string(),
+                            v.value.denom().to_dec_string()
+                        ),
+                        None => "— (no convergent)".to_string(),
+                    }),
+                ),
+            ]),
+        },
+    );
+
+    Ok(doc
+        .field(
+            "anchor",
+            Value::text(
+                "none. Phase is empirical (Rule J): it is determined and cited, never derived \
+                 and never borrowed from another body. Without one this calendar is complete \
+                 in units, intercalation and cycles and incomplete in phase, which is the \
+                 ordinary case — five of the seven shipped calendars are in it",
+            ),
+        )
+        .note(
+            "Loaded by the binary, not by ucal-body. §15.1 puts the loader in the library and \
+             D-A20 records that it is not there: every string in the data model is a \
+             `&'static str`, so a runtime loader must either leak or change a published type. \
+             This one leaks, bounded by a process that exits.",
         ))
 }

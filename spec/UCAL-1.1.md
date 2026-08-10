@@ -1,7 +1,7 @@
 <!--
   NORMATIVE. This is the corrected specification.
 
-  It is RFC UCAL-1 with the eighteen standing deltas applied in place. The
+  It is RFC UCAL-1 with the twenty standing deltas applied in place. The
   original is kept verbatim at RFC-UCAL-1.md; the reasoning behind each change
   is in SPEC-DELTAS.md. Section and rule numbering is unchanged from the
   original and MUST NOT be renumbered: the implementation cites it 494 times.
@@ -9,14 +9,15 @@
 
 > ## UCAL-1.1 — the normative specification
 >
-> RFC UCAL-1 with the **eighteen standing deltas applied in place**. Every
+> RFC UCAL-1 with the **twenty standing deltas applied in place**. Every
 > amended passage is marked inline with the delta that changed it and its class:
 >
 > | class | meaning | count |
 > |---|---|---|
 > | **CORRECTION** | the original is wrong | 6 |
-> | **AMENDMENT** | a normative change adopted by decision | 7 |
+> | **AMENDMENT** | a normative change adopted by decision | 8 |
 > | **EDITORIAL** | no behavioural effect | 5 |
+> | **UNIMPLEMENTED** | the RFC is right and this implementation does not do it | 1 |
 >
 > The original text is preserved at [`RFC-UCAL-1.md`](RFC-UCAL-1.md) — a
 > correction is only meaningful against the text it corrects. The reasoning for
@@ -854,10 +855,14 @@ pub fn parse_date(s: &str) -> Result<(Instant<UC1>, Precision), CivilError>;   /
 ## 15. `ucal-body`
 
 **15.1** Loader `deser-hjson`, strict (unknown keys → `UCAL-E0012`). Body files and anchor files are separate and version independently: parameters change with better measurement, anchors with re-determination.
+
+> **[D-A20 · UNIMPLEMENTED]** **This implementation has no loader.** The requirement above stands unchanged and is not met: `ucal_body::data::all()` is a hardcoded list of Rust constructor calls and `anchors::CALENDARS_WITH_ANCHORS` a hardcoded slice, so a body or an anchor can only enter the program by being compiled into it. Every parameter is still cited, epoch-stamped and window-valued — Rule C is met by compilation rather than by data — but adding a body means editing and republishing this crate, and `UCAL-E0012` has no raiser anywhere in the workspace. A conforming implementation should implement §15.1; this one does not yet.
 **15.2** `derive_leap_rule` and `derive_cycles` MUST be deterministic and MUST return the full convergent sequences they walked, so any derived calendar is auditable end to end.
 **15.3** `DerivedFields` MUST NOT contain a month or weekday unless a cycle was derived (§9.6). No fallback structure is permitted.
 **15.4** Earth's entry has no special code path, no extra fields, and no compile-time distinction from Mars's.
-**15.5** `fields()` algorithm: `elapsed = t.since(anchor.tick)?`; divide by `solar_day` (with `rate` applied over the interval) to get whole local days and a fraction; apply `leap_rule` to convert whole days to (year, day-of-year); apply `cycles` if present; propagate `anchor.window` and parameter uncertainty into `DerivedFields::window` by interval arithmetic (Rule U).
+**15.5** `fields()` algorithm: `elapsed = t.since(anchor.tick)?`; divide by `solar_day` (with `rate` applied over the interval) to get whole local days and a fraction; apply `leap_rule` to convert whole days to (year, day-of-year) **by the placement in D-A21**; apply `cycles` if present; propagate `anchor.window` and parameter uncertainty into `DerivedFields::window` by interval arithmetic (Rule U).
+
+> **[D-A21 · AMENDMENT]** **The leap placement is a convention and is declared here.** Rule K derives *how many* intercalary days a cycle holds; *which* day is intercalated is not derivable and §15.5 did not say. `days_before_year(y) = y·whole_days + ⌊y·p/q⌋`, with `p/q` the chosen convergent: intercalations are distributed as evenly as integer arithmetic allows, a year is `whole_days` or `whole_days + 1` long, and no intercalation falls inside a year. Without this, a calendar clumping every intercalation at the end of its cycle would satisfy the identical `LeapRule`, reproduce every convergent table, pass every conformance vector — and disagree about which absolute instant is day 366.
 
 ## 16. `ucal-cosmo`
 

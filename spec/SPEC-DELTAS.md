@@ -7,7 +7,15 @@ the delta of record, and every item here is covered by a test.
 
 Status key: **CORRECTION** — RFC is wrong, implementation follows the corrected
 value. **AMENDMENT** — normative change adopted by decision. **EDITORIAL** — no
-behavioural effect.
+behavioural effect. **UNIMPLEMENTED** — the RFC is right and this implementation
+does not do it.
+
+`UNIMPLEMENTED` was added in 1.4.0 and is the class this file had been missing.
+The other three all describe the RFC being changed; none of them could hold *the
+RFC is correct and the code is absent*, so eighteen deltas of bookkeeping had
+nowhere to record a normative requirement that was simply never built. An entry
+of this class is not a change to the specification — the requirement stands, in
+full, and the entry says the reference implementation does not meet it.
 
 ---
 
@@ -928,3 +936,110 @@ shifts — `cargo semver-checks` verifies that against the published 1.1.0. The
 CLI's hostile-input corpus asserts that every rejection carries a §19.5 exit code
 and names a remedy, so a "not found" diagnostic has to say which command lists
 the valid names.
+
+
+---
+
+## D-A20 — §15.1's data-file loader does not exist
+
+**Status: UNIMPLEMENTED.** The requirement stands unchanged. This records that
+the reference implementation does not meet it.
+
+### What the RFC requires
+
+> **15.1** Loader `deser-hjson`, strict (unknown keys → `UCAL-E0012`). Body files
+> and anchor files are separate and version independently: parameters change
+> with better measurement, anchors with re-determination.
+
+### What the implementation does
+
+`ucal_body::data::all()` is a hardcoded `Vec` of Rust constructor calls, and
+`ucal_body::anchors::CALENDARS_WITH_ANCHORS` is a hardcoded `&[&str]`. There is
+no loader, no file format, and no runtime path by which a body or an anchor can
+enter the program.
+
+Adding a body means editing `ucal-body`, rebuilding, and republishing to
+crates.io. Every parameter is still cited, epoch-stamped and window-valued —
+Rule C is met — but by compilation rather than by data.
+
+### Why it matters, beyond conformance
+
+§15.1's reason for two files is in its own sentence: parameters and anchors are
+revised for different reasons on different schedules. Compiling both into one
+crate means a new measurement of Titan's rotation and a re-determination of
+Earth's anchor are the same release.
+
+It also decides who can use the mechanism. Rule K.5 says Earth is an ordinary
+instance and §15.4 says its entry has no special code path, and both are true —
+but a reader who wants a calendar for a body that does not ship cannot have one
+without becoming a contributor to this crate.
+
+### The corroborating detail
+
+**`UCAL-E0012` — *unknown key in an HJSON data file* — has no raiser anywhere in
+the workspace.** It is a diagnostic defined for a loader that was never written.
+
+This was invisible until 1.2.0. `ucal events show` had been raising `E0012` for
+an unknown event id, which is not what that code means; [D-A19](#d-a19--ucal-e0016-a-name-that-is-not-in-a-catalogue)
+moved it to `UCAL-E0016`. Removing the one wrong caller left the code with none,
+and the absence became legible — a borrowed code had been concealing a missing
+feature.
+
+### Status of the work
+
+[`X1-authoring-local-calendars.md`](../Documentation/Proposals/X1-authoring-local-calendars.md)
+plans it in four stages and states the condition under which this entry would
+change class to `CORRECTION` instead: if the file format cannot express Rule C's
+obligations without being harder to write than the Rust it replaces, then bodies
+are code and §15.1 is wrong.
+
+---
+
+## D-A21 — the leap *placement* is a convention and must be declared
+
+**Status: AMENDMENT.** §15.5 gains a sentence.
+
+### What was underspecified
+
+> **15.5** … apply `leap_rule` to convert whole days to (year, day-of-year) …
+
+Rule K derives *how many* intercalary days a cycle holds: Earth's `31/128`,
+Mars's `45/76`, Mercury's `1/2`. That is a fact about two periods and is
+auditable end to end (§15.2).
+
+**Which day is intercalated is not derivable, and §15.5 does not say.** A
+calendar that placed every intercalation at the end of its cycle would satisfy
+the identical `LeapRule`, reproduce every convergent table, pass every
+conformance vector — and disagree with this implementation about which absolute
+instant is day 366.
+
+So the placement is load-bearing and was undeclared. A second conforming
+implementation could differ from this one on a date while agreeing on
+everything the specification checks.
+
+### The amendment
+
+`days_before_year(y) = y·whole_days + ⌊y·p/q⌋`, where `p/q` is the chosen
+convergent. Intercalations are distributed as evenly as integer arithmetic
+allows, and no intercalary day is placed within a year: a year is `whole_days`
+or `whole_days + 1` long, and the longer years fall where that formula puts
+them.
+
+### Why evenly, rather than clumped
+
+Clumping is what Earth does — the Gregorian leap day sits at the end of
+February — and it is a historical artefact of a calendar whose month lengths
+were fixed before its intercalation was. A derived calendar has no month lengths
+to preserve and no history to be compatible with, so the only remaining argument
+is drift: even distribution keeps the calendar's error against the true year
+bounded by one day *throughout* the cycle, where clumping lets it reach a full
+day just before the intercalation and reset.
+
+That is the same reasoning Rule K uses to choose a convergent at all, applied
+one level down.
+
+### Enforcement
+
+`crates/ucal-body/tests/leap_placement.rs` implements the clumped alternative,
+confirms it satisfies the same `LeapRule`, and asserts the two disagree — so the
+convention is pinned by something other than the code that implements it.

@@ -69,6 +69,7 @@ fn documents() -> Vec<(&'static str, Doc)> {
         v.push(("cal list", ucal::cmd_cal_list().unwrap()));
         v.push(("cal show", ucal::cmd_cal_show("earth-d", T).unwrap()));
         v.push(("cal anchor", ucal::cmd_cal_anchor("earth-d").unwrap()));
+        v.push(("cal derive", ucal::cmd_cal_derive(concat!(env!("CARGO_MANIFEST_DIR"), "/../../Documentation/examples/europa.hjson")).unwrap()));
         v.push((
             "show",
             ucal::cmd_show(T, &["earth-d".into(), "mars-d".into(), "earth-civil".into()]).unwrap(),

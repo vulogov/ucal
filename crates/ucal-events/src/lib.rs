@@ -163,6 +163,26 @@ const BETTS_2018: Citation = Citation::new(
              Nature Ecology & Evolution 2, 1556",
         Some("doi:10.1038/s41559-018-0644-x"),
     );
+const CYBURT_2016: Citation = Citation::new(
+        "Cyburt, R. H., Fields, B. D., Olive, K. A. and Yeh, T.-H. (2016), \
+             Big bang nucleosynthesis: present status, Rev. Mod. Phys. 88, 015004",
+        Some("doi:10.1103/RevModPhys.88.015004"),
+    );
+const GUMSLEY_2017: Citation = Citation::new(
+        "Gumsley, A. P. et al. (2017), Timing and tempo of the Great Oxidation \
+             Event, PNAS 114, 1811",
+        Some("doi:10.1073/pnas.1608824114"),
+    );
+const HUBLIN_2017: Citation = Citation::new(
+        "Hublin, J.-J. et al. (2017), New fossils from Jebel Irhoud, Morocco and \
+             the pan-African origin of Homo sapiens, Nature 546, 289",
+        Some("doi:10.1038/nature22336"),
+    );
+const ADAMS_LAUGHLIN_1997: Citation = Citation::new(
+        "Adams, F. C. and Laughlin, G. (1997), A dying universe: the long-term \
+             fate and evolution of astrophysical objects, Rev. Mod. Phys. 69, 337",
+        Some("doi:10.1103/RevModPhys.69.337"),
+    );
 const IUGS: Citation = Citation::new(
         "International Commission on Stratigraphy, International \
              Chronostratigraphic Chart v2023/09",
@@ -315,6 +335,138 @@ pub fn all() -> Vec<Event> {
             as_published: "0000-01-01T00:00:00 TT",
             citation: PLANCK_2018,
         },
+        Event {
+            id: "bbn",
+            label: "big bang nucleosynthesis",
+            description: "light nuclei form: deuterium, helium-4, and traces of lithium. A process spanning minutes, and the earliest event in this catalogue whose abundances are still directly measurable today",
+            window: window(
+                "185485843998610000000000000000000000000000000",
+                "22258301279833200000000000000000000000000000000",
+            ),
+            stated_as: StatedAs::AfterDatum,
+            as_published: "about 10 s to 20 min",
+            citation: CYBURT_2016,
+        },
+        Event {
+            id: "matter-radiation-equality",
+            label: "matter-radiation equality",
+            description: "the energy density of matter overtakes that of radiation, which is what allows structure to begin growing. Planck 2018 states this as a redshift; the window here is the conversion, and the published figure stays a redshift",
+            window: window(
+                "27511393931681514199200000000000000000000000000000000000",
+                "32779533195194995641600000000000000000000000000000000000",
+            ),
+            stated_as: StatedAs::AfterDatum,
+            as_published: "z_eq = 3387 +/- 21",
+            citation: PLANCK_2018,
+        },
+        Event {
+            id: "dark-energy-domination",
+            label: "dark energy domination",
+            description: "the expansion stops decelerating and begins accelerating, as the cosmological constant overtakes matter. A transition rather than an instant",
+            window: window(
+                "5268139263513481442400000000000000000000000000000000000000000",
+                "6438836877627588429600000000000000000000000000000000000000000",
+            ),
+            stated_as: StatedAs::AfterDatum,
+            as_published: "z = 0.3 to 0.6",
+            citation: PLANCK_2018,
+        },
+        Event {
+            id: "earth-formation",
+            label: "Earth accretion",
+            description: "the bulk of Earth's mass is assembled. Dated by lead isotopes in the oldest meteoritic material and by hafnium-tungsten in Earth's own mantle",
+            window: window(
+                "5395159954644862050192343085635637180530466139316558837890625",
+                "5436134371138855794744343085635637180530466139316558837890625",
+            ),
+            stated_as: StatedAs::BeforeBridgeEpoch,
+            as_published: "4.50 to 4.57 Ga",
+            citation: BOUVIER_2010,
+        },
+        Event {
+            id: "great-oxidation",
+            label: "the Great Oxidation Event",
+            description: "atmospheric oxygen rises from trace levels, the largest chemical change in Earth's history and one caused by life. A transition spanning some 200 Myr",
+            window: window(
+                "6636099425605815456624343085635637180530466139316558837890625",
+                "6770729651228937760152343085635637180530466139316558837890625",
+            ),
+            stated_as: StatedAs::BeforeBridgeEpoch,
+            as_published: "2.22 to 2.45 Ga",
+            citation: GUMSLEY_2017,
+        },
+        Event {
+            id: "permian-triassic",
+            label: "the Permian-Triassic boundary",
+            description: "the largest extinction in the fossil record. The IUGS chart places the boundary at 251.902 +/- 0.024 Ma",
+            window: window(
+                "7922739419328941257515669485635637180530466139316558837890625",
+                "7922767516071679996083362285635637180530466139316558837890625",
+            ),
+            stated_as: StatedAs::BeforeBridgeEpoch,
+            as_published: "251.902 +/- 0.024 Ma",
+            citation: IUGS,
+        },
+        Event {
+            id: "homo-sapiens",
+            label: "earliest Homo sapiens fossils",
+            description: "the Jebel Irhoud remains, the oldest fossils attributed to our own species. A date on a find, not on an origin: the species does not begin at a fossil",
+            window: window(
+                "8069999130813126547221583085635637180530466139316558837890625",
+                "8070040105229620540966135085635637180530466139316558837890625",
+            ),
+            stated_as: StatedAs::BeforeBridgeEpoch,
+            as_published: "315 +/- 34 ka",
+            citation: HUBLIN_2017,
+        },
+        Event {
+            id: "holocene",
+            label: "the base of the Holocene",
+            description: "the current epoch begins, defined at a fixed point in a Greenland ice core rather than by an event. The whole of recorded history is inside it",
+            window: window(
+                "8070197095779673242713118605635637180530466139316558837890625",
+                "8070197212849434654123817325635637180530466139316558837890625",
+            ),
+            stated_as: StatedAs::BeforeBridgeEpoch,
+            as_published: "11 700 yr b2k",
+            citation: IUGS,
+        },
+        Event {
+            id: "stelliferous-end",
+            label: "the end of star formation",
+            description: "the last stars burn out and the galaxies go dark. The first entry in this catalogue that is a prediction rather than an observation, and the tier ladder was built for this end of it",
+            window: window(
+                "58534880705705349360000000000000000000000000000000000000000000000",
+                "585348807057053493600000000000000000000000000000000000000000000000",
+            ),
+            stated_as: StatedAs::AfterDatum,
+            as_published: "10^14 to 10^15 yr",
+            citation: ADAMS_LAUGHLIN_1997,
+        },
+        Event {
+            id: "proton-decay",
+            label: "proton decay, if it happens",
+            description: "grand unified theories predict the proton is unstable; experiment has only ever set lower bounds. If it decays, ordinary matter ends here. Catalogued with the conditional intact, because the alternative is a catalogue that asserts a theory",
+            window: window(
+                "5853488070570534936000000000000000000000000000000000000000000000000000000000000000000",
+                "5853488070570534936000000000000000000000000000000000000000000000000000000000000000000000000",
+            ),
+            stated_as: StatedAs::AfterDatum,
+            as_published: "10^34 to 10^40 yr (lower bound only)",
+            citation: ADAMS_LAUGHLIN_1997,
+        },
+        Event {
+            id: "black-hole-evaporation",
+            label: "the last black holes evaporate",
+            description: "supermassive black holes finish radiating away. The largest number this catalogue contains, and still eleven tiers below the domain ceiling",
+            window: window(
+                "58534880705705349360000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+                "5853488070570534936000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+            ),
+            stated_as: StatedAs::AfterDatum,
+            as_published: "about 10^100 yr",
+            citation: ADAMS_LAUGHLIN_1997,
+        },
     ]
 }
 
@@ -384,7 +536,16 @@ mod tests {
         // §10.6: any statement inside the claim half-width must surface the
         // warning, because there the datum's own identification is comparable to
         // or larger than the quantity being discussed.
-        let expect_warned = ["inflation", "recombination"];
+        // Everything inside 20 Myr of the datum. `matter-radiation-equality`
+        // at ~51 kyr and `bbn` at minutes are both far inside it; the point of
+        // listing them rather than computing the set is that a new event
+        // landing in that band must be a deliberate edit here.
+        let expect_warned = [
+            "inflation",
+            "bbn",
+            "recombination",
+            "matter-radiation-equality",
+        ];
         for e in all() {
             let warned = e.warning() == Some(Warning::W0006);
             assert_eq!(
@@ -432,7 +593,16 @@ mod tests {
             );
         }
         assert_eq!(c.first().unwrap().id, "inflation");
-        assert_eq!(c.last().unwrap().id, "bridge-epoch");
+        // The catalogue no longer ends at the present. `bridge-epoch` used to be
+        // last, which meant the upper half of the tier ladder held nothing at
+        // all: forty-five rungs, and every event inside the first ten. The three
+        // far-future entries are predictions and are labelled as such.
+        assert_eq!(c.last().unwrap().id, "black-hole-evaporation");
+        let latest = c.last().unwrap().window.hi().ticks();
+        assert!(
+            latest < &<Ticks as TickInt>::domain_max(),
+            "the catalogue must stay inside the domain"
+        );
     }
 
     #[test]

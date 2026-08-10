@@ -41,6 +41,14 @@ use std::collections::BTreeSet;
 use std::path::Path;
 use std::process::Command;
 
+/// This repository's own `blob/main` prefix.
+///
+/// A link to a file this cycle added will 404 until the branch merges, and the
+/// release procedure runs this check *before* the merge. That is a false alarm
+/// with a completely reliable signature: the URL points at this repository's
+/// `main`, and the file it names is sitting in the working tree.
+const OWN_MAIN: &str = "https://github.com/vulogov/ucal/blob/main/";
+
 /// What happened to one URL.
 enum Outcome {
     /// Reached, on the host it named.
@@ -51,6 +59,9 @@ enum Outcome {
     Failed(String),
     /// `curl` itself could not run.
     NoTool(String),
+    /// A link to this repository's `main` naming a file that exists locally:
+    /// unmerged, not dead.
+    Unmerged(String),
 }
 
 /// Check every cited URL in the tree. Returns a process exit code.
@@ -71,7 +82,7 @@ pub fn run(root: &Path) -> i32 {
     let mut failed = 0usize;
     let mut moved = 0usize;
     for (url, sites) in &urls {
-        match head(url) {
+        match check_one(root, url) {
             Outcome::Ok(status) => println!("  ok    {status}  {url}"),
             Outcome::Moved { status, to } => {
                 moved += 1;
@@ -92,6 +103,11 @@ pub fn run(root: &Path) -> i32 {
                 failed += 1;
                 println!("  FAIL  curl: {e}  {url}");
             }
+            Outcome::Unmerged(rel) => {
+                println!("  --    {url}");
+                println!("          not on `main` yet; {rel} is in the working tree, so this");
+                println!("          resolves when the branch merges. Not counted as a failure.");
+            }
         }
     }
 
@@ -111,6 +127,23 @@ pub fn run(root: &Path) -> i32 {
     println!("\n  A locator that has rotted should point at an archived copy of the");
     println!("  document that was actually read, with the source string saying so.");
     2
+}
+
+/// Check one URL, allowing for links to unmerged files in this repository.
+fn check_one(root: &Path, url: &str) -> Outcome {
+    let outcome = head(url);
+    // Only a 404 on our own `main` can be an unmerged link, and only if the file
+    // is actually here. Anything else is what it says it is.
+    if let Outcome::Failed(status) = &outcome {
+        if status == "404" {
+            if let Some(rel) = url.strip_prefix(OWN_MAIN) {
+                if root.join(rel).exists() {
+                    return Outcome::Unmerged(rel.to_string());
+                }
+            }
+        }
+    }
+    outcome
 }
 
 /// `curl -sIL`, reduced to a final status and a final URL.

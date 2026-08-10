@@ -184,7 +184,7 @@ enum Command {
         #[command(subcommand)]
         what: EventCommand,
     },
-    /// The catalogue against the tier ladder — the whole of time, on one screen.
+    /// The catalogue against the tier ladder: the whole of time, in one document.
     #[cfg(feature = "events")]
     Timeline {
         /// Tier to place events at: a name, `T<k>`, or `5^e`.
@@ -292,6 +292,11 @@ enum CalCommand {
     Anchor {
         /// Calendar id.
         id: String,
+    },
+    /// Read a body file (§15.1) and show the calendar it derives.
+    Derive {
+        /// Path to a body file.
+        file: String,
     },
 }
 
@@ -523,6 +528,7 @@ fn main() {
             CalCommand::List => ucal::cmd_cal_list(),
             CalCommand::Show { id, instant } => ucal::cmd_cal_show(id, instant),
             CalCommand::Anchor { id } => ucal::cmd_cal_anchor(id),
+            CalCommand::Derive { file } => ucal::cmd_cal_derive(file),
         },
         #[cfg(all(feature = "body", feature = "civil"))]
         Command::Show {

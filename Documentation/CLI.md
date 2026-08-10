@@ -404,6 +404,53 @@ mechanism doing something Earth would never ask of it:
 | `cycles.cycles_per_year` | The satellite's period as a fraction of the body's year. |
 | `cycles.convergents` | The continued-fraction convergents of that ratio — the candidate cycle lengths, with the chosen one marked. |
 
+### `cal derive`
+
+```
+ucal cal derive <FILE>
+```
+
+Read a body file (§15.1) and show the calendar it derives — intercalation,
+cycles, and what is missing. This is how a body that does not ship gets a
+calendar without editing the crate;
+[`Documentation/examples/europa.hjson`](examples/europa.hjson) is a complete
+one.
+
+| field | meaning |
+|---|---|
+| `body` / `primary` | As the file declares them. |
+| `days_per_year` | `orbital_period / solar_day`, the ratio Rule K expands. |
+| `leap_rule.rule` | The chosen convergent, e.g. `202/279`. |
+| `leap_rule.convergent` | Which convergent it is — how many continued-fraction steps were walked. |
+| `leap_rule.whole_days_per_year` | The integer part. |
+| `leap_rule.placement` | The placement convention, declared by D-A21. |
+| `cycles` | The grouping cycle from the first satellite the file lists, or a statement that the body names none. §15.3 forbids a fallback, so no month is invented. |
+| `anchor` | Always `none`. Phase is empirical (Rule J) and is never derived. |
+
+**Every parameter needs Rule C's obligations** — the published value verbatim,
+its unit (`s`, `d` or `yr`), a citation, and the half-width of its validity
+window in Julian years. A file omitting any of them is refused rather than
+defaulted, because a format that let them be optional would be a second and
+laxer way of declaring a body.
+
+**One key per line.** HJSON runs an unquoted string to the end of the line, so
+`citation: NASA fact sheet` must be alone on its line.
+
+**The last digit you write chooses the intercalation.** A leap rule is a
+continued fraction and continued fractions are violently sensitive to their
+inputs. Titan's solar day rounded to six decimals differs from the exact
+derivation by 3.9 × 10⁻⁷ days, and the continued fraction diverges at the fifth
+term: `[1, 3, 35, 1, 1, 1, 5, 1]` becomes `[1, 3, 35, 1, 106, 6, 3, 1]`, and the
+chosen convergent changes with it. That is Rule K working, not a defect — but it
+means a rounded parameter is a different calendar.
+
+**Loaded by the binary, not by `ucal-body`.** §15.1 puts the loader in the
+library; [D-A20](../spec/SPEC-DELTAS.md) records that it is not there. Every
+string in the data model is a `&'static str`, so a runtime loader must either
+leak or change a published type, and the second is a breaking change. This one
+leaks, bounded by a process that exits — which is safe in a binary and would not
+be in a library.
+
 ### `cal anchor`
 
 | field | meaning |

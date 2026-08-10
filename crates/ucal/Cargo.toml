@@ -26,6 +26,11 @@ clap = { version = "4", features = ["derive", "wrap_help"] }
 clap_complete = "4"
 # The man page, generated from the same definition for the same reason.
 clap_mangen = "0.2"
+# §15.1 names this loader. It is a dependency of the *binary* and not of any
+# library crate: see `body_file.rs` for why the loader cannot live in
+# `ucal-body` without a breaking change, and D-A20 for the record.
+deser-hjson = "2"
+serde = { version = "1", features = ["derive"] }
 # Already in the tree through clap: making it direct adds a line to this
 # manifest and nothing to the dependency graph. Only the SGR value types are
 # used -- the tty test is std's `IsTerminal` and the choice logic is ours.
