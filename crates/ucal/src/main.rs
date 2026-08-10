@@ -293,6 +293,11 @@ enum CalCommand {
         /// Calendar id.
         id: String,
     },
+    /// Read a body file (§15.1) and show the calendar it derives.
+    Derive {
+        /// Path to a body file.
+        file: String,
+    },
 }
 
 #[cfg(feature = "civil")]
@@ -523,6 +528,7 @@ fn main() {
             CalCommand::List => ucal::cmd_cal_list(),
             CalCommand::Show { id, instant } => ucal::cmd_cal_show(id, instant),
             CalCommand::Anchor { id } => ucal::cmd_cal_anchor(id),
+            CalCommand::Derive { file } => ucal::cmd_cal_derive(file),
         },
         #[cfg(all(feature = "body", feature = "civil"))]
         Command::Show {

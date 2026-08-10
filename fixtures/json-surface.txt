@@ -30,6 +30,16 @@ cal-anchor.window	object
 cal-anchor.window.hi	string
 cal-anchor.window.lo	string
 cal-anchor.window.width_ticks	string
+cal-derive.anchor	string
+cal-derive.body	string
+cal-derive.cycles	string
+cal-derive.days_per_year	string
+cal-derive.leap_rule	object
+cal-derive.leap_rule.convergent	string
+cal-derive.leap_rule.placement	string
+cal-derive.leap_rule.rule	string
+cal-derive.leap_rule.whole_days_per_year	string
+cal-derive.primary	string
 cal-list.calendars	object
 cal-list.calendars.*	object
 cal-list.calendars.*.anchor_revision	string

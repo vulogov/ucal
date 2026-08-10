@@ -1,0 +1,40 @@
+// A body file (§15.1), read by `ucal cal derive`.
+//
+// Europa is not one of the seven calendars this program ships, which is the
+// point: this file adds one without editing the crate.
+//
+// Every parameter carries Rule C's obligations — the published value verbatim,
+// its unit, a citation, and the half-width of the window it is valid over.
+// A file that omits any of them is refused rather than defaulted.
+
+id: europa
+primary: jupiter
+
+// Tidally locked, so the rotation equals the orbit about Jupiter.
+rotation_period: {
+  value: 3.551181
+  unit: d
+  citation: NASA Planetary Fact Sheets (Williams, D. R.), NASA Space Science Data Coordinated Archive
+  locator: https://web.archive.org/web/2024/https://nssdc.gsfc.nasa.gov/planetary/factsheet/
+  valid_years: 10000
+}
+
+// The synodic day: tidal lock fixes Europa's face towards Jupiter, not towards
+// the Sun, so the Sun moves relative to the pair as Jupiter orbits. Derived the
+// same way Titan's is, and stated here as the published-style figure it implies.
+solar_day: {
+  value: 3.552106
+  unit: d
+  citation: NASA Planetary Fact Sheets (Williams, D. R.), NASA Space Science Data Coordinated Archive
+  locator: https://web.archive.org/web/2024/https://nssdc.gsfc.nasa.gov/planetary/factsheet/
+  valid_years: 10000
+}
+
+// The year is Jupiter's orbit, as Titan's is Saturn's.
+orbital_period: {
+  value: 4332.589
+  unit: d
+  citation: NASA Planetary Fact Sheets (Williams, D. R.), NASA Space Science Data Coordinated Archive
+  locator: https://web.archive.org/web/2024/https://nssdc.gsfc.nasa.gov/planetary/factsheet/
+  valid_years: 10000
+}
