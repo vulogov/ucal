@@ -274,43 +274,68 @@ Seven derived calendars, two with anchors. A body without an anchor is the ordin
 ucal cal list
 ─────────────
 calendars:
-  calendar      kind                             body     anchor_revision
-  ────────────  ───────────────────────────────  ───────  ───────────────
-  earth-d       derived — Rule K                 earth    1
+  calendar      kind                             body       anchor_revision
+  ────────────  ───────────────────────────────  ─────────  ───────────────
+  earth-d       derived — Rule K                 earth      1
                 leap_rule  31/128 (convergent 4)
                 cycles  from moon
-  mars-d        derived — Rule K                 mars     1
+  mars-d        derived — Rule K                 mars       1
                 leap_rule  45/76 (convergent 6)
                 cycles  none — the calendar names no grouping satellite
-  titan-d       derived — Rule K                 titan    —
+  titan-d       derived — Rule K                 titan      —
                 leap_rule  88/117 (convergent 3)
                 status  no anchor: complete in units, intercalation and cycles,
                         incomplete in phase. Asking for local fields is
                         UCAL-E0062 (Rule J.3).
-  luna-d        derived — Rule K                 luna     —
+  luna-d        derived — Rule K                 luna       —
                 leap_rule  31/84 (convergent 5)
                 status  no anchor: complete in units, intercalation and cycles,
                         incomplete in phase. Asking for local fields is
                         UCAL-E0062 (Rule J.3).
-  mercury-d     derived — Rule K                 mercury  —
+  mercury-d     derived — Rule K                 mercury    —
                 leap_rule  1/2 (convergent 1)
                 status  no anchor: complete in units, intercalation and cycles,
                         incomplete in phase. Asking for local fields is
                         UCAL-E0062 (Rule J.3).
-  venus-d       derived — Rule K                 venus    —
+  venus-d       derived — Rule K                 venus      —
                 leap_rule  135/146 (convergent 5)
                 status  no anchor: complete in units, intercalation and cycles,
                         incomplete in phase. Asking for local fields is
                         UCAL-E0062 (Rule J.3).
-  jupiter-d     derived — Rule K                 jupiter  —
+  jupiter-d     derived — Rule K                 jupiter    —
                 leap_rule  68/81 (convergent 4)
                 status  no anchor: complete in units, intercalation and cycles,
                         incomplete in phase. Asking for local fields is
                         UCAL-E0062 (Rule J.3).
-  earth-civil   legacy — declared tables (§8.6)  —        —
+  io-d          derived — Rule K                 io         —
+                leap_rule  58/59 (convergent 2)
+                status  no anchor: complete in units, intercalation and cycles,
+                        incomplete in phase. Asking for local fields is
+                        UCAL-E0062 (Rule J.3).
+  europa-d      derived — Rule K                 europa     —
+                leap_rule  1/24 (convergent 2)
+                status  no anchor: complete in units, intercalation and cycles,
+                        incomplete in phase. Asking for local fields is
+                        UCAL-E0062 (Rule J.3).
+  ganymede-d    derived — Rule K                 ganymede   —
+                leap_rule  149/261 (convergent 4)
+                status  no anchor: complete in units, intercalation and cycles,
+                        incomplete in phase. Asking for local fields is
+                        UCAL-E0062 (Rule J.3).
+  callisto-d    derived — Rule K                 callisto   —
+                leap_rule  17/28 (convergent 6)
+                status  no anchor: complete in units, intercalation and cycles,
+                        incomplete in phase. Asking for local fields is
+                        UCAL-E0062 (Rule J.3).
+  enceladus-d   derived — Rule K                 enceladus  —
+                leap_rule  28/151 (convergent 5)
+                status  no anchor: complete in units, intercalation and cycles,
+                        incomplete in phase. Asking for local fields is
+                        UCAL-E0062 (Rule J.3).
+  earth-civil   legacy — declared tables (§8.6)  —          —
                 leap_rule  97/400 (NOT a convergent — declared, not derived)
                 arbitrary  4
-  earth-julian  legacy — declared tables (§8.6)  —        —
+  earth-julian  legacy — declared tables (§8.6)  —          —
                 leap_rule  1/4 (a convergent)
                 arbitrary  4
 
@@ -329,6 +354,12 @@ ucal cal show earth-d
 calendar  earth-d
 kind      derived — Rule K
 body      earth
+ladder_placement:
+  unit       rung      above_rung
+  ─────────  ────────  ──────────
+  solar_day  T1 arc    591.3
+  year       T2 sweep  69.1
+  cycle      T2 sweep  5.6
 anchor:
   phase         mean solar midnight
   revision      1
@@ -374,6 +405,7 @@ cycles:
     4131/334
     8497/687
 certification:
+  rounded, half-even, 1 digits  above_rung
   rounded, trunc, 6 digits      day_fraction
   rounded, half-even, 9 digits  cycles_per_year
   every other number above is exact: the digits shown are the value

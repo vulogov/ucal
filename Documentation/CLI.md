@@ -394,6 +394,9 @@ mechanism doing something Earth would never ask of it:
 | `calendar` / `kind` / `body` | Which calendar this is. |
 | `anchor.method` | How the anchor was determined, cited. |
 | `anchor.uncertainty` | The observation's stated uncertainty. |
+| `ladder_placement.unit` | Which of this body's own periods a row places: its solar day, its year, and its grouping cycle where it has one. |
+| `ladder_placement.rung` | The coarsest universal tier that is no longer than that period — where the body's unit sits on the grid of §4.3. |
+| `ladder_placement.above_rung` | How many of that tier the period holds. Earth's day is 591.3 arcs and Mars's sol is 607.5, on a ladder whose steps are a factor of 3125: two planets, two independent measurements, one rung. |
 | `intercalation.rule` | The derived leap rule, as a fraction. |
 | `intercalation.whole_days_per_year` | The integer part: how many whole days a year holds before intercalation. |
 | `intercalation.bound` | The drift bound the rule was derived against — a **rate** in local units, not a duration (D-A13). |

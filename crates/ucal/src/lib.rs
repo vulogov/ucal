@@ -831,6 +831,53 @@ pub fn cmd_verify() -> CmdResult {
 // ucal between — a duration, on the ladder
 // ---------------------------------------------------------------------------
 
+/// Where a duration *sits* on the universal ladder: the rung, and how far above it.
+///
+/// Not to be confused with `between`'s `on_the_ladder`, which decomposes a
+/// duration into a count of every tier. This one answers a different question —
+/// which single rung is this period's size — and so carries different columns
+/// under a different key, because one name with two shapes in the
+/// `ucal-json/1` surface is a consumer's problem, not a saving.
+///
+/// Y1, and the one thing [`W4-two-ladders.md`] recommended keeping. Its step 1
+/// placed every unit of every shipped body and found Earth's day and Mars's sol
+/// on the *same rung* — 591 arcs and 607 — on a ladder whose steps are a factor
+/// of 3125. Two separate planets, two separate measurements, and a grid built
+/// from powers of five with no knowledge of either.
+///
+/// That is worth a row and is not worth a view: every unit of every body lands
+/// on `T1` or `T2`, two adjacent rungs out of forty-five, so a two-column
+/// display would be forty-three empty lines and two full ones.
+///
+/// [`W4-two-ladders.md`]: https://github.com/vulogov/ucal/blob/main/Documentation/Proposals/W4-two-ladders.md
+#[cfg(feature = "body")]
+fn ladder_placement(length: &Ratio) -> Option<(Tier, Ratio)> {
+    let tier = Tier::all_descending()
+        .find(|t| Ratio::from_int(t.ticks()).cmp_exact(length) != core::cmp::Ordering::Greater)?;
+    let above = length.div(&Ratio::from_int(tier.ticks())).ok()?;
+    Some((tier, above))
+}
+
+/// A `(rung, above)` pair as a row.
+#[cfg(feature = "body")]
+fn ladder_row(name: &str, length: &Ratio) -> Option<(String, Value)> {
+    let (tier, above) = ladder_placement(length)?;
+    let label = match ucal_core::tier::name_of(tier) {
+        Some(n) => format!("{tier} {}", n.key()),
+        None => tier.to_string(),
+    };
+    Some((
+        name.to_string(),
+        Value::Section(vec![
+            ("rung".into(), Value::text(label)),
+            (
+                "above_rung".into(),
+                Value::quantity(&above, 1, Rounding::HalfEven),
+            ),
+        ]),
+    ))
+}
+
 /// The named tiers, coarsest first.
 ///
 /// The grid has forty-five rungs and ten of them have names (Rule N). A
@@ -1523,11 +1570,26 @@ pub fn cmd_cal_show(id: &str, input: &str) -> CmdResult {
         })
         .collect();
 
+    // Y1: where this body's own units sit on the universal grid.
+    let mut ladder: Vec<(String, Value)> = Vec::new();
+    if let Some(r) = ladder_row("solar_day", c.body().solar_day().value_at_epoch()) {
+        ladder.push(r);
+    }
+    if let Some(r) = ladder_row("year", c.body().orbital_period().value_at_epoch()) {
+        ladder.push(r);
+    }
+    if let Some(cy) = c.cycles().first() {
+        if let Some(r) = ladder_row("cycle", &cy.synodic_period) {
+            ladder.push(r);
+        }
+    }
+
     let mut doc = Doc::new()
         .title(format!("ucal cal show {id}"))
         .field("calendar", Value::text(id))
         .field("kind", Value::text("derived — Rule K"))
         .field("body", Value::text(c.body().id()))
+        .field("ladder_placement", Value::rows("unit", ladder))
         .field(
             "anchor",
             Value::Section(vec![
