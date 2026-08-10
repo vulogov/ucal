@@ -1696,6 +1696,12 @@ pub fn cmd_events_list() -> CmdResult {
     for e in events::chronological() {
         let mut fields = vec![
             ("label".into(), Value::text(e.label)),
+            // Kept, though doubling the catalogue in 1.4.0 pushed the text
+            // rendering past one screen. Dropping this field would have fixed
+            // that and removed a `ucal-json/1` path, which promise 4 forbids —
+            // the fields a consumer reads are not free to move because a
+            // *terminal* rendering grew. §20's "one-screen demo" was written
+            // against eleven events; the claim is what changed, not the data.
             ("as_published".into(), Value::text(e.as_published)),
             (
                 "window_ticks".into(),
@@ -1792,9 +1798,15 @@ pub fn cmd_events_show(id: &str) -> CmdResult {
 
 /// `ucal timeline` — the catalogue against the tier ladder (§19).
 ///
-/// A one-screen view of the whole of absolute time: each milestone placed at a
-/// stated tier, with the tier's own name, so the ladder and the catalogue are
-/// read together.
+/// The whole of absolute time in one document: each milestone placed at a stated
+/// tier, with the tier's own name, so the ladder and the catalogue are read
+/// together.
+///
+/// §20 called this the one-screen demo and it was, at eleven events. The 1.4.0
+/// catalogue is twenty-two and reaches T31, so it no longer fits a screen —
+/// which is the claim changing, not the data: trimming a field to fit would
+/// have removed a `ucal-json/1` path, and promise 4 does not bend for a
+/// terminal.
 #[cfg(feature = "events")]
 pub fn cmd_timeline(tier: Tier) -> CmdResult {
     let mut rows: Vec<(String, Value)> = Vec::new();
@@ -1812,6 +1824,12 @@ pub fn cmd_timeline(tier: Tier) -> CmdResult {
                 "tiers_since_datum".to_string(),
                 Value::number(mid.ticks().quot_rem(&tier.ticks()).0.to_dec_string()),
             ),
+            // Kept, though doubling the catalogue in 1.4.0 pushed the text
+            // rendering past one screen. Dropping this field would have fixed
+            // that and removed a `ucal-json/1` path, which promise 4 forbids —
+            // the fields a consumer reads are not free to move because a
+            // *terminal* rendering grew. §20's "one-screen demo" was written
+            // against eleven events; the claim is what changed, not the data.
             ("as_published".into(), Value::text(e.as_published)),
         ];
         if e.warning().is_some() {

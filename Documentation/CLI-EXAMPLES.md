@@ -452,35 +452,116 @@ ucal timeline — at tier T4
 ──────────────────────────
 tier  T4
 events:
-  event                           at                   tiers_since_datum
-  ──────────────────────────────  ───────────────────  ─────────────────
-  inflationary epoch              0 drift              0
+  event
+  ──────────────────────────────
+  inflationary epoch
+                                  at  0 drift
+                                  tiers_since_datum  0
                                   as_published  10^-36 to 10^-32 s
                                   warning  UCAL-W0006 — inside the claim
                                            half-width
-  recombination                   2 drift              2
+  big bang nucleosynthesis
+                                  at  0 drift
+                                  tiers_since_datum  0
+                                  as_published  about 10 s to 20 min
+                                  warning  UCAL-W0006 — inside the claim
+                                           half-width
+  matter-radiation equality
+                                  at  0 drift
+                                  tiers_since_datum  0
+                                  as_published  z_eq = 3387 +/- 21
+                                  warning  UCAL-W0006 — inside the claim
+                                           half-width
+  recombination
+                                  at  2 drift
+                                  tiers_since_datum  2
                                   as_published  240 to 430 kyr (z = 1400 to z =
                                                 1000)
                                   warning  UCAL-W0006 — inside the claim
                                            half-width
-  first stars                     1769 drift           1769
+  first stars
+                                  at  1769 drift
+                                  tiers_since_datum  1769
                                   as_published  100 to 400 Myr
-  reionization                    1 deep, 943 drift    4068
+  reionization
+                                  at  1 deep, 943 drift
+                                  tiers_since_datum  4068
                                   as_published  150 Myr to 1 Gyr
-  first galaxies                  1 deep, 1828 drift   4953
+  first galaxies
+                                  at  1 deep, 1828 drift
+                                  tiers_since_datum  4953
                                   as_published  400 Myr to 1 Gyr
-  Solar System formation          20 deep, 2730 drift  65230
+  dark energy domination
+                                  at  22 deep, 2014 drift
+                                  tiers_since_datum  70764
+                                  as_published  z = 0.3 to 0.6
+  Solar System formation
+                                  at  20 deep, 2730 drift
+                                  tiers_since_datum  65230
                                   as_published  4567 to 4571 Ma ago
-  last universal common ancestor  22 deep, 2983 drift  71733
+  Earth accretion
+                                  at  20 deep, 2971 drift
+                                  tiers_since_datum  65471
+                                  as_published  4.50 to 4.57 Ga
+  last universal common ancestor
+                                  at  22 deep, 2983 drift
+                                  tiers_since_datum  71733
                                   as_published  3500 to 3800 Ma ago
-  base of the Cambrian            29 deep, 3124 drift  93749
+  the Great Oxidation Event
+                                  at  25 deep, 2914 drift
+                                  tiers_since_datum  81039
+                                  as_published  2.22 to 2.45 Ga
+  base of the Cambrian
+                                  at  29 deep, 3124 drift
+                                  tiers_since_datum  93749
                                   as_published  538.8 ± 0.1 Ma ago
-  Cretaceous-Palaeogene boundary  31 deep, 220 drift   97095
+  the Permian-Triassic boundary
+                                  at  30 deep, 2030 drift
+                                  tiers_since_datum  95780
+                                  as_published  251.902 +/- 0.024 Ma
+  Cretaceous-Palaeogene boundary
+                                  at  31 deep, 220 drift
+                                  tiers_since_datum  97095
                                   as_published  66.0 to 66.1 Ma ago
-  hominin-chimpanzee divergence   31 deep, 641 drift   97516
+  hominin-chimpanzee divergence
+                                  at  31 deep, 641 drift
+                                  tiers_since_datum  97516
                                   as_published  6 to 7 Ma ago
-  the bridge epoch                31 deep, 687 drift   97562
+  earliest Homo sapiens fossils
+                                  at  31 deep, 685 drift
+                                  tiers_since_datum  97560
+                                  as_published  315 +/- 34 ka
+  the base of the Holocene
+                                  at  31 deep, 687 drift
+                                  tiers_since_datum  97562
+                                  as_published  11 700 yr b2k
+  the bridge epoch
+                                  at  31 deep, 687 drift
+                                  tiers_since_datum  97562
                                   as_published  0000-01-01T00:00:00 TT
+  the end of star formation
+                                  at  398 T6, 1702 deep, 574 drift
+                                  tiers_since_datum  3892038074
+                                  as_published  10^14 to 10^15 yr
+  proton decay, if it happens
+                                  at  1244 T13, 2813 T12, 3120 T11, 1052 T10,
+                                      2336 T9, 2898 T8, 2312 T7, 1445 T6, 583
+                                      deep, 690 drift
+                                  tiers_since_datum  353821996987590080283870685
+                                                     56510065
+                                  as_published  10^34 to 10^40 yr (lower bound
+                                                only)
+  the last black holes evaporate
+                                  at  1 T31, 1739 T30, 407 T29, 1119 T28, 2157
+                                      T27, 2798 T26, 2739 T25, 728 T24, 760
+                                      T23, 1260 T22, 2356 T21, 1020 T20, 1641
+                                      T19, 2345 T18, 137 T17, 1901 T16, 2209
+                                      T15, 1207 T14, 0 drift
+                                  tiers_since_datum  357359859597606383480325912
+                                                     094839567619719168000000000
+                                                     000000000000000000000000000
+                                                     00000000000000
+                                  as_published  about 10^100 yr
 
 Positions are the windows' midpoints floored to the stated tier. The midpoint
 is a rendering choice; the window is the value (Rule U).

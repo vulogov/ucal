@@ -184,7 +184,7 @@ enum Command {
         #[command(subcommand)]
         what: EventCommand,
     },
-    /// The catalogue against the tier ladder — the whole of time, on one screen.
+    /// The catalogue against the tier ladder: the whole of time, in one document.
     #[cfg(feature = "events")]
     Timeline {
         /// Tier to place events at: a name, `T<k>`, or `5^e`.
