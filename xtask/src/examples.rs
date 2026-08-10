@@ -187,6 +187,23 @@ pub fn write(root: &Path) -> Result<std::path::PathBuf, String> {
 /// a built program and `check-docs` must stay runnable on a clean checkout.
 /// Saying so is the point — a check that silently passes when it cannot run is
 /// how a stale file survives.
+///
+/// # It can fail for a reason that is not a defect
+///
+/// The binary it runs is whatever is at `target/release/ucal`, and nothing here
+/// knows whether that is current. A tree whose sources have moved since the last
+/// `cargo build --release` produces a **false failure**: the committed file is
+/// correct and the binary is old.
+///
+/// That happened during 1.4.0 and cost a few minutes of looking for a defect
+/// that was not there. CI never sees it — every run builds from scratch — so
+/// this is a local-only trap, and the failure message names the fix rather than
+/// the diagnosis, which is why it reads as worse than it is.
+///
+/// Not solved by having this build the binary: `check-docs` would then take
+/// minutes instead of milliseconds, and a check nobody runs because it is slow
+/// is worse than one that occasionally misreports. Recorded instead, and the
+/// release procedure builds first.
 pub fn check(root: &Path) -> Result<Option<usize>, String> {
     let Ok(bin) = binary(root) else {
         return Ok(None);
@@ -199,7 +216,10 @@ pub fn check(root: &Path) -> Result<Option<usize>, String> {
         Ok(Some(examples().len()))
     } else {
         Err(format!(
-            "{} is stale; run `cargo run -p xtask -- gen-examples`",
+            "{} does not match what target/release/ucal produces.\n          \
+             If sources changed since the last release build, that binary is \
+             stale and this is a false alarm: `cargo build --release -p ucal` \
+             first.\n          Otherwise: `cargo run -p xtask -- gen-examples`",
             path.display()
         ))
     }
