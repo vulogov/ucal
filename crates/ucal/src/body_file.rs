@@ -194,7 +194,7 @@ struct BodyFile {
 ///
 /// The bounded leak this module's header describes. Called once per string in a
 /// loaded file, in a process that then exits.
-fn leak(s: String) -> &'static str {
+pub(crate) fn leak(s: String) -> &'static str {
     Box::leak(s.into_boxed_str())
 }
 

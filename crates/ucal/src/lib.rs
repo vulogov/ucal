@@ -18,6 +18,8 @@ pub mod cert;
 // reason every other body-dependent item here is — `ucal` builds without that
 // feature, and the features workflow catches it when it does not.
 #[cfg(feature = "body")]
+pub mod anchor_file;
+#[cfg(feature = "body")]
 pub mod body_file;
 pub mod emit;
 pub mod style;
@@ -2538,6 +2540,23 @@ fn anchorless_note() -> String {
 /// See [`body_file`] for why the loader lives in the binary.
 #[cfg(feature = "body")]
 pub fn cmd_cal_derive(path: &str) -> CmdResult {
+    cmd_cal_derive_with(path, None, None)
+}
+
+/// Y2 — the same derivation, optionally given §15.1's other file.
+///
+/// A body file yields intercalation and cycles. It cannot yield a **date**,
+/// because a date needs a phase, and Rule J makes phase empirical: determined
+/// and cited, never derived. That is the whole reason `cal derive` has always
+/// ended with a paragraph about what is missing.
+///
+/// With an anchor file, the missing half arrives — from a file, subject to the
+/// identical checks `Anchor::new` applies to the compiled-in anchors. The
+/// loader adds none of its own and must not: a file is a much easier place to
+/// narrow a window by assumption than a Rust constant, which is what GE-3
+/// forbids and what `X1.3` named as this feature's kill criterion.
+#[cfg(feature = "body")]
+pub fn cmd_cal_derive_with(path: &str, anchor: Option<&str>, at: Option<&str>) -> CmdResult {
     let body = body_file::load(std::path::Path::new(path))?;
 
     let solar = body.solar_day().value_at_epoch();
@@ -2632,12 +2651,92 @@ pub fn cmd_cal_derive(path: &str) -> CmdResult {
         },
     );
 
-    Ok(doc
-        .field("anchor", Value::text(anchorless_note()))
-        .note(
-            "Loaded by the binary, not by ucal-body. §15.1 puts the loader in the library and \
-             D-A20 records that it is not there: every string in the data model is a \
-             `&'static str`, so a runtime loader must either leak or change a published type. \
-             This one leaks, bounded by a process that exits.",
-        ))
+    let doc = match anchor {
+        None => {
+            if at.is_some() {
+                return Err(TimeError::with_context(
+                    Code::E0062,
+                    "--at asks for a date, and a date needs a phase: pass --anchor <FILE> as \
+                     well. Phase is empirical (Rule J) and is never derived from a body file",
+                ));
+            }
+            doc.field("anchor", Value::text(anchorless_note()))
+        }
+        Some(a) => {
+            let anchor = anchor_file::load(std::path::Path::new(a))?;
+            let id: &'static str = body_file::leak(format!("{}-d", body.id()));
+            if anchor.calendar_id() != id {
+                return Err(TimeError::with_context(
+                    Code::E0062,
+                    body_file::leak(format!(
+                        "the anchor file names calendar `{}`, and this body file derives `{id}`",
+                        anchor.calendar_id()
+                    )),
+                ));
+            }
+            let satellite = body.satellites().first().map(|s| s.id());
+            let cal = ucal_body::calendar::BodyCalendar::build(
+                id,
+                body.clone(),
+                anchor,
+                satellite,
+                ucal_body::DriftBound::DEFAULT,
+                32,
+            )?;
+            let a = cal.anchor();
+            let doc = doc.field(
+                "anchor",
+                Value::Section(vec![
+                    ("phase".into(), Value::text(a.phase().label())),
+                    ("revision".into(), Value::number(a.revision().to_string())),
+                    ("method".into(), Value::text(a.method().method)),
+                    (
+                        "uncertainty".into(),
+                        Value::text(a.method().uncertainty_note),
+                    ),
+                    (
+                        "window_ticks".into(),
+                        Value::number(a.uncertainty().ticks().to_dec_string()),
+                    ),
+                    ("citation".into(), Value::text(a.citation().source)),
+                ]),
+            );
+            match at {
+                None => doc.note(
+                    "An anchor is present, so this calendar can produce a date: pass \
+                     --at <INSTANT> for one.",
+                ),
+                Some(t) => {
+                    let (t, _) = parse_instant(t)?;
+                    let f = cal.fields(&t)?;
+                    doc.field(
+                        "fields",
+                        Value::Section(vec![
+                            ("year".into(), Value::number(f.year.to_string())),
+                            ("day".into(), Value::number(f.day.to_string())),
+                            (
+                                "day_fraction".into(),
+                                Value::quantity(&f.day_fraction, 6, Rounding::Trunc),
+                            ),
+                            (
+                                "anchor_revision".into(),
+                                Value::number(f.anchor_revision.to_string()),
+                            ),
+                            (
+                                "window_ticks".into(),
+                                Value::number(f.window.width().ticks().to_dec_string()),
+                            ),
+                        ]),
+                    )
+                }
+            }
+        }
+    };
+
+    Ok(doc.note(
+        "Loaded by the binary, not by ucal-body. §15.1 puts the loader in the library and \
+         D-A20 records that it is not there: every string in the data model is a \
+         `&'static str`, so a runtime loader must either leak or change a published type. \
+         This one leaks, bounded by a process that exits.",
+    ))
 }

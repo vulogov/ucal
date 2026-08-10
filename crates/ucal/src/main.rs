@@ -297,6 +297,12 @@ enum CalCommand {
     Derive {
         /// Path to a body file.
         file: String,
+        /// Path to an anchor file (§15.1), which turns the derivation into a date.
+        #[arg(long, value_name = "FILE")]
+        anchor: Option<String>,
+        /// The instant to render in the derived calendar. Requires --anchor.
+        #[arg(long, value_name = "INSTANT")]
+        at: Option<String>,
     },
 }
 
@@ -528,7 +534,9 @@ fn main() {
             CalCommand::List => ucal::cmd_cal_list(),
             CalCommand::Show { id, instant } => ucal::cmd_cal_show(id, instant),
             CalCommand::Anchor { id } => ucal::cmd_cal_anchor(id),
-            CalCommand::Derive { file } => ucal::cmd_cal_derive(file),
+            CalCommand::Derive { file, anchor, at } => {
+                ucal::cmd_cal_derive_with(file, anchor.as_deref(), at.as_deref())
+            }
         },
         #[cfg(all(feature = "body", feature = "civil"))]
         Command::Show {

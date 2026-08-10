@@ -410,7 +410,7 @@ mechanism doing something Earth would never ask of it:
 ### `cal derive`
 
 ```
-ucal cal derive <FILE>
+ucal cal derive <FILE> [--anchor <FILE>] [--at <INSTANT>]
 ```
 
 Read a body file (§15.1) and show the calendar it derives — intercalation,
@@ -418,6 +418,36 @@ cycles, and what is missing. This is how a body that does not ship gets a
 calendar without editing the crate;
 [`Documentation/examples/europa.hjson`](examples/europa.hjson) is a complete
 one.
+
+**`--anchor` supplies the missing half, and `--at` asks for a date.** §15.1 names
+body files *and* anchor files, versioned independently because parameters change
+with better measurement and anchors with re-determination. A body file yields
+intercalation and cycles; it cannot yield a date, because a date needs a phase
+and Rule J makes phase empirical — determined and cited, never derived.
+
+```
+ucal cal derive Documentation/examples/earth.hjson \
+  --anchor Documentation/examples/earth-anchor.hjson \
+  --at 8070205189123984864657505252035637180530466139316558837890625
+```
+
+That pair states exactly what `data::earth` and `anchors::earth` state, and
+produces the same local fields as `ucal cal show earth-d` for the same instant.
+A test asserts it: if the two disagreed, the file route would be a second
+implementation of the calendar agreeing with the first only by coincidence.
+
+**The loader adds no checks of its own, and must not.** Every refusal comes from
+`Anchor::new`, which the compiled-in anchors also pass through — the phase must
+name a physical event of the body (`UCAL-E0063` for a foreign epoch, clock or
+calendar), the uncertainty window must contain its own tick (`UCAL-E0062`), and
+the determination must state a method, a citation and what dominates the
+uncertainty. A file cannot reach a state a Rust constant could not; what it can
+do is reach that state without editing the crate.
+
+The window is **stated, never computed**. Nothing derives it from an uncertainty
+or an uncertainty from it, because a loader that widened or narrowed a window by
+a rule of its own would be narrowing by assumption, which GE-3 forbids and which
+a file makes far easier than a constant does.
 
 | field | meaning |
 |---|---|
@@ -428,7 +458,8 @@ one.
 | `leap_rule.whole_days_per_year` | The integer part. |
 | `leap_rule.placement` | The placement convention, declared by D-A21. |
 | `cycles` | The grouping cycle from the first satellite the file lists, or a statement that the body names none. §15.3 forbids a fallback, so no month is invented. |
-| `anchor` | Always `none`. Phase is empirical (Rule J) and is never derived. |
+| `anchor` | Without `--anchor`: `none`, with the count of shipped calendars in the same state. With one: the phase, revision, method, uncertainty, window and citation the file declares. |
+| `fields` | Only with `--anchor` **and** `--at`: the instant in the derived calendar's local fields, interval-valued and carrying the anchor revision. |
 
 **Every parameter needs Rule C's obligations** — the published value verbatim,
 its unit (`s`, `d` or `yr`), a citation, and the half-width of its validity
