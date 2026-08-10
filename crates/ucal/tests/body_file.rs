@@ -103,6 +103,21 @@ fn an_unknown_key_is_e0012() {
     assert_eq!(e.code, Code::E0012);
 }
 
+/// D-A22: a file that will not load is `UCAL-E0017`, not a locale-table failure.
+///
+/// Both conditions, because they were one code before and the context string is
+/// what distinguishes them.
+#[test]
+fn an_unloadable_file_is_e0017() {
+    let missing = std::path::Path::new("/nonexistent/ucal-no-such-body.hjson");
+    let e = body_file::load(missing).expect_err("a missing file must be refused");
+    assert_eq!(e.code, Code::E0017);
+
+    let (_d, p) = tmp("not-hjson", "id: europa\n  {{{ this is not hjson");
+    let e = body_file::load(&p).expect_err("a malformed file must be refused");
+    assert_eq!(e.code, Code::E0017);
+}
+
 /// Rule C is not optional in a file.
 ///
 /// The obligations are what make the compiled-in data trustworthy. A loader that

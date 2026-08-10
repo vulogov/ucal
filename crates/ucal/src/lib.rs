@@ -2517,12 +2517,6 @@ pub fn cmd_tour() -> CmdResult {
 /// are in. The count is taken from the registry rather than written down: it was
 /// written down once, said "five of the seven", and was wrong the moment Y3
 /// added five bodies.
-/// What "no anchor" means, with the count taken from the registry.
-///
-/// The count was a literal — "five of the seven shipped calendars" — and Y3
-/// added five bodies, at which point the program was telling the user something
-/// false about itself in the middle of a paragraph about not asserting things
-/// without a mechanism. Counted here so it cannot go stale again.
 #[cfg(feature = "body")]
 fn anchorless_note() -> String {
     let derived = ucal_body::calendar::registered();
@@ -2539,6 +2533,9 @@ fn anchorless_note() -> String {
     )
 }
 
+/// Derive a calendar from a body file (§15.1), and say what it is missing.
+///
+/// See [`body_file`] for why the loader lives in the binary.
 #[cfg(feature = "body")]
 pub fn cmd_cal_derive(path: &str) -> CmdResult {
     let body = body_file::load(std::path::Path::new(path))?;

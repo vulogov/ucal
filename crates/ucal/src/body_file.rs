@@ -184,7 +184,7 @@ impl ParamFile {
 pub fn load(path: &std::path::Path) -> Result<Body> {
     let text = std::fs::read_to_string(path).map_err(|e| {
         TimeError::with_context(
-            Code::E0010,
+            Code::E0017,
             match e.kind() {
                 std::io::ErrorKind::NotFound => "no such body file",
                 _ => "the body file could not be read",
@@ -194,7 +194,7 @@ pub fn load(path: &std::path::Path) -> Result<Body> {
 
     let file: BodyFile = deser_hjson::from_str(&text).map_err(|e| {
         // §15.1: unknown keys are E0012. Everything else the deserialiser
-        // rejects is a malformed file, which is E0010's family.
+        // rejects is a malformed file, which is E0017 (D-A22).
         let msg = e.to_string();
         if msg.contains("unknown field") {
             TimeError::with_context(
@@ -210,10 +210,7 @@ pub fn load(path: &std::path::Path) -> Result<Body> {
                  and valid_years (Rule C)",
             )
         } else {
-            TimeError::with_context(
-                Code::E0010,
-                "the body file is not well-formed HJSON",
-            )
+            TimeError::with_context(Code::E0017, "the body file is not well-formed HJSON")
         }
     })?;
 
