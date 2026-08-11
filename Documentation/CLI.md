@@ -909,7 +909,7 @@ wrong five would be useful.
 A full-screen clock showing universe time. `q`, `Esc` or `Ctrl-C` quits.
 
 ```
-ucal wallclock [--theme <KEY>] [--startrek]
+ucal wallclock [--theme <KEY>] [--startrek] [--clock-local <ID>]
 ucal wallclock --theme list
 ```
 
@@ -949,6 +949,35 @@ wrong before it is drawn; printing nothing would hide it.
 `--theme list` prints them as an ordinary document. An unknown key is
 `UCAL-E0016` — a name that is not in a declared catalogue, the same answer
 `ucal cal show` gives for a calendar that does not exist.
+
+### A second dial: `--clock-local <ID>`
+
+A wall clock's second face has always shown another *place*, and so does this
+one. `--clock-local mars-d` puts Mars beside the universal readout: local year,
+local day, how far through the local day the instant falls, and which anchor
+revision produced it.
+
+```
+ucal wallclock --startrek --clock-local mars-d
+```
+
+**`--clock-local` and not `--locale`.** `--locale` is this program's *language*
+flag — Rule N makes a tier's name locale-scoped and display-only — and it now
+applies to the clock too: `--locale ru` draws the face as `T0 бой` rather than
+`T0 beat`. The tier *index* is never localised, because that is what a reader
+compares when two machines are set to different languages. The two flags are
+different vocabularies and compose:
+
+```
+ucal wallclock --startrek --locale ru --clock-local earth-d
+```
+
+Only an **anchored** calendar can be a second dial. Local fields need a phase,
+phase is empirical (Rule J.3), and ten of the twelve derived calendars that ship
+have no anchor — the ordinary case, for the reason
+[`D5-titan-anchor.md`](Proposals/D5-titan-anchor.md) records. Asking for one of
+them is `UCAL-E0062`, reported **before** the clock takes over the terminal, so
+the failure is a message rather than a full-screen panel with nothing in it.
 
 **No Earth unit appears on the face as a unit** (Rule A.5), and a test asserts
 it. A clock is where that temptation lives: every clock a reader has ever seen

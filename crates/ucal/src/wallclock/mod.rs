@@ -49,7 +49,7 @@ pub mod digits;
 pub mod face;
 pub mod theme;
 
-use ucal_core::{Instant, TimeError, UC1};
+use ucal_core::{Instant, LocaleId, TimeError, UC1};
 
 pub use face::Face;
 pub use theme::Theme;
@@ -72,14 +72,30 @@ const REFRESH: Duration = Duration::from_millis(50);
 /// `q`, `Esc` or `Ctrl-C` stops it. Any theme key listed by
 /// [`theme::by_name`] may be given; an unknown one is `UCAL-E0016`, because a
 /// theme is a name in a declared catalogue like any other.
-pub fn run(theme_name: &str) -> Result<(), TimeError> {
+///
+/// `locale` is the *language* the tier names are drawn in (Rule N).
+/// `clock_local` is the *place* — a body's own calendar, shown as a second
+/// dial, which is what the second face on a wall clock has always been for.
+/// Two vocabularies, two flags: `--locale ru` and `--clock-local mars-d`.
+pub fn run(
+    theme_name: &str,
+    locale: LocaleId,
+    clock_local: Option<&str>,
+) -> Result<(), TimeError> {
     let theme = theme::by_name(theme_name)?;
+    // Read the second dial once before taking over the terminal. A calendar id
+    // that does not exist, or one that exists and has no anchor, is a message
+    // and an exit code — not a full-screen clock with an empty panel on it and
+    // no way to see why.
+    if let Some(id) = clock_local {
+        Face::at(now_instant()?, locale, Some(id))?;
+    }
 
     let mut term = enter()?;
     // The clock's own result is kept separate from the restore, so a failure
     // inside the loop cannot leave the terminal in raw mode. Both are reported;
     // the loop's failure wins, because it is the one that explains anything.
-    let outcome = clock_loop(&mut term, theme);
+    let outcome = clock_loop(&mut term, theme, locale, clock_local);
     let restored = leave(&mut term);
     outcome.and(restored)
 }
@@ -120,10 +136,12 @@ fn terminal_failure(e: std::io::Error) -> TimeError {
 fn clock_loop(
     term: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     theme: &'static Theme,
+    locale: LocaleId,
+    clock_local: Option<&str>,
 ) -> Result<(), TimeError> {
     let mut last = StdInstant::now();
     loop {
-        let face = Face::read_now()?;
+        let face = Face::read_now(locale, clock_local)?;
         term.draw(|f| face.render(f, theme))
             .map_err(terminal_failure)?;
 

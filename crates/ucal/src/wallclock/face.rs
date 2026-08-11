@@ -12,27 +12,39 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Paragraph};
 use ratatui::Frame;
 use ucal_core::backend::TickInt;
-use ucal_core::{Instant, Ticks, Tier, TimeError, UC1};
+use ucal_core::{Instant, LocaleId, Ticks, Tier, TimeError, UC1};
 
 /// One tier's hand: which of the 3125 subdivisions of the tier above it we are
 /// currently in.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 #[non_exhaustive]
 pub struct Hand {
     /// The tier this hand belongs to.
     pub tier: Tier,
-    /// Its name, where it has one.
-    pub name: &'static str,
+    /// Its name in the active locale, where it has one.
+    ///
+    /// Owned rather than `&'static str` because Rule N makes a tier's name
+    /// locale-scoped, and a localised name is looked up rather than compiled in.
+    pub name: String,
     /// `0..3125`.
     pub position: u32,
 }
 
 impl Hand {
+    /// The rail label: tier index and, where it has one, its localised name.
+    pub fn label(&self) -> String {
+        if self.name.is_empty() {
+            self.tier.to_string()
+        } else {
+            format!("{} {}", self.tier, self.name)
+        }
+    }
+
     /// How far round its dial, in thousandths.
     ///
     /// Integer, because a clock face is not a place to introduce a float into a
     /// program that has spent nine releases keeping them out (Rule E).
-    pub fn per_mille(self) -> u32 {
+    pub fn per_mille(&self) -> u32 {
         self.position * 1000 / 3125
     }
 }
@@ -45,6 +57,38 @@ impl Hand {
 /// which is the reason the module header sets out.
 const FACE_TIERS: [i8; 5] = [3, 2, 1, 0, -1];
 
+impl Local {
+    /// Read a body calendar's local fields at an instant.
+    ///
+    /// `UCAL-E0062` for a calendar that exists and has no anchor, which is ten
+    /// of the twelve that ship. That is the ordinary case and not a gap: a
+    /// second dial needs a phase, phase is empirical (Rule J), and D5 recorded
+    /// what establishing one honestly costs. The error says so rather than
+    /// showing a dial with no hand on it.
+    pub fn read(id: &str, t: &Instant<UC1>) -> Result<Local, TimeError> {
+        let cal = ucal_body::calendar::by_id(id)?;
+        let f = cal.fields(t)?;
+        // Percent through the local day, computed as a ratio and floored — no
+        // float reaches this (Rule E), and the value is a hand position rather
+        // than a measurement, so flooring is the honest rounding.
+        let hundred = ucal_core::Ratio::from_u64(100);
+        let through = f
+            .day_fraction
+            .mul(&hundred)
+            .map(|r| r.floor().to_dec_string())
+            .unwrap_or_default()
+            .parse::<u32>()
+            .unwrap_or(0);
+        Ok(Local {
+            calendar: id.to_string(),
+            year: f.year.to_string(),
+            day: f.day.to_string(),
+            through_day: through.min(100),
+            revision: f.anchor_revision,
+        })
+    }
+}
+
 /// A reading of the clock.
 #[derive(Clone, Debug)]
 #[non_exhaustive]
@@ -55,16 +99,45 @@ pub struct Face {
     pub hands: Vec<Hand>,
     /// The full `UC1` human form, for the line under the readout.
     pub human: String,
+    /// A second dial: a body's own calendar, where one was asked for.
+    ///
+    /// A wall clock with a second face, and the analogue is exact — the second
+    /// face on a real one shows another *place*, and so does this. What it shows
+    /// is local fields, which need a phase, so only an anchored calendar can
+    /// appear here (Rule J.3).
+    pub local: Option<Local>,
+}
+
+/// The second dial.
+#[derive(Clone, PartialEq, Eq, Debug)]
+#[non_exhaustive]
+pub struct Local {
+    /// The calendar id, e.g. `mars-d`.
+    pub calendar: String,
+    /// Local year, 1-based from the anchor.
+    pub year: String,
+    /// Day of the local year.
+    pub day: String,
+    /// How far through the local day, as a percentage — the hand of that dial.
+    pub through_day: u32,
+    /// Which anchor revision produced it. Anchors are observations (Rule J).
+    pub revision: u32,
 }
 
 impl Face {
     /// Read the system clock.
-    pub fn read_now() -> Result<Face, TimeError> {
-        Face::at(super::now_instant()?)
+    pub fn read_now(locale: LocaleId, clock_local: Option<&str>) -> Result<Face, TimeError> {
+        Face::at(super::now_instant()?, locale, clock_local)
     }
 
     /// Read a given instant, which is what the tests use.
-    pub fn at(t: Instant<UC1>) -> Result<Face, TimeError> {
+    /// `locale` names the language the tiers are drawn in; `clock_local` names
+    /// a place, and is a calendar id.
+    pub fn at(
+        t: Instant<UC1>,
+        locale: LocaleId,
+        clock_local: Option<&str>,
+    ) -> Result<Face, TimeError> {
         let ticks = t.ticks();
         let mut hands = Vec::new();
         for k in FACE_TIERS {
@@ -77,25 +150,37 @@ impl Face {
             let position = r.to_dec_string().parse::<u32>().unwrap_or(0);
             hands.push(Hand {
                 tier,
-                name: ucal_core::tier::name_of(tier).map_or("", |n| n.key()),
+                // Rule N: a tier's name is locale-scoped and display-only. The
+                // face is display, so it uses the locale's name; the *index* is
+                // beside it and is not, which is what a reader compares across
+                // two machines set to different languages.
+                name: match ucal_core::tier::name_of(tier) {
+                    Some(_) => ucal_core::locale::display(locale, tier),
+                    None => String::new(),
+                },
                 position,
             });
         }
+        let local = match clock_local {
+            None => None,
+            Some(id) => Some(Local::read(id, &t)?),
+        };
         Ok(Face {
             human: crate::render_at(&t, Tier::new(0)?),
             at: t,
             hands,
+            local,
         })
     }
 
     /// The hand a reader watches: `T0`, the beat, at about 21 per second.
-    pub fn beat(&self) -> Option<Hand> {
-        self.hands.iter().copied().find(|h| h.tier.index() == 0)
+    pub fn beat(&self) -> Option<&Hand> {
+        self.hands.iter().find(|h| h.tier.index() == 0)
     }
 
     /// The hand below it, which is a blur and is drawn as one.
-    pub fn blur(&self) -> Option<Hand> {
-        self.hands.iter().copied().find(|h| h.tier.index() == -1)
+    pub fn blur(&self) -> Option<&Hand> {
+        self.hands.iter().find(|h| h.tier.index() == -1)
     }
 
     /// Draw the face.
@@ -131,7 +216,9 @@ impl Face {
             rows[0],
         );
         self.render_readout(f, rows[1], theme, Alignment::Left);
-        f.render_widget(Paragraph::new(self.hand_lines(theme)), rows[2]);
+        let mut body = self.hand_lines(theme);
+        body.extend(self.local_lines(theme));
+        f.render_widget(Paragraph::new(body), rows[2]);
         f.render_widget(
             Paragraph::new(vec![
                 Line::styled(self.human.clone(), Style::default().fg(theme.text)),
@@ -210,11 +297,7 @@ impl Face {
         }
         for (i, h) in hands.iter().enumerate() {
             let colour = theme.blocks[i % theme.blocks.len()];
-            let label = if h.name.is_empty() {
-                h.tier.to_string()
-            } else {
-                format!("{} {}", h.tier, h.name)
-            };
+            let label = h.label();
             if let Some(r) = block_rows.get(i) {
                 f.render_widget(
                     Paragraph::new(vec![
@@ -294,13 +377,12 @@ impl Face {
         );
 
         self.render_blur(f, main_rows[3], theme);
-        f.render_widget(
-            Paragraph::new(vec![
-                Line::from(""),
-                Line::styled(self.human.clone(), Style::default().fg(theme.text)),
-            ]),
-            main_rows[4],
-        );
+        let mut tail = vec![
+            Line::from(""),
+            Line::styled(self.human.clone(), Style::default().fg(theme.text)),
+        ];
+        tail.extend(self.local_lines(theme));
+        f.render_widget(Paragraph::new(tail), main_rows[4]);
         // The bottom bar, which LCARS always has.
         f.render_widget(
             Paragraph::new(vec![
@@ -362,17 +444,60 @@ impl Face {
         );
     }
 
+    /// The second dial, where one was asked for.
+    ///
+    /// A block of four lines rather than a panel of its own: it is a *second*
+    /// face, and giving it equal weight would make the clock a comparison table.
+    /// The bar is how far through the local day the instant falls, which is the
+    /// only quantity here that moves at a rate worth drawing — one local day is
+    /// a day of that body and not of this one.
+    fn local_lines(&self, theme: &Theme) -> Vec<Line<'static>> {
+        let Some(l) = &self.local else {
+            return Vec::new();
+        };
+        let width = 40usize;
+        let filled = l.through_day as usize * width / 100;
+        let bar: String = core::iter::repeat_n('▓', filled)
+            .chain(core::iter::repeat_n('░', width - filled))
+            .collect();
+        vec![
+            Line::from(""),
+            Line::from(vec![
+                Span::styled(
+                    format!("{:<14}", l.calendar.to_uppercase()),
+                    Style::default().fg(theme.label),
+                ),
+                Span::styled(
+                    format!("year {}  day {}", l.year, l.day),
+                    Style::default().fg(theme.text).add_modifier(Modifier::BOLD),
+                ),
+            ]),
+            Line::from(vec![
+                Span::styled(format!("{bar} "), Style::default().fg(theme.blocks[1 % theme.blocks.len()])),
+                Span::styled(
+                    format!("{}% through the local day", l.through_day),
+                    Style::default().fg(theme.label),
+                ),
+            ]),
+            Line::styled(
+                format!(
+                    "anchor revision {} — an anchor is an observation and is versioned (Rule J)",
+                    l.revision
+                ),
+                Style::default().fg(theme.label),
+            ),
+        ]
+    }
+
     fn hand_lines(&self, theme: &Theme) -> Vec<Line<'static>> {
         self.hands
             .iter()
             .map(|h| {
-                let label = if h.name.is_empty() {
-                    h.tier.to_string()
-                } else {
-                    format!("{} {}", h.tier, h.name)
-                };
                 Line::from(vec![
-                    Span::styled(format!("{label:<12}"), Style::default().fg(theme.label)),
+                    Span::styled(
+                        format!("{:<14}", h.label()),
+                        Style::default().fg(theme.label),
+                    ),
                     Span::styled(format!("{:>4}", h.position), Style::default().fg(theme.text)),
                 ])
             })

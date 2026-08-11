@@ -220,6 +220,15 @@ enum Command {
         /// Shorthand for `--theme startrek`, which is LCARS.
         #[arg(long)]
         startrek: bool,
+        /// A body's own calendar, shown as a second dial: `earth-d`, `mars-d`.
+        ///
+        /// `--clock-local` and not `--locale`, which is already this program's
+        /// *language* flag (Rule N). The two are different vocabularies and one
+        /// name for both is the confusion this project spends its time removing:
+        /// `--locale ru` translates the tier names on the face, and
+        /// `--clock-local mars-d` puts Mars beside them.
+        #[arg(long = "clock-local", value_name = "ID")]
+        clock_local: Option<String>,
     },
     /// Shell completions, generated from this program's own argument parser.
     Completions {
@@ -472,10 +481,17 @@ fn main() {
     // output is the screen rather than a document. `--theme list` *is* a Doc,
     // and falls through to the dispatch below.
     #[cfg(feature = "tui")]
-    if let Command::Wallclock { theme, startrek } = &cli.command {
+    if let Command::Wallclock {
+        theme,
+        startrek,
+        clock_local,
+    } = &cli.command
+    {
         let key = if *startrek { "startrek" } else { theme.as_str() };
         if key != "list" {
-            if let Err(e) = ucal::wallclock::run(key) {
+            let run = LocaleId::parse(&cli.locale)
+                .and_then(|l| ucal::wallclock::run(key, l, clock_local.as_deref()));
+            if let Err(e) = run {
                 eprintln!("{e}");
                 std::process::exit(exit_code(&e));
             }
