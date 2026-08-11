@@ -275,3 +275,88 @@ fn the_local_year_counts_from_one_at_the_anchor() {
         "the face does not say what the year counts:\n{out}"
     );
 }
+
+/// `--once` is deterministic: same instant, same size, same bytes.
+///
+/// The property the committed frame in `CLI-EXAMPLES.md` depends on. If it were
+/// not true, `check-docs` would fail on a clean tree at random and the artefact
+/// would have to be deleted rather than fixed.
+#[test]
+fn a_frame_is_reproducible() {
+    let f = face();
+    let theme = theme::by_name("startrek").expect("a theme");
+    let a = ucal::wallclock::once(&f, theme, 80, 26, false).expect("a frame");
+    let b = ucal::wallclock::once(&f, theme, 80, 26, false).expect("a frame");
+    assert_eq!(a, b);
+    assert_eq!(a.lines().count(), 26);
+    // Plain means plain.
+    assert!(!a.contains('\u{1b}'), "escape sequences in an uncoloured frame");
+}
+
+/// With colour on, the frame carries SGR sequences and the same glyphs.
+#[test]
+fn a_coloured_frame_is_the_same_picture() {
+    let f = face();
+    let theme = theme::by_name("startrek").expect("a theme");
+    let plain = ucal::wallclock::once(&f, theme, 80, 26, false).expect("a frame");
+    let colour = ucal::wallclock::once(&f, theme, 80, 26, true).expect("a frame");
+    assert!(colour.contains('\u{1b}'), "no escapes in a coloured frame");
+    let stripped: String = strip_ansi(&colour);
+    for line in plain.lines() {
+        assert!(
+            stripped.contains(line.trim_end()),
+            "a line of the plain frame is missing from the coloured one: {line}"
+        );
+    }
+}
+
+fn strip_ansi(s: &str) -> String {
+    let mut out = String::new();
+    let mut chars = s.chars();
+    while let Some(c) = chars.next() {
+        if c == '\u{1b}' {
+            for c in chars.by_ref() {
+                if c == 'm' {
+                    break;
+                }
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
+/// A frame outside the size the layout can say anything at is refused.
+#[test]
+fn an_absurd_frame_size_is_refused() {
+    let f = face();
+    let theme = theme::by_name("plain").expect("a theme");
+    for (w, h) in [(19, 24), (401, 24), (80, 9), (80, 201)] {
+        assert!(
+            ucal::wallclock::once(&f, theme, w, h, false).is_err(),
+            "{w}x{h} was accepted"
+        );
+    }
+    assert!(ucal::wallclock::once(&f, theme, 20, 10, false).is_ok());
+    assert!(ucal::wallclock::once(&f, theme, 400, 200, false).is_ok());
+}
+
+/// Every theme produces a frame, and no two themes produce the same one.
+///
+/// A palette-only theme still changes the bytes, because the colour is in them.
+/// A theme that rendered identically to another would be a duplicate entry in a
+/// catalogue, which is the thing `--theme list` exists to prevent.
+#[test]
+fn no_two_themes_render_the_same_frame() {
+    let f = face();
+    let mut seen: Vec<(&str, String)> = Vec::new();
+    for t in theme::ALL {
+        let frame = ucal::wallclock::once(&f, t, 90, 28, true).expect("a frame");
+        for (other, prev) in &seen {
+            assert_ne!(*prev, frame, "themes `{other}` and `{}` are the same", t.key);
+        }
+        seen.push((t.key, frame));
+    }
+    assert_eq!(seen.len(), theme::ALL.len());
+}

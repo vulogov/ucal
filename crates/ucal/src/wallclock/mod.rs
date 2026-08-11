@@ -47,11 +47,13 @@
 
 pub mod digits;
 pub mod face;
+pub mod frame;
 pub mod theme;
 
 use ucal_core::{Instant, LocaleId, TimeError, UC1};
 
 pub use face::Face;
+pub use frame::once;
 pub use theme::Theme;
 
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
@@ -98,6 +100,28 @@ pub fn run(
     let outcome = clock_loop(&mut term, theme, locale, clock_local);
     let restored = leave(&mut term);
     outcome.and(restored)
+}
+
+/// Draw one frame and return it, instead of taking over the terminal.
+///
+/// Deterministic given an instant and a size, which is what makes it
+/// committable. See [`frame`] for why that matters more than it sounds.
+pub fn run_once(
+    theme_name: &str,
+    locale: LocaleId,
+    clock_local: Option<&str>,
+    at: Option<&str>,
+    width: u16,
+    height: u16,
+    color: bool,
+) -> Result<String, TimeError> {
+    let theme = theme::by_name(theme_name)?;
+    let t = match at {
+        Some(s) => crate::parse_instant(s)?.0,
+        None => now_instant()?,
+    };
+    let face = Face::at(t, locale, clock_local)?;
+    frame::once(&face, theme, width, height, color)
 }
 
 fn enter() -> Result<Terminal<CrosstermBackend<std::io::Stdout>>, TimeError> {

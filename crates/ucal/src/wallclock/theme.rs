@@ -77,8 +77,55 @@ pub const LCARS: Theme = Theme {
     blur: Color::Rgb(0xCC, 0x66, 0x66),
 };
 
+/// DEC VT220 amber phosphor: one warm hue on near-black, and no second one.
+///
+/// The block font in [`super::digits`] was drawn for this and had never been
+/// shown in it. A palette and nothing else — the layout is `plain`'s.
+pub const AMBER: Theme = Theme {
+    key: "amber",
+    about: "VT220 amber phosphor — one warm hue, no second one",
+    lcars: false,
+    background: Color::Rgb(0x0A, 0x06, 0x00),
+    text: Color::Rgb(0xFF, 0xB0, 0x00),
+    label: Color::Rgb(0x99, 0x66, 0x00),
+    primary: Color::Rgb(0xFF, 0xC8, 0x40),
+    blocks: &[Color::Rgb(0xFF, 0xB0, 0x00)],
+    blur: Color::Rgb(0x99, 0x66, 0x00),
+};
+
+/// The other half of the same idea: IBM 3270 / VT100 green.
+pub const GREEN: Theme = Theme {
+    key: "green",
+    about: "3270 green phosphor — the other half of the same idea",
+    lcars: false,
+    background: Color::Rgb(0x00, 0x0A, 0x00),
+    text: Color::Rgb(0x33, 0xFF, 0x33),
+    label: Color::Rgb(0x11, 0x88, 0x11),
+    primary: Color::Rgb(0x66, 0xFF, 0x66),
+    blocks: &[Color::Rgb(0x33, 0xFF, 0x33)],
+    blur: Color::Rgb(0x11, 0x88, 0x11),
+};
+
+/// Dark on light, committed.
+///
+/// The useful one rather than the evocative one. [`PLAIN`] uses `Color::Reset`
+/// and inherits whatever the terminal has, which is right until someone puts a
+/// frame on a light background and the labels — `DarkGray` on white — go faint.
+/// This one commits to the background it is drawn on.
+pub const PAPER: Theme = Theme {
+    key: "paper",
+    about: "dark on light, committed — for light terminals and for print",
+    lcars: false,
+    background: Color::Rgb(0xFA, 0xF8, 0xF2),
+    text: Color::Rgb(0x1A, 0x1A, 0x1A),
+    label: Color::Rgb(0x5A, 0x5A, 0x5A),
+    primary: Color::Rgb(0x00, 0x00, 0x00),
+    blocks: &[Color::Rgb(0x33, 0x33, 0x33)],
+    blur: Color::Rgb(0x8A, 0x8A, 0x8A),
+};
+
 /// Every theme, in the order `--theme list` prints them.
-pub const ALL: &[&Theme] = &[&PLAIN, &LCARS];
+pub const ALL: &[&Theme] = &[&PLAIN, &AMBER, &GREEN, &PAPER, &LCARS];
 
 /// Look a theme up by key.
 ///

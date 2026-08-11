@@ -3,7 +3,7 @@
 **Generated — do not edit.** Every block below is the real output of the command above it, captured by running it. Regenerate with:
 
 ```
-cargo build --release -p ucal
+cargo build --release -p ucal --features tui
 cargo run -p xtask -- gen-examples
 ```
 
@@ -787,6 +787,66 @@ input:
   scale      tt
   calendar   gregorian
   exactness  exact; construction never rounds (Rule R)
+```
+
+## `ucal wallclock --once --at 8070205189123984864657505252035637180530466139316558837890625 --theme startrek --height 26`
+
+LCARS. The elbow, the rail of tier readouts, the beat in block digits, and the flicker as a bar because a number would be wrong before it was drawn.
+
+```
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄   UNIVERSE CALENDAR · UC1
+████████████████
+████████████████   ABSOLUTE TIME · PLANCK TICKS · BASE FIVE
+███████▀▀▀▀▀▀▀▀▀
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄  █████ █   █ █████ █████
+        T3 SPAN       █ █   █     █     █
+           2481   █████ █████  ████    █
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄  █         █     █   █
+       T2 SWEEP   █████     █ █████   █
+           2999
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄   T1 ARC   3108  ONE STOP EVERY 2 MIN 26 S
+         T1 ARC
+           3108   ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄  T-1 FLICKER · 66 000 PER SECOND · A POSITION, NOT A NUMBER
+        T0 BEAT
+           2437
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+    T-1 FLICKER   UC1 0031·0687·2481·2999·3108·2437
+           1104
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+
+
+
+
+                  ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+                   Q TO DISENGAGE
+```
+
+## `ucal wallclock --once --at 8070205189123984864657505252035637180530466139316558837890625 --clock-local mars-d --height 20`
+
+The plain theme with a second dial. A wall clock's second face has always shown another place, and Mars is one.
+
+```
+UCAL — universe calendar
+█████ █   █ █████ █████
+    █ █   █     █     █
+█████ █████  ████    █
+█         █     █   █
+█████     █ █████   █
+
+T3 span       2481
+T2 sweep      2999
+T1 arc        3108
+T0 beat       2437
+T-1 flicker   1104
+
+MARS-D        year 82  day 83   counted from the anchor — year 1 began there
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░ 44% through the local day
+anchor revision 1 — an anchor is an observation and is versioned (Rule J)
+
+
+UC1 0031·0687·2481·2999·3108·2437
+q to quit
 ```
 
 ## `ucal explain abc`
