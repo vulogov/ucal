@@ -67,10 +67,6 @@ tui = ["dep:ratatui", "dep:crossterm", "std", "civil"]
 
 [dev-dependencies]
 ucal-events = { workspace = true }
-# `TestBackend` renders a face into a buffer, so the clock is checkable without
-# a terminal. Same crate as the dependency above; the dev entry only makes the
-# testing backend available when the `tui` feature is on.
-ratatui = { version = "0.29", default-features = false }
 
 [[bin]]
 name = "ucal"

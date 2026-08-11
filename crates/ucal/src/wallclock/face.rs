@@ -114,7 +114,24 @@ pub struct Face {
 pub struct Local {
     /// The calendar id, e.g. `mars-d`.
     pub calendar: String,
-    /// Local year, 1-based from the anchor.
+    /// Local year, **1-based from the anchor**.
+    ///
+    /// Not a Gregorian year and not an offset from one. Year 1 is the year that
+    /// began at the anchor, so `earth-d` year 27 is the twenty-seventh year
+    /// since 2000-01-01 — which lands in Gregorian 2026, one less than a reader
+    /// subtracting naively would guess, because the count starts at one.
+    ///
+    /// The face says so in words. A bare `year 27` invites exactly two wrong
+    /// readings, "2027" and "2000 + 27", and the first person to see it asked.
+    /// §15.5 defines the fields and names no era to count from instead, which
+    /// [`X1-authoring-local-calendars.md`] records as a gap; until there is one,
+    /// the display's job is to say what the number counts.
+    ///
+    /// The Gregorian equivalent is deliberately *not* shown: an Earth label
+    /// beside a local one is the substitution Rule A.5 refuses, and
+    /// `ucal to-civil` is the conversion for anyone who wants it.
+    ///
+    /// [`X1-authoring-local-calendars.md`]: https://github.com/vulogov/ucal/blob/main/Documentation/Proposals/X1-authoring-local-calendars.md
     pub year: String,
     /// Day of the local year.
     pub day: String,
@@ -470,6 +487,13 @@ impl Face {
                 Span::styled(
                     format!("year {}  day {}", l.year, l.day),
                     Style::default().fg(theme.text).add_modifier(Modifier::BOLD),
+                ),
+                // No ordinal: "1th local year" was the first draft, and a
+                // suffix table for one label is a rule to get wrong later. The
+                // convention stated plainly needs no agreement about English.
+                Span::styled(
+                    "   counted from the anchor — year 1 began there",
+                    Style::default().fg(theme.label),
                 ),
             ]),
             Line::from(vec![

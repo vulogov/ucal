@@ -244,3 +244,34 @@ fn the_second_dial_draws_everywhere_too() {
         }
     }
 }
+
+/// The local year counts from the anchor and starts at **one**.
+///
+/// The first person to see `year 27` on the face asked whether it meant 2027.
+/// It does not: `earth-d` is anchored at 2000-01-01 and counts from 1, so year
+/// 27 is the twenty-seventh year of that reckoning and falls in Gregorian 2026.
+/// Both wrong readings — "2027" and "2000 + 27" — are off by one in opposite
+/// directions, which is what an unlabelled count invites.
+///
+/// The convention is pinned here rather than described, and the face states it
+/// in words beside the number.
+#[test]
+fn the_local_year_counts_from_one_at_the_anchor() {
+    // One tick after `earth-d`'s anchor.
+    let anchor_plus_one = <Ticks as TickInt>::from_dec_str(
+        "8070205173569172848597429796163475680530466139316558837890626",
+    )
+    .expect("ticks");
+    let t = Instant::<UC1>::from_ticks(anchor_plus_one).expect("in domain");
+    let f = Face::at(t, en(), Some("earth-d")).expect("earth-d has an anchor");
+    let local = f.local.clone().expect("a dial");
+    assert_eq!(local.year, "1", "the year at the anchor must be 1, not 0");
+    assert_eq!(local.day, "1", "the day at the anchor must be 1, not 0");
+
+    // And the face says what the number counts, so nobody has to ask again.
+    let out = drawn_face(&f, "startrek", 110, 32);
+    assert!(
+        out.contains("year 1 began there"),
+        "the face does not say what the year counts:\n{out}"
+    );
+}

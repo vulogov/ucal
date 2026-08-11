@@ -122,6 +122,26 @@ jobs:
       - name: workspace builds at the MSRV
         run: cargo build --workspace --all-targets
 
+      # The `tui` feature needs 1.88, through ratatui -> instability -> darling.
+      # It is the one stated exception (Documentation/STABILITY.md) and this
+      # keeps it exactly one feature wide: if the exception ever silently
+      # disappears the assertion below fails too, and someone has to decide
+      # whether the note is still true.
+      - name: the tui exception is exactly one feature wide
+        run: |
+          if cargo build -p ucal --features tui 2>/dev/null; then
+            echo "\`--features tui\` now builds at 1.87."
+            echo "That is good news and makes STABILITY.md's stated MSRV"
+            echo "exception false. Remove the exception and this check."
+            exit 1
+          fi
+          echo "ok: --features tui does not build at 1.87, as documented"
+          cargo build -p ucal --all-features 2>/dev/null && {
+            echo "--all-features built at 1.87, which contradicts the above."
+            exit 1
+          }
+          echo "ok: the exception is the tui feature and nothing else
+
   checks:
     name: harness, lints, docs, vectors
     runs-on: ubuntu-latest

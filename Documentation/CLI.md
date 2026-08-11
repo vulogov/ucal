@@ -401,11 +401,32 @@ mechanism doing something Earth would never ask of it:
 | `intercalation.whole_days_per_year` | The integer part: how many whole days a year holds before intercalation. |
 | `intercalation.bound` | The drift bound the rule was derived against — a **rate** in local units, not a duration (D-A13). |
 | `intercalation.walked` | How many continued-fraction steps were taken to reach it. |
-| `fields.year`, `fields.month`, `fields.day`, `fields.hour`, `fields.minute`, `fields.second`, `fields.weekday` | The instant in this calendar's local fields. |
+| `fields.year`, `fields.month`, `fields.day`, `fields.hour`, `fields.minute`, `fields.second`, `fields.weekday` | The instant in this calendar's local fields. **`year` counts from the anchor and starts at 1** — see below. |
 | `fields.day_fraction` | How far through the local day the instant falls. |
 | `cycles.satellite` | Which satellite the grouping cycle is derived from, if any. |
 | `cycles.cycles_per_year` | The satellite's period as a fraction of the body's year. |
 | `cycles.convergents` | The continued-fraction convergents of that ratio — the candidate cycle lengths, with the chosen one marked. |
+
+**`year` is not a Gregorian year, and is not an offset from one.** It counts
+local years from the calendar's anchor, and **year 1 is the year that began at
+the anchor**. `earth-d` is anchored at mean solar midnight, Greenwich, on
+2000-01-01, so its year 27 is the twenty-seventh year of that reckoning and
+falls in Gregorian 2026 — one less than subtracting naively suggests, because
+the count starts at one and not at zero.
+
+The day-of-year drifts from the Gregorian one for the same reason the calendar
+exists: `earth-d` intercalates by the derived `31/128`, and the Gregorian
+calendar by the declared `97/400`, which is not a convergent of anything. Two
+rules, two placements, and a widening gap.
+
+No Gregorian equivalent is printed beside it. An Earth label next to a local one
+is the substitution Rule A.5 refuses; `ucal to-civil` is the conversion, and it
+is a command you ask for.
+
+§15.5 defines the fields and gives derived calendars no era structure — no way
+to say "year 1 of this reckoning is the anchor plus N" — which
+[`X1-authoring-local-calendars.md`](Proposals/X1-authoring-local-calendars.md)
+records as a gap. Until there is one, the number's meaning is this paragraph.
 
 ### `cal derive`
 
