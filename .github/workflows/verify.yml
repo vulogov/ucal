@@ -154,6 +154,18 @@ jobs:
       - name: workspace lints
         run: cargo run -p xtask -- lint
 
+      # check-docs verifies the committed worked examples against a fresh run,
+      # and needs the binary to do it. Without this step it reported
+      #
+      #     --    worked examples not checked: target/release/ucal is absent
+      #
+      # in every run since the check was written, which is precisely the silent
+      # skip its own comment in xtask/src/main.rs warns is how a stale file
+      # survives. `--features tui` because two of the examples are wall-clock
+      # frames.
+      - name: the binary the documentation is generated from
+        run: cargo build --release --locked -p ucal --features tui
+
       # §13.5's single source of truth, every citation resolving against spec/,
       # and Documentation/CLI.md covering the command surface.
       - name: generated docs and citations
