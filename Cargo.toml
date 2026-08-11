@@ -10,16 +10,21 @@ members = [
     "xtask",
 ]
 # The fuzz targets need nightly and libFuzzer; excluding them keeps
-# `cargo build --workspace` and the 1.87 MSRV job away from both.
+# `cargo build --workspace` and the 1.88 MSRV job away from both.
 exclude = ["fuzz"]
 
 [workspace.package]
 version = "1.5.0"
 edition = "2021"
-# Set by the default backend: bnum 0.14 requires 1.87, and `u512` is the
-# default. Verified by CI at exactly this version -- it read 1.85 until 0.6.0
-# and had been false since bnum was updated, because nothing checked it.
-rust-version = "1.87"
+# Set by the `tui` feature's tree in 1.5.0: ratatui reaches instability and
+# darling, which declare 1.88. Before that it was set by the default backend —
+# bnum 0.14 requires 1.87 — and that floor is still the one that binds every
+# library crate. This is a binary-only feature raising the workspace floor, which
+# is why it is a minor-version change and is stated in the release notes.
+# Verified by CI at exactly this version, on the workspace and on `--features
+# tui` -- it read 1.85 until 0.6.0 and had been false since bnum was updated,
+# because nothing checked it.
+rust-version = "1.88"
 license = "MPL-2.0"
 authors = ["Vladimir Ulogov"]
 repository = "https://github.com/vulogov/ucal"

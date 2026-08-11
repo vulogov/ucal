@@ -230,7 +230,7 @@ exists so that it does not have to.
 
 ### A fixed minimum Rust version
 
-`rust-version = "1.87"`, and the policy is:
+`rust-version = "1.88"`, and the policy is:
 
 - **An MSRV increase is a minor-version change**, never a patch. Within `1.x` a
   patch release compiles on every toolchain the preceding minor release did.
@@ -239,27 +239,27 @@ exists so that it does not have to.
   `bnum 0.14`, which the default `u512` backend requires. A caller using only
   `bigint` can build `ucal-core` on 1.85 — but `rust-version` describes the
   default configuration, which is what a caller gets by typing `cargo add`.
-- **`ucal`'s non-default `tui` feature needs 1.88**, and is the one stated
-  exception. `ratatui` reaches `instability` and `darling`, which declare 1.88,
-  so `cargo install ucal --features tui` does not build on 1.87. Nothing in the
-  default configuration is affected and no library crate is: the feature exists
-  only in the binary and only for `ucal wallclock`. The published release
-  binaries are built on stable and carry it.
+- **The floor covers every feature, not the default set.** 1.5.0 added `tui`,
+  whose tree reaches `instability` and `darling` at 1.88, and for one
+  release-in-progress this file carried it as a *stated exception*: the default
+  configuration built at 1.87 and `--features tui` did not.
 
-  Recorded rather than papered over. Pinning the transitive dependencies back to
-  a 1.87-compatible set was possible and was not done: it would hold only until
-  the next lock refresh, and a promise that survives by being re-fought every
-  quarter is a promise about the maintainer's attention rather than about the
-  software. If `tui` ever becomes a default feature, that is an MSRV bump and a
-  minor-version change, by the first rule above.
+  That was the wrong shape and the exception is gone. A feature that cannot be
+  built at the declared MSRV is a second, unstated MSRV — a caller who types
+  `cargo install ucal --features tui` and is told their toolchain is too old has
+  not been given a number they could have checked. The floor is 1.88, `rust-version`
+  says so, and CI builds `--all-features` at it.
 
-*Enforced by* a CI job pinned to exactly 1.87 that builds the workspace and all
-targets, plus a check that the manifest still declares 1.87, plus a check that
-the `tui` exception is exactly one feature wide — that job asserts `--features
-tui` fails at 1.87 and that everything else succeeds, so the exception cannot
-quietly widen. The version pin is a literal rather than read from the manifest:
-a job that follows the manifest would prove nothing about a manifest lowered by
-hand.
+  The library crates are unaffected in substance: their floor is still `bnum
+  0.14`'s 1.87, and a caller depending on `ucal-core` alone needs no more than
+  that. The workspace declares one number because a workspace has one, and the
+  higher of the two is the honest one to publish.
+
+*Enforced by* a CI job pinned to exactly 1.88 that builds the workspace and all
+targets **and `-p ucal --features tui --all-targets`**, plus a check that the
+manifest still declares 1.88. The version pin is a literal rather than read from
+the manifest: a job that follows the manifest would prove nothing about a
+manifest lowered by hand.
 
 *History, and the reason this is enforced rather than stated.* It read `1.85`
 until 0.6.0 and had been **false** since `bnum` was updated — a caller on 1.85
