@@ -133,6 +133,10 @@ fn examples() -> Vec<Example> {
             why: "An Apollo DSKY. VERB 16 NOUN 65 is a real pair — monitor, decimal, time — and the lamps are drawn unlit except COMP ACTY, because the rest report conditions this program does not have.",
         },
         Example {
+            args: &["wallclock", "--once", "--at", T, "--theme", "orbit", "--height", "22"],
+            why: "Hands, on dials, in braille. Every tier has 3125 stops because every rung is 5^5 of the one below, so each tier is a circle and they nest. Drawn with integer CORDIC: there is no float in this program and a clock face is a bad place to make the first exception.",
+        },
+        Example {
             args: &["wallclock", "--once", "--at", T, "--clock-local", "mars-d", "--height", "20"],
             why: "The plain theme with a second dial. A wall clock's second face has always shown another place, and Mars is one.",
         },

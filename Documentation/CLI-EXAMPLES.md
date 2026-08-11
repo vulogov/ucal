@@ -915,6 +915,35 @@ An Apollo DSKY. VERB 16 NOUN 65 is a real pair — monitor, decimal, time — an
 
 ```
 
+## `ucal wallclock --once --at 8070205189123984864657505252035637180530466139316558837890625 --theme orbit --height 22`
+
+Hands, on dials, in braille. Every tier has 3125 stops because every rung is 5^5 of the one below, so each tier is a circle and they nest. Drawn with integer CORDIC: there is no float in this program and a clock face is a bad place to make the first exception.
+
+```
+ UCAL — universe calendar, on dials
+ every tier has 3125 stops, because every rung is 5^5 of the one below
+⠀⠀⠀⠀⢀⡠⠤⠴⠤⠤⣀⠀⠀⠀⠀ ⠀⠀⠀⠀⢀⡠⢤⠴⠤⠤⣀⠀⠀⠀⠀ ⠀⠀⠀⠀⢀⡠⠤⢴⠤⠤⣀⠀⠀⠀⠀ ⠀⠀⠀⠀⢀⡠⠤⠴⠤⠤⣀⠀⠀⠀⠀ ⠀⠀⠀⠀⢀⡠⠤⠴⠤⠤⣀⠀⠀⠀⠀
+⠀⠀⢠⠞⠁⠀⠀⠀⠀⠀⠀⠙⢦⠀⠀ ⠀⠀⢠⠞⠁⠀⠸⡀⠀⠀⠀⠙⢦⠀⠀ ⠀⠀⢠⠞⠁⠀⠀⢸⠀⠀⠀⠙⢦⠀⠀ ⠀⠀⢠⠞⠁⠀⠀⠀⠀⠀⠀⠙⢦⠀⠀ ⠀⠀⢠⠞⠁⠀⠀⠀⠀⠀⠀⠙⢦⠀⠀
+⠀⢠⣃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢣⠀ ⠀⢠⠃⠀⠀⠀⠀⢇⠀⠀⠀⠀⠀⢣⠀ ⠀⢠⠃⠀⠀⠀⠀⢸⠀⠀⠀⠀⠀⢣⠀ ⠀⢠⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢣⠀ ⠀⢠⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢣⠀
+⠀⢸⠀⠉⠑⠒⠢⠤⠀⠀⠀⠀⠀⢸⠀ ⠀⢸⠀⠀⠀⠀⠀⠸⠀⠀⠀⠀⠀⢸⠀ ⠀⢸⠀⠀⠀⠀⠀⠸⠀⠀⠀⠀⠀⢸⠀ ⠀⢸⠉⠒⠒⠢⠤⠤⠀⠀⠀⠀⠀⢸⠀ ⠀⢸⠀⠀⠀⠀⠀⠠⣀⠀⠀⠀⠀⢸⠀
+⠀⠸⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡸⠀ ⠀⠸⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡸⠀ ⠀⠸⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡸⠀ ⠀⠸⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡸⠀ ⠀⠸⡀⠀⠀⠀⠀⠀⠀⠓⠤⡀⠀⡸⠀
+⠀⠀⠱⣄⠀⠀⠀⠀⠀⠀⠀⢀⡴⠁⠀ ⠀⠀⠱⣄⠀⠀⠀⠀⠀⠀⠀⢀⡴⠁⠀ ⠀⠀⠱⣄⠀⠀⠀⠀⠀⠀⠀⢀⡴⠁⠀ ⠀⠀⠱⣄⠀⠀⠀⠀⠀⠀⠀⢀⡴⠁⠀ ⠀⠀⠱⣄⠀⠀⠀⠀⠀⠀⠀⢉⡶⠁⠀
+⠀⠀⠀⠈⠑⠢⠤⠤⠤⠤⠒⠉⠀⠀⠀ ⠀⠀⠀⠈⠑⠢⠤⠤⠤⠤⠒⠉⠀⠀⠀ ⠀⠀⠀⠈⠑⠢⠤⠤⠤⠤⠒⠉⠀⠀⠀ ⠀⠀⠀⠈⠑⠢⠤⠤⠤⠤⠒⠉⠀⠀⠀ ⠀⠀⠀⠈⠑⠢⠤⠤⠤⠤⠒⠉⠀⠀⠀
+     2481            2999            3108            2437            1104
+    T3 span        T2 sweep         T1 arc          T0 beat       T-1 flicker
+ ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+ the finest hand has no dial: 66 000 stops a second is not a hand
+
+ UC1 0031·0687·2481·2999·3108·2437
+
+ q to quit
+
+
+
+
+
+```
+
 ## `ucal wallclock --once --at 8070205189123984864657505252035637180530466139316558837890625 --clock-local mars-d --height 20`
 
 The plain theme with a second dial. A wall clock's second face has always shown another place, and Mars is one.

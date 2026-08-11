@@ -45,6 +45,7 @@
 //!
 //! [`GE-U4-tier-navigator.md`]: https://github.com/vulogov/ucal/blob/main/Documentation/Proposals/GE-U4-tier-navigator.md
 
+pub mod dial;
 pub mod digits;
 pub mod face;
 pub mod frame;

@@ -33,6 +33,8 @@ pub enum Layout {
     Panel,
     /// A DSKY: a lamp column, a program register, and a stack of numbers.
     Dsky,
+    /// Round dials with hands, drawn in braille.
+    Orbit,
 }
 
 /// A clock face's colours and chrome.
@@ -254,6 +256,40 @@ pub const DSKY: Theme = Theme {
     blur: Color::Rgb(0x2E, 0x6B, 0x3A),
 };
 
+/// Hands on dials — the only face here that is a clock in the old sense.
+///
+/// Every other theme prints digits. This one draws a **hand**, and the calendar
+/// makes that natural rather than decorative: every tier has exactly 3125 stops,
+/// because each rung of the ladder is `5^5` of the one below, so each tier *is*
+/// a circle with 3125 positions and they nest the way an hour hand nests in a
+/// minute hand.
+///
+/// Drawn on a braille canvas with integer CORDIC — see [`super::dial`] for why
+/// there is no `f64::sin` in it.
+///
+/// **Read [`super::dial::Canvas::dial`]'s note on resolution before believing a
+/// hand.** A dial twenty characters across has a rim of a few hundred dots and
+/// resolves about one stop in thirty. It is a clock you read to the tier, not to
+/// the stop, and the digits are printed beside it for the same reason a real
+/// clock has numerals.
+pub const ORBIT: Theme = Theme {
+    key: "orbit",
+    about: "hands on dials, in braille — the only face here with no big digits",
+    layout: Layout::Orbit,
+    background: Color::Reset,
+    text: Color::Rgb(0xC8, 0xD8, 0xE8),
+    label: Color::Rgb(0x5A, 0x6A, 0x7A),
+    primary: Color::Rgb(0xFF, 0xE0, 0x90),
+    blocks: &[
+        Color::Rgb(0x6A, 0x8A, 0xB8),
+        Color::Rgb(0x8A, 0xA8, 0xD0),
+        Color::Rgb(0xB0, 0xC8, 0xE0),
+        Color::Rgb(0xFF, 0xE0, 0x90),
+        Color::Rgb(0x5A, 0x6A, 0x7A),
+    ],
+    blur: Color::Rgb(0xFF, 0xE0, 0x90),
+};
+
 /// Every theme, in the order `--theme list` prints them.
 pub const ALL: &[&Theme] = &[
     &PLAIN,
@@ -264,6 +300,7 @@ pub const ALL: &[&Theme] = &[
     &TARGETING,
     &PANEL,
     &DSKY,
+    &ORBIT,
 ];
 
 /// Look a theme up by key.

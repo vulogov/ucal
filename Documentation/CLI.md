@@ -990,17 +990,34 @@ wrong before it is drawn; printing nothing would hide it.
   DSKY gives its three registers equal size, and this gives the beat the block
   font, because it is the register that moves.
 
+- **orbit** — hands on dials, in braille, and the only face here with no big
+  numerals. The calendar makes this natural rather than decorative: every tier
+  has exactly 3125 stops, because every rung of the ladder is `5^5` of the one
+  below, so each tier *is* a circle and they nest the way an hour hand nests in
+  a minute hand.
+
+  Drawn with **integer CORDIC** — shifts, adds, and a table of sixteen
+  constants. There is no floating point anywhere in this program (Rule E) and a
+  clock face is a bad place to make the first exception, since it is the part a
+  reader looks at. The table is re-derived by a test rather than trusted.
+
+  A dial this size resolves about one stop in thirty, so no tick marks are
+  drawn: 3125 marks on a rim of seventy dots is a solid ring claiming a
+  precision it does not have. The hand says which part of the tier you are in
+  and the numeral beneath says which stop, which is the division of labour a
+  clock with numerals on its face has always had.
+
 `--startrek`, `--gagarin` and `--armstrong` are shorthands for the matching
 `--theme`, and are mutually exclusive.
 
-The last four are **layouts**, not palettes. LCARS is a console:
+The last five are **layouts**, not palettes. LCARS is a console:
 coloured blocks, generous space, numbers set against a rail, an interface for
 reading. A gunsight is an instrument: a frame at the edge of vision, one number
 in the middle, everything else in a strip. Vostok is a *surface* you read;
 a DSKY is a *terminal you address*, two digits for a verb and two for a noun.
 
 A theme that was only a different mood — the same arrangement in different
-colours — would be a palette wearing a layout's name. A test requires the five
+colours — would be a palette wearing a layout's name. A test requires the six
 layouts to draw differently with colour switched off, and requires two themes
 that share a layout to draw identically.
 

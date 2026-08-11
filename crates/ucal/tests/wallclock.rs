@@ -397,8 +397,8 @@ fn each_layout_is_a_different_arrangement() {
     // and a theme whose layout nothing else shares is why the enum exists.
     assert_eq!(
         by_layout.len(),
-        5,
-        "expected five distinct layouts, found {:?}",
+        6,
+        "expected six distinct layouts, found {:?}",
         by_layout.iter().map(|(l, _)| *l).collect::<Vec<_>>()
     );
 }
@@ -475,5 +475,88 @@ fn the_starwars_face_is_a_gunsight() {
             "hand {} missing from the strip:\n{out}",
             h.label()
         );
+    }
+}
+
+/// The dials draw round, and the hand points where the arithmetic says.
+///
+/// A dial is easy to get subtly wrong in a way that still looks like a clock:
+/// an ellipse instead of a circle, a hand running anticlockwise, a quadrant
+/// swapped. This checks the geometry rather than the appearance — the dot the
+/// hand ends on must be the one `cos_sin` names, and the rim must be the same
+/// distance from the centre in both axes.
+#[test]
+fn a_dial_is_round_and_its_hand_points_the_right_way() {
+    use ucal::wallclock::dial::{cos_sin, Canvas, SCALE};
+
+    // Straight up, a quarter clockwise, half, three quarters.
+    for (p, want_c, want_s) in [
+        (0u32, 1i64, 0i64),
+        (3125 / 4, 0, 1),
+        (3125 / 2, -1, 0),
+        (3 * 3125 / 4, 0, -1),
+    ] {
+        let (c, s) = cos_sin(p);
+        assert!(
+            (c - want_c * SCALE).abs() < SCALE / 50 && (s - want_s * SCALE).abs() < SCALE / 50,
+            "position {p} gave ({c}, {s}), wanted about ({}, {})",
+            want_c * SCALE,
+            want_s * SCALE
+        );
+    }
+
+    // Round: the rim's extent in x and in y must match, because braille dots are
+    // square. An aspect correction applied at the wrong level draws an ellipse
+    // and looks deliberate.
+    let mut canvas = Canvas::new(20, 10);
+    canvas.dial(0);
+    let lines = canvas.lines();
+    let blank = '\u{2800}';
+    let rows: Vec<usize> = lines
+        .iter()
+        .enumerate()
+        .filter(|(_, l)| l.chars().any(|c| c != blank))
+        .map(|(i, _)| i)
+        .collect();
+    let cols: Vec<usize> = (0..20)
+        .filter(|c| {
+            lines
+                .iter()
+                .any(|l| l.chars().nth(*c).is_some_and(|ch| ch != blank))
+        })
+        .collect();
+    let (h_cells, w_cells) = (
+        rows.last().unwrap_or(&0) - rows.first().unwrap_or(&0) + 1,
+        cols.last().unwrap_or(&0) - cols.first().unwrap_or(&0) + 1,
+    );
+    // Cells are 2 dots wide and 4 tall, so a round dial covers about twice as
+    // many columns as rows.
+    let ratio = w_cells * 100 / h_cells.max(1);
+    assert!(
+        (150..=260).contains(&ratio),
+        "the dial is {w_cells} cells wide and {h_cells} tall: ratio {ratio}, wanted about 200"
+    );
+}
+
+/// The orbit face draws dials and no block digits.
+///
+/// It is the only face here with no big numerals, which is the point of it. If
+/// block digits appeared, the layout would have quietly become another variant
+/// of `plain` with a decoration on top.
+#[test]
+fn the_orbit_face_has_hands_and_no_block_digits() {
+    let f = face();
+    let out = ucal::wallclock::once(
+        &f,
+        theme::by_name("orbit").expect("a theme"),
+        96,
+        24,
+        false,
+    )
+    .expect("a frame");
+    assert!(out.contains('\u{2800}') || out.contains('⠿'), "no braille:\n{out}");
+    assert!(!out.contains('█'), "orbit should have no block digits:\n{out}");
+    for h in &f.hands {
+        assert!(out.contains(&h.position.to_string()), "{out}");
     }
 }

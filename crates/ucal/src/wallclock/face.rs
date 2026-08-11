@@ -4,6 +4,7 @@
 //! layout — so it can be built and asserted on without a terminal. Rendering
 //! takes a [`Theme`] and puts it on a frame.
 
+use super::dial;
 use super::digits;
 use super::theme::{Layout, Theme};
 use ratatui::layout::{Alignment, Constraint, Direction, Layout as Layout2, Rect};
@@ -213,6 +214,7 @@ impl Face {
             Layout::Targeting => self.render_targeting(f, area, theme),
             Layout::Panel => self.render_panel(f, area, theme),
             Layout::Dsky => self.render_dsky(f, area, theme),
+            Layout::Orbit => self.render_orbit(f, area, theme),
         }
     }
 
@@ -827,6 +829,105 @@ impl Face {
         tail.extend(self.local_lines(theme));
         tail.push(Line::from(""));
         tail.push(Line::styled("  [Q] KEY REL", dim));
+        f.render_widget(Paragraph::new(tail), rows[3]);
+    }
+    // ucal-lint-allow-end(no-wrapping-arithmetic)
+
+    // ---- orbit -----------------------------------------------------------
+
+    /// A row of dials with hands.
+    ///
+    /// One per tier, coarsest on the left, each drawn on its own braille canvas
+    /// with the numeral beneath it. The numerals are not a hedge: a dial this
+    /// size resolves about one stop in thirty, so it says which part of the tier
+    /// you are in and the number says which stop — the same division of labour a
+    /// clock with numerals on its face has always had.
+    // ucal-lint-allow-begin(no-wrapping-arithmetic): u16 terminal geometry only
+    fn render_orbit(&self, f: &mut Frame, area: Rect, theme: &Theme) {
+        let ink = Style::default().fg(theme.text);
+        let dim = Style::default().fg(theme.label);
+
+        let rows = Layout2::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(2),
+                Constraint::Min(8),
+                Constraint::Length(3),
+                Constraint::Min(0),
+            ])
+            .split(area);
+
+        f.render_widget(
+            Paragraph::new(vec![
+                Line::styled(" UCAL — universe calendar, on dials", ink),
+                Line::styled(
+                    " every tier has 3125 stops, because every rung is 5^5 of the one below",
+                    dim,
+                ),
+            ]),
+            rows[0],
+        );
+
+        // One dial per hand, side by side.
+        let n = self.hands.len().max(1);
+        let each = (rows[1].width as usize / n).clamp(1, 24);
+        let cells = Layout2::default()
+            .direction(Direction::Horizontal)
+            .constraints(
+                self.hands
+                    .iter()
+                    .map(|_| Constraint::Length(each as u16))
+                    .chain(core::iter::once(Constraint::Min(0)))
+                    .collect::<Vec<_>>(),
+            )
+            .split(rows[1]);
+
+        for (i, h) in self.hands.iter().enumerate() {
+            let Some(r) = cells.get(i) else { continue };
+            if r.width < 4 || r.height < 4 {
+                continue;
+            }
+            let colour = theme.blocks[i % theme.blocks.len()];
+            let cols = (r.width as usize).saturating_sub(1);
+            let dial_rows = (r.height as usize).saturating_sub(2);
+            let mut canvas = dial::Canvas::new(cols, dial_rows);
+            canvas.dial(h.position);
+            let mut lines: Vec<Line> = canvas
+                .lines()
+                .into_iter()
+                .map(|l| Line::styled(l, Style::default().fg(colour)))
+                .collect();
+            lines.push(Line::styled(
+                format!("{:^width$}", h.position, width = cols),
+                Style::default().fg(theme.primary),
+            ));
+            lines.push(Line::styled(
+                format!("{:^width$}", h.label(), width = cols),
+                dim,
+            ));
+            f.render_widget(Paragraph::new(lines), *r);
+        }
+
+        let width = rows[2].width.saturating_sub(2) as usize;
+        let filled = self.blur().map_or(0, |b| b.per_mille() as usize) * width / 1000;
+        let bar: String = core::iter::repeat_n('▁', filled)
+            .chain(core::iter::repeat_n(' ', width.saturating_sub(filled)))
+            .collect();
+        f.render_widget(
+            Paragraph::new(vec![
+                Line::styled(format!(" {bar}"), Style::default().fg(theme.blur)),
+                Line::styled(
+                    " the finest hand has no dial: 66 000 stops a second is not a hand",
+                    dim,
+                ),
+            ]),
+            rows[2],
+        );
+
+        let mut tail = vec![Line::styled(format!(" {}", self.human), ink)];
+        tail.extend(self.local_lines(theme));
+        tail.push(Line::from(""));
+        tail.push(Line::styled(" q to quit", dim));
         f.render_widget(Paragraph::new(tail), rows[3]);
     }
     // ucal-lint-allow-end(no-wrapping-arithmetic)
