@@ -973,6 +973,17 @@ wrong before it is drawn; printing nothing would hide it.
 - **startrek** — LCARS, in its production palette. Warm orange elbows, peach and
   lilac rails, black behind everything. `--startrek` is shorthand for
   `--theme startrek`.
+- **starwars** — a targeting computer. Canopy brackets at the corners, a reticle
+  round the beat, the flicker riding the crosshair, and every other hand
+  compressed into one strip along the bottom. Amber wireframe on black.
+
+The last two are **layouts**, not palettes, and they are opposites. LCARS is a
+console: coloured blocks, generous space, numbers set against a rail, an
+interface for reading. A gunsight is an instrument: a frame at the edge of
+vision, one number in the middle, and everything else in a strip. A theme that
+was only a different mood — the same arrangement in different colours — would be
+a palette wearing a layout's name, and a test requires the three layouts to draw
+differently with colour switched off.
 
 `--theme list` prints them as an ordinary document. An unknown key is
 `UCAL-E0016` — a name that is not in a declared catalogue, the same answer

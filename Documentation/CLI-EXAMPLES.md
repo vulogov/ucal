@@ -822,6 +822,37 @@ LCARS. The elbow, the rail of tier readouts, the beat in block digits, and the f
                    Q TO DISENGAGE
 ```
 
+## `ucal wallclock --once --at 8070205189123984864657505252035637180530466139316558837890625 --theme starwars --height 24`
+
+A targeting computer: canopy brackets, a reticle round the beat, the flicker riding the crosshair, and every other hand compressed into one strip. An instrument, where LCARS is a console.
+
+```
+┌──────                                                                  ──────┐
+  TARGETING · UC1                                                 LOCK T1 3108
+  ABSOLUTE TIME · PLANCK TICKS · BASE FIVE
+ ┌───                                                                      ───┐
+ │                          █████ █   █ █████ █████                           │
+ │                              █ █   █     █     █                           │
+ │                          █████ █████  ████    █                            │
+ │                          █         █     █   █                             │
+ │                          █████     █ █████   █                             │
+ └───                                                                      ───┘
+ ━━━━━━━━━━━━━━━━━━━━━━━━━━━────────────┼──────────────────────────────────────
+  T-1 FLICKER ON THE AXIS · 66 000 PER SECOND
+  T3 SPAN 2481   T2 SWEEP 2999   T1 ARC 3108   T0 BEAT 2437   T-1 FLICKER 1104
+
+  UC1 0031·0687·2481·2999·3108·2437
+
+  [Q] DISENGAGE
+
+
+
+
+
+
+└──────                                                                  ──────┘
+```
+
 ## `ucal wallclock --once --at 8070205189123984864657505252035637180530466139316558837890625 --clock-local mars-d --height 20`
 
 The plain theme with a second dial. A wall clock's second face has always shown another place, and Mars is one.

@@ -121,6 +121,10 @@ fn examples() -> Vec<Example> {
             why: "LCARS. The elbow, the rail of tier readouts, the beat in block digits, and the flicker as a bar because a number would be wrong before it was drawn.",
         },
         Example {
+            args: &["wallclock", "--once", "--at", T, "--theme", "starwars", "--height", "24"],
+            why: "A targeting computer: canopy brackets, a reticle round the beat, the flicker riding the crosshair, and every other hand compressed into one strip. An instrument, where LCARS is a console.",
+        },
+        Example {
             args: &["wallclock", "--once", "--at", T, "--clock-local", "mars-d", "--height", "20"],
             why: "The plain theme with a second dial. A wall clock's second face has always shown another place, and Mars is one.",
         },

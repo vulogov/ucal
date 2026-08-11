@@ -9,6 +9,28 @@
 use ratatui::style::Color;
 use ucal_core::{Code, TimeError};
 
+/// How a face is arranged, as opposed to what colour it is.
+///
+/// This was a `bool` — `lcars: true` or not — for exactly as long as there were
+/// two layouts. [`Z2-wallclock-faces.md`] predicted where that would stop being
+/// honest: *"a third layout is where `lcars: bool` stops being honest and
+/// `Theme` needs a `layout` enum"*. `starwars` is the third.
+///
+/// Closed on purpose. A layout is a body of drawing code in this module, not a
+/// value a caller can supply, so an exhaustive match is the feature — see
+/// `CLOSED_VOCABULARIES` in `xtask/src/lint.rs` for the rule.
+///
+/// [`Z2-wallclock-faces.md`]: https://github.com/vulogov/ucal/blob/main/Documentation/Proposals/Z2-wallclock-faces.md
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Layout {
+    /// Labels down the left, readout at the top. No chrome.
+    Plain,
+    /// An elbow into a vertical rail of blocks, LCARS.
+    Lcars,
+    /// A gunsight: canopy frame, reticle, crosshair, and a HUD strip.
+    Targeting,
+}
+
 /// A clock face's colours and chrome.
 #[derive(Clone, Copy, Debug)]
 #[non_exhaustive]
@@ -17,8 +39,8 @@ pub struct Theme {
     pub key: &'static str,
     /// One line, for `--theme list`.
     pub about: &'static str,
-    /// Whether to draw LCARS elbows and rails, or a plain frame.
-    pub lcars: bool,
+    /// How the face is arranged.
+    pub layout: Layout,
     /// The page.
     pub background: Color,
     /// Ordinary text.
@@ -40,7 +62,7 @@ pub struct Theme {
 pub const PLAIN: Theme = Theme {
     key: "plain",
     about: "monochrome, no chrome — the default",
-    lcars: false,
+    layout: Layout::Plain,
     background: Color::Reset,
     text: Color::Reset,
     label: Color::DarkGray,
@@ -62,7 +84,7 @@ pub const PLAIN: Theme = Theme {
 pub const LCARS: Theme = Theme {
     key: "startrek",
     about: "LCARS — the library computer interface, in its production palette",
-    lcars: true,
+    layout: Layout::Lcars,
     background: Color::Black,
     text: Color::Rgb(0xFF, 0xCC, 0x99),
     label: Color::Rgb(0x99, 0x99, 0xFF),
@@ -84,7 +106,7 @@ pub const LCARS: Theme = Theme {
 pub const AMBER: Theme = Theme {
     key: "amber",
     about: "VT220 amber phosphor — one warm hue, no second one",
-    lcars: false,
+    layout: Layout::Plain,
     background: Color::Rgb(0x0A, 0x06, 0x00),
     text: Color::Rgb(0xFF, 0xB0, 0x00),
     label: Color::Rgb(0x99, 0x66, 0x00),
@@ -97,7 +119,7 @@ pub const AMBER: Theme = Theme {
 pub const GREEN: Theme = Theme {
     key: "green",
     about: "3270 green phosphor — the other half of the same idea",
-    lcars: false,
+    layout: Layout::Plain,
     background: Color::Rgb(0x00, 0x0A, 0x00),
     text: Color::Rgb(0x33, 0xFF, 0x33),
     label: Color::Rgb(0x11, 0x88, 0x11),
@@ -115,7 +137,7 @@ pub const GREEN: Theme = Theme {
 pub const PAPER: Theme = Theme {
     key: "paper",
     about: "dark on light, committed — for light terminals and for print",
-    lcars: false,
+    layout: Layout::Plain,
     background: Color::Rgb(0xFA, 0xF8, 0xF2),
     text: Color::Rgb(0x1A, 0x1A, 0x1A),
     label: Color::Rgb(0x5A, 0x5A, 0x5A),
@@ -124,8 +146,41 @@ pub const PAPER: Theme = Theme {
     blur: Color::Rgb(0x8A, 0x8A, 0x8A),
 };
 
+/// A targeting computer.
+///
+/// The other science-fiction interface everyone has seen, and structurally the
+/// opposite of LCARS. LCARS is a *console*: coloured blocks, generous space,
+/// numbers set against a rail, an interface for reading. A gunsight is an
+/// *instrument*: a frame at the edge of vision, a reticle in the middle, one
+/// number that matters, and everything else compressed into a strip along the
+/// bottom. Amber wireframe on black, because that is what a lit reticle looks
+/// like through a canopy.
+///
+/// It earns its place by being a third layout rather than a fourth palette —
+/// which is the bar [`Z2-wallclock-faces.md`] set for a theme, and the reason
+/// `blueprint` is not here.
+///
+/// [`Z2-wallclock-faces.md`]: https://github.com/vulogov/ucal/blob/main/Documentation/Proposals/Z2-wallclock-faces.md
+pub const TARGETING: Theme = Theme {
+    key: "starwars",
+    about: "a targeting computer — canopy frame, reticle, and a HUD strip",
+    layout: Layout::Targeting,
+    background: Color::Black,
+    text: Color::Rgb(0xFF, 0xA5, 0x2C),
+    label: Color::Rgb(0x8A, 0x55, 0x14),
+    primary: Color::Rgb(0xFF, 0xC8, 0x5C),
+    blocks: &[
+        Color::Rgb(0xFF, 0xA5, 0x2C),
+        Color::Rgb(0xE0, 0x50, 0x20),
+        Color::Rgb(0x4C, 0xD9, 0x64),
+        Color::Rgb(0xFF, 0xC8, 0x5C),
+        Color::Rgb(0x8A, 0x55, 0x14),
+    ],
+    blur: Color::Rgb(0xE0, 0x50, 0x20),
+};
+
 /// Every theme, in the order `--theme list` prints them.
-pub const ALL: &[&Theme] = &[&PLAIN, &AMBER, &GREEN, &PAPER, &LCARS];
+pub const ALL: &[&Theme] = &[&PLAIN, &AMBER, &GREEN, &PAPER, &LCARS, &TARGETING];
 
 /// Look a theme up by key.
 ///

@@ -889,6 +889,7 @@ const CLOSED_VOCABULARIES: &[(&str, &str)] = &[
     ("Provenance", "Rule C's binary: measured, or derived from something measured"),
     ("ColorChoice", "auto, always, never — the universal triple"),
     ("Frame", "already #[non_exhaustive]; listed so the pair with Rule F is visible"),
+    ("Layout", "a wall-clock layout is drawing code in this crate, not a value a caller supplies"),
 ];
 
 /// The two operations that can discard information in this tree.

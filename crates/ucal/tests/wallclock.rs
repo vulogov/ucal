@@ -360,3 +360,57 @@ fn no_two_themes_render_the_same_frame() {
     }
     assert_eq!(seen.len(), theme::ALL.len());
 }
+
+/// Three layouts, three genuinely different arrangements.
+///
+/// `Theme` carried a `lcars: bool` for as long as there were two, and Z2 said
+/// where that would stop being honest. This is the check that keeps the enum
+/// earning itself: a "layout" that differed from another only in colour would
+/// be a palette wearing a layout's name.
+#[test]
+fn each_layout_is_a_different_arrangement() {
+    use ucal::wallclock::theme::Layout;
+    let f = face();
+    let mut by_layout: Vec<(Layout, String)> = Vec::new();
+    for t in theme::ALL {
+        // Uncoloured, so only the *arrangement* can differ.
+        let frame = ucal::wallclock::once(&f, t, 90, 28, false).expect("a frame");
+        if let Some((_, other)) = by_layout.iter().find(|(l, _)| *l == t.layout) {
+            assert_eq!(
+                *other, frame,
+                "two themes share a layout but draw differently: {}",
+                t.key
+            );
+        } else {
+            for (l, other) in &by_layout {
+                assert_ne!(
+                    *other, frame,
+                    "layouts {:?} and {:?} draw identically without colour",
+                    l, t.layout
+                );
+            }
+            by_layout.push((t.layout, frame));
+        }
+    }
+    assert_eq!(by_layout.len(), 3, "expected three distinct layouts");
+}
+
+/// The targeting face draws its instrument furniture.
+#[test]
+fn the_starwars_face_is_a_gunsight() {
+    let f = face();
+    let theme = theme::by_name("starwars").expect("a theme");
+    let out = ucal::wallclock::once(&f, theme, 90, 28, false).expect("a frame");
+    assert!(out.contains("TARGETING"), "{out}");
+    assert!(out.contains('┼'), "no crosshair:\n{out}");
+    assert!(out.contains("┌──"), "no canopy bracket:\n{out}");
+    // Every hand on one strip, because an instrument does not give a number its
+    // own panel.
+    for h in &f.hands {
+        assert!(
+            out.contains(&format!("{:04}", h.position)),
+            "hand {} missing from the strip:\n{out}",
+            h.label()
+        );
+    }
+}

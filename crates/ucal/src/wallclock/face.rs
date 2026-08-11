@@ -5,8 +5,8 @@
 //! takes a [`Theme`] and puts it on a frame.
 
 use super::digits;
-use super::theme::Theme;
-use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
+use super::theme::{Layout, Theme};
+use ratatui::layout::{Alignment, Constraint, Direction, Layout as Layout2, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Paragraph};
@@ -207,17 +207,17 @@ impl Face {
             Block::default().style(Style::default().bg(theme.background)),
             area,
         );
-        if theme.lcars {
-            self.render_lcars(f, area, theme);
-        } else {
-            self.render_plain(f, area, theme);
+        match theme.layout {
+            Layout::Plain => self.render_plain(f, area, theme),
+            Layout::Lcars => self.render_lcars(f, area, theme),
+            Layout::Targeting => self.render_targeting(f, area, theme),
         }
     }
 
     // ---- plain -----------------------------------------------------------
 
     fn render_plain(&self, f: &mut Frame, area: Rect, theme: &Theme) {
-        let rows = Layout::default()
+        let rows = Layout2::default()
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(1),
@@ -255,7 +255,7 @@ impl Face {
     /// rail. Drawing it in a terminal means the corner is a block and the
     /// rounding is a half-block, which is as close as a character cell gets.
     fn render_lcars(&self, f: &mut Frame, area: Rect, theme: &Theme) {
-        let cols = Layout::default()
+        let cols = Layout2::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Length(18), Constraint::Min(0)])
             .split(area);
@@ -263,7 +263,7 @@ impl Face {
         let main = cols[1];
 
         // The elbow: a solid block at the top of the rail, joined to the header.
-        let rail_rows = Layout::default()
+        let rail_rows = Layout2::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Length(4), Constraint::Min(0)])
             .split(rail);
@@ -282,7 +282,7 @@ impl Face {
         // position. This is the LCARS idiom — a stack of labelled buttons that
         // are not buttons.
         let hands = &self.hands;
-        let block_rows = Layout::default()
+        let block_rows = Layout2::default()
             .direction(Direction::Vertical)
             .constraints(
                 hands
@@ -337,7 +337,7 @@ impl Face {
         }
 
         // The main panel.
-        let main_rows = Layout::default()
+        let main_rows = Layout2::default()
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(4),
@@ -415,6 +415,166 @@ impl Face {
             main_rows[5],
         );
     }
+
+    // ---- targeting -------------------------------------------------------
+
+    /// A gunsight.
+    ///
+    /// Structurally the opposite of LCARS, which is why it is a layout and not a
+    /// palette. LCARS is a console — coloured blocks, generous space, an
+    /// interface for reading. A gunsight is an instrument: a frame at the edge
+    /// of vision, a reticle in the middle holding the one number that matters,
+    /// and everything else compressed into a strip along the bottom.
+    //
+    // # Rule O, and why a region rather than seven line markers
+    //
+    // Every saturating subtraction below is a `u16` column or row count. A pane
+    // two cells narrower than its border is a pane of zero cells, which is the
+    // right answer and the only one; Rule O exists because a silently clamped
+    // *duration* is a wrong answer where an error was available.
+    //
+    // The region is bounded by types rather than by discipline, which is what
+    // makes it safe to draw this wide: nothing in scope here is a quantity in
+    // this calendar. `Rect` is `u16`s, `Hand::position` is a `u32` under 3125,
+    // and the only `Ratio` in the whole module is inside `Local::read`, which is
+    // a different function in a different impl.
+    // ucal-lint-allow-begin(no-wrapping-arithmetic): u16 terminal geometry only
+    fn render_targeting(&self, f: &mut Frame, area: Rect, theme: &Theme) {
+        let w = area.width;
+        let h = area.height;
+        let amber = Style::default().fg(theme.text);
+        let dim = Style::default().fg(theme.label);
+        let hot = Style::default().fg(theme.blocks[1 % theme.blocks.len()]);
+        let lock = Style::default().fg(theme.blocks[2 % theme.blocks.len()]);
+
+        // The canopy frame: corner brackets only. A closed box would be a
+        // window; brackets are what a HUD draws, because the pilot is looking
+        // through the middle of it.
+        let corner = 6.min(w.saturating_sub(2) / 2) as usize;
+        let bar: String = core::iter::repeat_n('─', corner).collect();
+        let pad: String = core::iter::repeat_n(' ', (w as usize).saturating_sub(corner * 2 + 2)).collect();
+        f.render_widget(
+            Paragraph::new(Line::styled(format!("┌{bar}{pad}{bar}┐"), amber)),
+            Rect::new(area.x, area.y, w, 1),
+        );
+        if h >= 2 {
+            f.render_widget(
+                Paragraph::new(Line::styled(format!("└{bar}{pad}{bar}┘"), amber)),
+                Rect::new(area.x, area.y + h - 1, w, 1),
+            );
+        }
+
+        let inner = Rect::new(
+            area.x + 1,
+            area.y + 1,
+            w.saturating_sub(2),
+            h.saturating_sub(2),
+        );
+        if inner.height < 6 || inner.width < 18 {
+            return;
+        }
+
+        let rows = Layout2::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(2),
+                Constraint::Length(digits::HEIGHT as u16 + 2),
+                Constraint::Length(2),
+                Constraint::Min(0),
+            ])
+            .split(inner);
+
+        // Header: what this is, and the slow hand as a "lock" readout.
+        let arc = self
+            .hands
+            .iter()
+            .find(|hh| hh.tier.index() == 1)
+            .map_or(0, |hh| hh.position);
+        f.render_widget(
+            Paragraph::new(vec![
+                Line::from(vec![
+                    Span::styled(" TARGETING · UC1", amber),
+                    Span::styled(
+                        format!("{:>width$}", format!("LOCK T1 {arc:04} "), width = (rows[0].width as usize).saturating_sub(16)),
+                        lock,
+                    ),
+                ]),
+                Line::styled(
+                    " ABSOLUTE TIME · PLANCK TICKS · BASE FIVE",
+                    dim,
+                ),
+            ]),
+            rows[0],
+        );
+
+        // The reticle: corner ticks around the readout, and the readout inside.
+        let rw = rows[1].width as usize;
+        let tick = 3.min(rw / 4);
+        let inner_pad: String = core::iter::repeat_n(' ', rw.saturating_sub(tick * 2 + 2)).collect();
+        let tick_bar: String = core::iter::repeat_n('─', tick).collect();
+        let mut reticle: Vec<Line> = Vec::new();
+        reticle.push(Line::styled(
+            format!("┌{tick_bar}{inner_pad}{tick_bar}┐"),
+            hot,
+        ));
+        let beat = self.beat().map_or(0, |hh| hh.position);
+        for row in digits::render(&format!("{beat:04}")) {
+            let body = format!("{row:^width$}", width = rw.saturating_sub(2));
+            reticle.push(Line::from(vec![
+                Span::styled("│", hot),
+                Span::styled(body, Style::default().fg(theme.primary)),
+                Span::styled("│", hot),
+            ]));
+        }
+        reticle.push(Line::styled(
+            format!("└{tick_bar}{inner_pad}{tick_bar}┘"),
+            hot,
+        ));
+        f.render_widget(Paragraph::new(reticle), rows[1]);
+
+        // The crosshair, with the flicker riding it. The bar and the sight line
+        // are the same row on purpose: the fastest hand is the one a gunsight
+        // would put on the axis.
+        let cross_w = rows[2].width as usize;
+        let filled = self.blur().map_or(0, |b| b.per_mille() as usize) * cross_w / 1000;
+        let cross: String = (0..cross_w)
+            .map(|i| {
+                if i == cross_w / 2 {
+                    '┼'
+                } else if i < filled {
+                    '━'
+                } else {
+                    '─'
+                }
+            })
+            .collect();
+        f.render_widget(
+            Paragraph::new(vec![
+                Line::styled(cross, hot),
+                Line::styled(" T-1 FLICKER ON THE AXIS · 66 000 PER SECOND", dim),
+            ]),
+            rows[2],
+        );
+
+        // The HUD strip: every hand on one line, because an instrument does not
+        // give a number its own panel.
+        let strip: String = self
+            .hands
+            .iter()
+            .map(|hh| format!("{} {:04}", hh.label().to_uppercase(), hh.position))
+            .collect::<Vec<_>>()
+            .join("   ");
+        let mut tail = vec![
+            Line::styled(format!(" {strip}"), amber),
+            Line::from(""),
+            Line::styled(format!(" {}", self.human), dim),
+        ];
+        tail.extend(self.local_lines(theme));
+        tail.push(Line::from(""));
+        tail.push(Line::styled(" [Q] DISENGAGE", hot));
+        f.render_widget(Paragraph::new(tail), rows[3]);
+    }
+    // ucal-lint-allow-end(no-wrapping-arithmetic)
 
     // ---- shared ----------------------------------------------------------
 
