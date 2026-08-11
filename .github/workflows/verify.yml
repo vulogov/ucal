@@ -136,11 +136,14 @@ jobs:
             exit 1
           fi
           echo "ok: --features tui does not build at 1.87, as documented"
-          cargo build -p ucal --all-features 2>/dev/null && {
+          # `if !` rather than `&&`: the runner uses `bash -e`, under which a
+          # failing left-hand side of `&&` ends the step. The failure is the
+          # expected outcome here, so it has to be tested and not merely run.
+          if cargo build -p ucal --all-features 2>/dev/null; then
             echo "--all-features built at 1.87, which contradicts the above."
             exit 1
-          }
-          echo "ok: the exception is the tui feature and nothing else
+          fi
+          echo "ok: the exception is the tui feature and nothing else"
 
   checks:
     name: harness, lints, docs, vectors
