@@ -50,6 +50,11 @@ jobs:
       - run: cargo build -p ucal --no-default-features --features u512,std,body,civil
       - run: cargo build -p ucal --no-default-features --features u512,std,events
       - run: cargo build -p ucal --no-default-features --features u512,std,cosmo
+      # The wall clock. `tui` needs `civil` (it reads the system clock through
+      # the leap table), and the two combinations below check that the feature
+      # declares that dependency rather than relying on `default` to supply it.
+      - run: cargo build -p ucal --no-default-features --features u512,std,civil,tui
+      - run: cargo build -p ucal --features tui
 
   refused:
     name: every unsupported combination fails with a sentence

@@ -1,0 +1,161 @@
+//! The wall clock, rendered into a buffer.
+//!
+//! A TUI is the easiest thing in a program to leave untested, because running it
+//! needs a terminal. `TestBackend` does not, so there is no excuse: the face is
+//! drawn into a fixed-size buffer and read back as text.
+#![cfg(feature = "tui")]
+
+use ratatui::backend::TestBackend;
+use ratatui::Terminal;
+use ucal::wallclock::{theme, Face};
+use ucal_core::backend::TickInt;
+use ucal_core::{Instant, Ticks, Tier, UC1};
+
+const T: &str = "8070205189123984864657505252035637180530466139316558837890625";
+
+fn face() -> Face {
+    let t = Instant::<UC1>::from_ticks(
+        <Ticks as TickInt>::from_dec_str(T).expect("a decimal tick count"),
+    )
+    .expect("inside the domain");
+    Face::at(t).expect("a face")
+}
+
+fn drawn(theme_key: &str, w: u16, h: u16) -> String {
+    let theme = theme::by_name(theme_key).expect("a theme");
+    let mut term = Terminal::new(TestBackend::new(w, h)).expect("a test terminal");
+    term.draw(|f| face().render(f, theme)).expect("draws");
+    let buf = term.backend().buffer().clone();
+    (0..buf.area.height)
+        .map(|y| {
+            (0..buf.area.width)
+                .map(|x| buf[(x, y)].symbol().to_string())
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Every theme draws, at a size a terminal might actually be.
+///
+/// The failure this catches is the one a TUI has that nothing else does: a
+/// layout that indexes past the end of a `split` and takes the process down. The
+/// CLI carries no panicking construct by lint, and `no-panic-in-cli` cannot see
+/// an index into a `Vec` that a constraint list made shorter than expected.
+#[test]
+fn every_theme_draws_at_every_plausible_size() {
+    for t in theme::ALL {
+        for (w, h) in [(80, 24), (120, 40), (200, 60), (40, 20), (20, 10), (10, 5)] {
+            let out = drawn(t.key, w, h);
+            assert_eq!(
+                out.lines().count(),
+                h as usize,
+                "{} at {w}x{h} produced the wrong number of rows",
+                t.key
+            );
+        }
+    }
+}
+
+/// The readout is the beat, in block digits, and it is on the screen.
+#[test]
+fn the_beat_is_drawn_large() {
+    let f = face();
+    let beat = f.beat().expect("a beat hand");
+    // Every block-digit row is made of these two characters and spaces.
+    let out = drawn("plain", 80, 24);
+    assert!(
+        out.contains('█'),
+        "no block digits in the readout:\n{out}"
+    );
+    assert!(beat.position < 3125, "a hand has 3125 stops, not {}", beat.position);
+}
+
+/// LCARS draws its rail and its header, and plain draws neither.
+#[test]
+fn the_startrek_theme_is_visibly_a_different_layout() {
+    let lcars = drawn("startrek", 100, 30);
+    let plain = drawn("plain", 100, 30);
+    assert!(lcars.contains("UNIVERSE CALENDAR"), "{lcars}");
+    assert!(lcars.contains('▄'), "no LCARS elbow:\n{lcars}");
+    assert!(!plain.contains('▄'), "the plain theme grew chrome:\n{plain}");
+    assert_ne!(lcars, plain);
+}
+
+/// Rule A.5: no Earth unit on the face.
+///
+/// A clock is where the temptation lives — every clock a reader has seen counts
+/// in hours, minutes and seconds, and the whole point of this one is that it
+/// does not. The face names tiers, and the only place a second appears is in the
+/// sentence explaining how fast the blurred tier moves, which is a statement
+/// about the display rather than a unit the clock counts in.
+#[test]
+fn the_face_names_no_earth_unit_as_a_unit() {
+    for t in theme::ALL {
+        let out = drawn(t.key, 120, 40).to_lowercase();
+        for unit in ["hour", "minute", " am ", " pm ", "o'clock", "utc", "gregorian"] {
+            assert!(
+                !out.contains(unit),
+                "the {} face shows `{unit}`:\n{out}",
+                t.key
+            );
+        }
+    }
+}
+
+/// Every hand is inside its dial, for an instant at each end of the domain.
+#[test]
+fn every_hand_is_a_position_on_a_dial_of_3125() {
+    for ticks in ["0", "1", T, &Ticks::domain_max().to_dec_string()] {
+        let Some(v) = <Ticks as TickInt>::from_dec_str(ticks) else {
+            continue;
+        };
+        let Ok(t) = Instant::<UC1>::from_ticks(v) else {
+            continue;
+        };
+        let f = Face::at(t).expect("a face");
+        for h in &f.hands {
+            assert!(
+                h.position < 3125,
+                "{} is at {}, off the end of its dial",
+                h.tier,
+                h.position
+            );
+            assert!(h.per_mille() <= 1000);
+        }
+    }
+}
+
+/// The clock's hands agree with the tier arithmetic they claim to show.
+///
+/// `T1` is 3125 `T0`s. A face whose `T1` hand did not advance once per 3125
+/// beats would be a picture of a clock rather than a clock.
+#[test]
+fn a_tiers_hand_advances_once_per_3125_of_the_one_below() {
+    let base = <Ticks as TickInt>::from_dec_str(T).expect("ticks");
+    let t0 = Tier::new(0).expect("T0");
+    let one_beat = t0.ticks();
+
+    let f0 = Face::at(Instant::<UC1>::from_ticks(base.clone()).expect("in domain")).expect("face");
+    let a = f0.beat().expect("beat").position;
+
+    let plus = base
+        .try_add(&one_beat)
+        .expect("one beat later is inside the domain");
+    let f1 = Face::at(Instant::<UC1>::from_ticks(plus).expect("in domain")).expect("face");
+    let b = f1.beat().expect("beat").position;
+
+    assert_eq!(
+        b,
+        (a + 1) % 3125,
+        "one beat later, the beat hand did not advance one stop"
+    );
+}
+
+/// An unknown theme is `UCAL-E0016`, and says where to find the real ones.
+#[test]
+fn an_unknown_theme_is_a_catalogue_miss() {
+    let e = theme::by_name("klingon").expect_err("no such theme");
+    assert_eq!(e.code, ucal_core::Code::E0016);
+    assert!(e.to_string().contains("--theme list"), "{e}");
+}

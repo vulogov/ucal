@@ -19,6 +19,8 @@ pub mod cert;
 // feature, and the features workflow catches it when it does not.
 #[cfg(feature = "body")]
 pub mod anchor_file;
+#[cfg(feature = "tui")]
+pub mod wallclock;
 #[cfg(feature = "body")]
 pub mod body_file;
 pub mod emit;
@@ -1163,14 +1165,14 @@ pub fn cmd_to_civil(
     Ok(doc)
 }
 
-/// `ucal now` — the system clock, converted through the bundled leap table.
+/// The system clock as a `UC1` instant, through the bundled leap table.
 ///
-/// §8.4: the clock is read as UTC and converted offline. Unix time does not count
-/// leap seconds, so its value is a *label-linear* count and is converted as a UTC
-/// label rather than as an elapsed duration — which is exactly the distinction
-/// Rule L exists to keep visible.
-#[cfg(all(feature = "civil", feature = "std"))]
-pub fn cmd_now(precision: Tier, form: Form) -> CmdResult {
+/// Extracted so `ucal wallclock` reads *now* by the same route `ucal now` does.
+/// A clock with its own path to the system time would be a second
+/// implementation, and the two would eventually disagree by a leap second — the
+/// one quantity §8.4 says cannot be computed and must be looked up.
+#[cfg(feature = "civil")]
+pub fn now_instant() -> Result<Instant<UC1>, TimeError> {
     use std::time::{SystemTime, UNIX_EPOCH};
     let d = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -1181,7 +1183,7 @@ pub fn cmd_now(precision: Tier, form: Form) -> CmdResult {
     let days = 719_528 + unix_secs.div_euclid(86_400);
     let sod = unix_secs.rem_euclid(86_400);
     let (y, mo, dd) = ucal_civil::calendar::civil_from_days(days, CivilCalendar::Gregorian);
-    let t = si::from_civil(
+    si::from_civil(
         y,
         mo,
         dd,
@@ -1191,7 +1193,19 @@ pub fn cmd_now(precision: Tier, form: Form) -> CmdResult {
         SubSecond::new(nanos as u128, 9)?,
         Scale::Utc,
         CivilCalendar::Gregorian,
-    )?;
+    )
+}
+
+/// `ucal now` — the system clock, converted through the bundled leap table.
+///
+/// §8.4: the clock is read as UTC and converted offline. Unix time does not count
+/// leap seconds, so its value is a *label-linear* count and is converted as a UTC
+/// label rather than as an elapsed duration — which is exactly the distinction
+/// Rule L exists to keep visible.
+#[cfg(all(feature = "civil", feature = "std"))]
+#[cfg(feature = "civil")]
+pub fn cmd_now(precision: Tier, form: Form) -> CmdResult {
+    let t = now_instant()?;
 
     let fmt = Fmt::default()
         .with_form(form)
@@ -2383,6 +2397,39 @@ struct Step {
 /// itself as a considered curriculum.
 ///
 /// [`Documentation/CLI.md`]: https://github.com/vulogov/ucal/blob/main/Documentation/CLI.md
+/// `ucal wallclock --theme list` — the themes, as a document.
+///
+/// A catalogue, so it is enumerable: a caller told "no such theme" should be
+/// able to find out what there is, which is the same reason `ucal cal list`
+/// exists.
+#[cfg(feature = "tui")]
+pub fn cmd_wallclock_themes() -> Doc {
+    Doc::new()
+        .title("ucal wallclock themes")
+        .field(
+            "themes",
+            Value::rows(
+                "theme",
+                wallclock::theme::ALL
+                    .iter()
+                    .map(|t| {
+                        (
+                            t.key.to_string(),
+                            Value::Section(vec![("about".into(), Value::text(t.about))]),
+                        )
+                    })
+                    .collect::<Vec<_>>(),
+            ),
+        )
+        .note(
+            "The clock shows T3 span down to T-1 flicker. Above T3 a hand does not move \
+             within a human lifetime — one T4 is 141 000 years — and below T-1 it moves \
+             66 000 times a second, which no refresh rate reaches.",
+        )
+}
+
+/// `ucal tour` — the first five minutes.
+#[allow(clippy::doc_markdown)]
 pub fn cmd_tour() -> CmdResult {
     let t = "8070205189123984864657505252035637180530466139316558837890625";
 

@@ -211,6 +211,16 @@ enum Command {
     Verify,
     /// The first five minutes: what to type, what it shows, and why.
     Tour,
+    /// A full-screen clock showing universe time. `q` quits.
+    #[cfg(feature = "tui")]
+    Wallclock {
+        /// Theme key, or `list` to name them all.
+        #[arg(long, default_value = "plain")]
+        theme: String,
+        /// Shorthand for `--theme startrek`, which is LCARS.
+        #[arg(long)]
+        startrek: bool,
+    },
     /// Shell completions, generated from this program's own argument parser.
     Completions {
         /// bash, zsh, fish, powershell or elvish.
@@ -458,6 +468,20 @@ fn main() {
         clap_complete::generate(*shell, &mut cmd, name, &mut std::io::stdout());
         return;
     }
+    // Also not a `Doc`: it owns the terminal until the user quits, and its
+    // output is the screen rather than a document. `--theme list` *is* a Doc,
+    // and falls through to the dispatch below.
+    #[cfg(feature = "tui")]
+    if let Command::Wallclock { theme, startrek } = &cli.command {
+        let key = if *startrek { "startrek" } else { theme.as_str() };
+        if key != "list" {
+            if let Err(e) = ucal::wallclock::run(key) {
+                eprintln!("{e}");
+                std::process::exit(exit_code(&e));
+            }
+            return;
+        }
+    }
     if let Command::Man { command } = &cli.command {
         // roff on stdout, for the same reason as the completions above: a page
         // written by hand is a second description of the CLI, and this one comes
@@ -551,6 +575,10 @@ fn main() {
         }
         Command::Verify => ucal::cmd_verify(),
         Command::Tour => ucal::cmd_tour(),
+        // Only `--theme list` reaches here; every other value ran the clock and
+        // returned above.
+        #[cfg(feature = "tui")]
+        Command::Wallclock { .. } => Ok(ucal::cmd_wallclock_themes()),
         // Handled by the early return above; this arm exists only because a
         // `match` must be exhaustive. A diagnostic rather than `unreachable!()`
         // — the CLI crate carries no panicking construct (`no-panic-in-cli`),

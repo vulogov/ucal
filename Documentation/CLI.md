@@ -904,6 +904,60 @@ wrong five would be useful.
 
 ---
 
+## `ucal wallclock`
+
+A full-screen clock showing universe time. `q`, `Esc` or `Ctrl-C` quits.
+
+```
+ucal wallclock [--theme <KEY>] [--startrek]
+ucal wallclock --theme list
+```
+
+**Only in a build with the `tui` feature.** `ratatui` and `crossterm` are a
+large tree and [`GE-U4-tier-navigator.md`](Proposals/GE-U4-tier-navigator.md)
+asked in as many words that `cargo install ucal` stay lean, so the feature is not
+in `default`. The published release binaries are built with it; a source install
+opts in with `cargo install ucal --features tui`.
+
+### What is on the face, and what is not
+
+Which of this calendar's units *move* at a rate a person can watch is a question
+with a numeric answer, and it decides the design:
+
+- **T3 span**, one of them 45 years — a rail readout.
+- **T2 sweep**, 5.3 days — a rail readout.
+- **T1 arc**, 2 min 26 s — the hand you read the time from.
+- **T0 beat**, 46.8 ms — the big readout, about 21 per second.
+- **T-1 flicker**, 15 µs — a bar, not a number.
+
+Above `T3` a hand does not move within a human lifetime — one `T4` is 141 000
+years. Below `T-1` a hand moves 66 000 times a second, which no refresh rate
+reaches. Both ends are off the face for the same reason.
+
+The flicker is a **bar** because it is a real quantity moving too fast to read
+and not too fast to see. Printing it as a number would print a number that is
+wrong before it is drawn; printing nothing would hide it.
+
+### Themes
+
+- **plain** — monochrome, no chrome. The default, and deliberately dull: a clock
+  that only looked right in one aesthetic would be a demo.
+- **startrek** — LCARS, in its production palette. Warm orange elbows, peach and
+  lilac rails, black behind everything. `--startrek` is shorthand for
+  `--theme startrek`.
+
+`--theme list` prints them as an ordinary document. An unknown key is
+`UCAL-E0016` — a name that is not in a declared catalogue, the same answer
+`ucal cal show` gives for a calendar that does not exist.
+
+**No Earth unit appears on the face as a unit** (Rule A.5), and a test asserts
+it. A clock is where that temptation lives: every clock a reader has ever seen
+counts in hours, minutes and seconds, and the point of this one is that it does
+not. The two places a second is named — the arc's pace and the flicker's rate —
+are statements *about the display*, not units the clock counts in.
+
+---
+
 ## `ucal doctor`
 
 Profile, backend, ceiling, leap table, features, provenance (§19.3).
