@@ -392,7 +392,70 @@ fn each_layout_is_a_different_arrangement() {
             by_layout.push((t.layout, frame));
         }
     }
-    assert_eq!(by_layout.len(), 3, "expected three distinct layouts");
+    // Every theme's layout must be one of these, and every one of these must
+    // be reached by some theme: a layout nothing selects is unreachable code,
+    // and a theme whose layout nothing else shares is why the enum exists.
+    assert_eq!(
+        by_layout.len(),
+        5,
+        "expected five distinct layouts, found {:?}",
+        by_layout.iter().map(|(l, _)| *l).collect::<Vec<_>>()
+    );
+}
+
+/// The 1960s pair: an enamelled plate and a keypad, both drawn.
+///
+/// Two answers to the same decade, and the check is that they are answers rather
+/// than palettes — `gagarin` is a surface with bezelled gauges, `armstrong` a
+/// terminal with a verb, a noun and three registers.
+#[test]
+fn the_space_programme_faces_draw_their_own_furniture() {
+    let f = face();
+    let gagarin = ucal::wallclock::once(
+        &f,
+        theme::by_name("gagarin").expect("a theme"),
+        96,
+        28,
+        false,
+    )
+    .expect("a frame");
+    assert!(gagarin.contains("ВРЕМЯ ВСЕЛЕННОЙ"), "{gagarin}");
+    assert!(gagarin.contains("ГОТОВ"), "{gagarin}");
+    assert!(gagarin.contains("┌────────────┐"), "no bezel:\n{gagarin}");
+
+    let armstrong = ucal::wallclock::once(
+        &f,
+        theme::by_name("armstrong").expect("a theme"),
+        96,
+        28,
+        false,
+    )
+    .expect("a frame");
+    for want in ["COMP ACTY", "VERB", "NOUN", "R1", "R2", "R3", "PROG"] {
+        assert!(armstrong.contains(want), "no `{want}`:\n{armstrong}");
+    }
+    // V16 N65 is a real pair — monitor, decimal, time — and not decoration.
+    assert!(armstrong.contains("16"), "{armstrong}");
+    assert!(armstrong.contains("65"), "{armstrong}");
+}
+
+/// The Cyrillic chrome does not become the tier names.
+///
+/// `--locale` decides a name's language (Rule N) and a theme does not get to
+/// override it. `--gagarin` alone draws Cyrillic chrome around English names,
+/// which looks odd and is correct; `--gagarin --locale ru` is the pairing.
+#[test]
+fn a_theme_does_not_override_the_locale() {
+    let gagarin = theme::by_name("gagarin").expect("a theme");
+    let f_en = Face::at(instant(), en(), None).expect("a face");
+    let out = ucal::wallclock::once(&f_en, gagarin, 96, 28, false).expect("a frame");
+    assert!(out.contains("ВРЕМЯ ВСЕЛЕННОЙ"), "chrome should be Cyrillic");
+    assert!(out.contains("T0 BEAT"), "names should follow --locale:\n{out}");
+
+    let ru = LocaleId::parse("ru").expect("ru ships");
+    let f_ru = Face::at(instant(), ru, None).expect("a face");
+    let out_ru = ucal::wallclock::once(&f_ru, gagarin, 96, 28, false).expect("a frame");
+    assert!(out_ru.contains("ДУГА"), "{out_ru}");
 }
 
 /// The targeting face draws its instrument furniture.

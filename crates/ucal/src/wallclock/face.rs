@@ -211,6 +211,8 @@ impl Face {
             Layout::Plain => self.render_plain(f, area, theme),
             Layout::Lcars => self.render_lcars(f, area, theme),
             Layout::Targeting => self.render_targeting(f, area, theme),
+            Layout::Panel => self.render_panel(f, area, theme),
+            Layout::Dsky => self.render_dsky(f, area, theme),
         }
     }
 
@@ -572,6 +574,259 @@ impl Face {
         tail.extend(self.local_lines(theme));
         tail.push(Line::from(""));
         tail.push(Line::styled(" [Q] DISENGAGE", hot));
+        f.render_widget(Paragraph::new(tail), rows[3]);
+    }
+    // ucal-lint-allow-end(no-wrapping-arithmetic)
+
+    // ---- panel (Vostok) --------------------------------------------------
+
+    /// An enamelled plate with gauges set into it.
+    ///
+    /// The oldest tradition of the five and the only light one, because the
+    /// object was: a pale panel built in 1960 to be read and operated with a
+    /// glove on. Where LCARS is a screen and a gunsight is a projection, this is
+    /// a surface — bezelled instruments in a row, each with an engraved plate
+    /// under it saying what it measures.
+    ///
+    /// The chrome is Cyrillic and the tier names are not: `--locale` decides a
+    /// name's language (Rule N) and a theme does not get to override it. The
+    /// intended pairing is `--gagarin --locale ru`.
+    // ucal-lint-allow-begin(no-wrapping-arithmetic): u16 terminal geometry only
+    fn render_panel(&self, f: &mut Frame, area: Rect, theme: &Theme) {
+        let ink = Style::default().fg(theme.text);
+        let engraved = Style::default().fg(theme.label);
+        let lamp = Style::default().fg(theme.blocks[1 % theme.blocks.len()]);
+        let ready = Style::default().fg(theme.blocks[2 % theme.blocks.len()]);
+
+        let rows = Layout2::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(3),
+                Constraint::Length(5),
+                Constraint::Length(digits::HEIGHT as u16 + 4),
+                Constraint::Length(3),
+                Constraint::Min(0),
+            ])
+            .split(area);
+
+        // The title plate.
+        f.render_widget(
+            Paragraph::new(vec![
+                Line::styled(" ВРЕМЯ ВСЕЛЕННОЙ · UC1", ink),
+                Line::styled(" АБСОЛЮТНОЕ ВРЕМЯ · ПЛАНКОВСКИЕ ТИКИ · ОСНОВАНИЕ ПЯТЬ", engraved),
+                Line::styled(" ───────────────────────────────────────────────────", engraved),
+            ]),
+            rows[0],
+        );
+
+        // A row of gauges for the slow hands, each in a bezel over its plate.
+        let slow: Vec<&Hand> = self
+            .hands
+            .iter()
+            .filter(|h| h.tier.index() >= 1)
+            .collect();
+        if !slow.is_empty() {
+            let cells = Layout2::default()
+                .direction(Direction::Horizontal)
+                .constraints(
+                    slow.iter()
+                        .map(|_| Constraint::Length(16))
+                        .chain(core::iter::once(Constraint::Min(0)))
+                        .collect::<Vec<_>>(),
+                )
+                .split(rows[1]);
+            for (i, h) in slow.iter().enumerate() {
+                if let Some(r) = cells.get(i) {
+                    f.render_widget(
+                        Paragraph::new(vec![
+                            Line::styled(" ┌────────────┐", ink),
+                            Line::from(vec![
+                                Span::styled(" │", ink),
+                                Span::styled(format!("{:^12}", h.position), Style::default().fg(theme.primary).add_modifier(Modifier::BOLD)),
+                                Span::styled("│", ink),
+                            ]),
+                            Line::styled(" └────────────┘", ink),
+                            Line::styled(format!("{:^15}", h.label().to_uppercase()), engraved),
+                        ]),
+                        *r,
+                    );
+                }
+            }
+        }
+
+        // The main instrument.
+        let beat = self.beat().map_or(0, |h| h.position);
+        let mut main = vec![Line::styled(" ┌──────────────────────────────┐", ink)];
+        for row in digits::render(&format!("{beat:04}")) {
+            main.push(Line::from(vec![
+                Span::styled(" │ ", ink),
+                Span::styled(format!("{row:<28}"), Style::default().fg(theme.primary)),
+                Span::styled("│", ink),
+            ]));
+        }
+        main.push(Line::styled(" └──────────────────────────────┘", ink));
+        // The plate carries the tier's name in the active locale, like every
+        // other plate on this panel. It read `T0 · ОСНОВНОЙ ОТСЧЁТ` first,
+        // which made the main instrument the one gauge whose label ignored
+        // `--locale` — chrome and name are separate here, and that had quietly
+        // mixed them.
+        let beat_label = self
+            .beat()
+            .map_or_else(|| "T0".to_string(), |h| h.label().to_uppercase());
+        main.push(Line::styled(
+            format!("        {beat_label} · ОСНОВНОЙ ОТСЧЁТ"),
+            engraved,
+        ));
+        f.render_widget(Paragraph::new(main), rows[2]);
+
+        // The lamp: the sub-visible tier, as a red bar rather than a number.
+        let width = rows[3].width.saturating_sub(4) as usize;
+        let filled = self.blur().map_or(0, |b| b.per_mille() as usize) * width / 1000;
+        let bar: String = core::iter::repeat_n('▆', filled)
+            .chain(core::iter::repeat_n('▁', width.saturating_sub(filled)))
+            .collect();
+        f.render_widget(
+            Paragraph::new(vec![
+                Line::from(vec![Span::styled(format!(" ● {bar}"), lamp)]),
+                Line::styled("   T-1 · 66 000 В СЕКУНДУ · ПОЛОЖЕНИЕ, НЕ ЧИСЛО", engraved),
+            ]),
+            rows[3],
+        );
+
+        let mut tail = vec![Line::styled(format!(" {}", self.human), ink)];
+        tail.extend(self.local_lines(theme));
+        tail.push(Line::from(""));
+        tail.push(Line::from(vec![
+            Span::styled(" ● ГОТОВ", ready),
+            Span::styled("     [Q] ВЫХОД", engraved),
+        ]));
+        f.render_widget(Paragraph::new(tail), rows[4]);
+    }
+
+    // ---- DSKY (Apollo) ---------------------------------------------------
+
+    /// A verb, a noun, and three registers.
+    ///
+    /// The other answer to the same decade. Vostok's panel was a surface you
+    /// read; this was a terminal you addressed — two digits for a verb, two for
+    /// a noun, and three numeric registers showing whatever you had just asked
+    /// for. `V16 N65` is a real pair: monitor, decimal, and the time register.
+    ///
+    /// The lamps are drawn unlit except `COMP ACTY`. The rest report conditions
+    /// this program does not have, and a lit lamp that means nothing is a
+    /// decoration pretending to be an instrument.
+    fn render_dsky(&self, f: &mut Frame, area: Rect, theme: &Theme) {
+        let green = Style::default().fg(theme.text);
+        let bright = Style::default().fg(theme.primary).add_modifier(Modifier::BOLD);
+        let dim = Style::default().fg(theme.label);
+        let caution = Style::default().fg(theme.blocks[1 % theme.blocks.len()]);
+
+        let cols = Layout2::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Length(14), Constraint::Min(0)])
+            .split(area);
+
+        // The annunciator column.
+        let lamps = [
+            ("COMP ACTY", true),
+            ("UPLINK ACTY", false),
+            ("NO ATT", false),
+            ("STBY", false),
+            ("KEY REL", false),
+            ("OPR ERR", false),
+            ("TRACKER", false),
+        ];
+        let mut column = vec![Line::styled("┌────────────┐", dim)];
+        for (name, lit) in lamps {
+            column.push(Line::from(vec![
+                Span::styled("│", dim),
+                Span::styled(
+                    format!("{name:^12}"),
+                    if lit { bright } else { dim },
+                ),
+                Span::styled("│", dim),
+            ]));
+        }
+        column.push(Line::styled("└────────────┘", dim));
+        f.render_widget(Paragraph::new(column), cols[0]);
+
+        let rows = Layout2::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(4),
+                Constraint::Length(3),
+                Constraint::Length(digits::HEIGHT as u16 + 2),
+                Constraint::Min(0),
+            ])
+            .split(cols[1]);
+
+        // PROG, VERB, NOUN.
+        f.render_widget(
+            Paragraph::new(vec![
+                Line::from(vec![
+                    Span::styled("  PROG  ", dim),
+                    Span::styled("01", bright),
+                    Span::styled("    UNIVERSE CALENDAR · UC1", dim),
+                ]),
+                Line::from(vec![
+                    Span::styled("  VERB  ", dim),
+                    Span::styled("16", bright),
+                    Span::styled("    NOUN  ", dim),
+                    Span::styled("65", bright),
+                    Span::styled("   MONITOR DECIMAL · TIME", dim),
+                ]),
+                Line::styled("  ──────────────────────────────────────────", dim),
+                Line::from(""),
+            ]),
+            rows[0],
+        );
+
+        // R1 and R2: the slow registers, in the instrument's own numerals.
+        let reg = |k: i8| self.hands.iter().find(|h| h.tier.index() == k);
+        let mut regs: Vec<Line> = Vec::new();
+        for (name, k) in [("R1", 2i8), ("R2", 1i8)] {
+            let h = reg(k);
+            regs.push(Line::from(vec![
+                Span::styled(format!("  {name}   "), dim),
+                Span::styled(
+                    format!("+{:05}", h.map_or(0, |h| h.position)),
+                    green,
+                ),
+                Span::styled(
+                    format!("   {}", h.map_or(String::new(), |h| h.label().to_uppercase())),
+                    dim,
+                ),
+            ]));
+        }
+        regs.push(Line::from(""));
+        f.render_widget(Paragraph::new(regs), rows[1]);
+
+        // R3: the register that moves, in the block font. A real DSKY gives all
+        // three the same size; see the theme's own note on the departure.
+        let beat = self.beat().map_or(0, |h| h.position);
+        let mut r3 = vec![Line::from(vec![
+            Span::styled("  R3   ", dim),
+            Span::styled("T0 BEAT · 21 PER SECOND", dim),
+        ])];
+        for row in digits::render(&format!("{beat:04}")) {
+            r3.push(Line::styled(format!("  {row}"), bright));
+        }
+        f.render_widget(Paragraph::new(r3), rows[2]);
+
+        let width = rows[3].width.saturating_sub(4) as usize;
+        let filled = self.blur().map_or(0, |b| b.per_mille() as usize) * width / 1000;
+        let bar: String = core::iter::repeat_n('▮', filled)
+            .chain(core::iter::repeat_n('▯', width.saturating_sub(filled)))
+            .collect();
+        let mut tail = vec![
+            Line::styled(format!("  {bar}"), caution),
+            Line::styled("  T-1 FLICKER · TOO FAST FOR A REGISTER", dim),
+            Line::from(""),
+            Line::styled(format!("  {}", self.human), green),
+        ];
+        tail.extend(self.local_lines(theme));
+        tail.push(Line::from(""));
+        tail.push(Line::styled("  [Q] KEY REL", dim));
         f.render_widget(Paragraph::new(tail), rows[3]);
     }
     // ucal-lint-allow-end(no-wrapping-arithmetic)

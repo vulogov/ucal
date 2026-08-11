@@ -853,6 +853,68 @@ A targeting computer: canopy brackets, a reticle round the beat, the flicker rid
 └──────                                                                  ──────┘
 ```
 
+## `ucal wallclock --once --at 8070205189123984864657505252035637180530466139316558837890625 --gagarin --locale ru --height 24`
+
+A Vostok instrument panel: an enamelled plate with bezelled gauges set into it, engraved labels, and a red lamp. Cyrillic chrome; the tier names follow --locale, which is why this example passes one.
+
+```
+ ВРЕМЯ ВСЕЛЕННОЙ · UC1
+ АБСОЛЮТНОЕ ВРЕМЯ · ПЛАНКОВСКИЕ ТИКИ · ОСНОВАНИЕ ПЯТЬ
+ ───────────────────────────────────────────────────
+ ┌────────────┐  ┌────────────┐  ┌────────────┐
+ │    2481    │  │    2999    │  │    3108    │
+ └────────────┘  └────────────┘  └────────────┘
+   T3 ПРОЛЁТ       T2 ОБХОД         T1 ДУГА
+
+ ┌──────────────────────────────┐
+ │ █████ █   █ █████ █████     │
+ │     █ █   █     █     █     │
+ │ █████ █████  ████    █      │
+ │ █         █     █   █       │
+ │ █████     █ █████   █       │
+ └──────────────────────────────┘
+        T0 БОЙ · ОСНОВНОЙ ОТСЧЁТ
+
+ ● ▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+   T-1 · 66 000 В СЕКУНДУ · ПОЛОЖЕНИЕ, НЕ ЧИСЛО
+
+ UC1 0031·0687·2481·2999·3108·2437
+
+ ● ГОТОВ     [Q] ВЫХОД
+
+```
+
+## `ucal wallclock --once --at 8070205189123984864657505252035637180530466139316558837890625 --armstrong --height 24`
+
+An Apollo DSKY. VERB 16 NOUN 65 is a real pair — monitor, decimal, time — and the lamps are drawn unlit except COMP ACTY, because the rest report conditions this program does not have.
+
+```
+┌────────────┐  PROG  01    UNIVERSE CALENDAR · UC1
+│ COMP ACTY  │  VERB  16    NOUN  65   MONITOR DECIMAL · TIME
+│UPLINK ACTY │  ──────────────────────────────────────────
+│   NO ATT   │
+│    STBY    │  R1   +02999   T2 SWEEP
+│  KEY REL   │  R2   +03108   T1 ARC
+│  OPR ERR   │
+│  TRACKER   │  R3   T0 BEAT · 21 PER SECOND
+└────────────┘  █████ █   █ █████ █████
+                    █ █   █     █     █
+                █████ █████  ████    █
+                █         █     █   █
+                █████     █ █████   █
+
+                ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯
+                T-1 FLICKER · TOO FAST FOR A REGISTER
+
+                UC1 0031·0687·2481·2999·3108·2437
+
+                [Q] KEY REL
+
+
+
+
+```
+
 ## `ucal wallclock --once --at 8070205189123984864657505252035637180530466139316558837890625 --clock-local mars-d --height 20`
 
 The plain theme with a second dial. A wall clock's second face has always shown another place, and Mars is one.

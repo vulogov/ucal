@@ -218,8 +218,14 @@ enum Command {
         #[arg(long, default_value = "plain")]
         theme: String,
         /// Shorthand for `--theme startrek`, which is LCARS.
-        #[arg(long)]
+        #[arg(long, conflicts_with_all = ["gagarin", "armstrong"])]
         startrek: bool,
+        /// Shorthand for `--theme gagarin`, a Vostok instrument panel.
+        #[arg(long, conflicts_with_all = ["startrek", "armstrong"])]
+        gagarin: bool,
+        /// Shorthand for `--theme armstrong`, an Apollo DSKY.
+        #[arg(long, conflicts_with_all = ["startrek", "gagarin"])]
+        armstrong: bool,
         /// A body's own calendar, shown as a second dial: `earth-d`, `mars-d`.
         ///
         /// `--clock-local` and not `--locale`, which is already this program's
@@ -655,13 +661,22 @@ fn main() {
     if let Command::Wallclock {
         theme,
         startrek,
+        gagarin,
+        armstrong,
         clock_local,
         once,
         at,
         height,
     } = &cli.command
     {
-        let key = if *startrek { "startrek" } else { theme.as_str() };
+        // The shorthands are mutually exclusive by `conflicts_with_all`, so at
+        // most one is set and the order here cannot hide a second choice.
+        let key = match (*startrek, *gagarin, *armstrong) {
+            (true, _, _) => "startrek",
+            (_, true, _) => "gagarin",
+            (_, _, true) => "armstrong",
+            _ => theme.as_str(),
+        };
         if key != "list" {
             // `--width` is the global flag, and off a terminal it resolves to
             // the 80-column baseline — which is the size a committed frame

@@ -125,6 +125,14 @@ fn examples() -> Vec<Example> {
             why: "A targeting computer: canopy brackets, a reticle round the beat, the flicker riding the crosshair, and every other hand compressed into one strip. An instrument, where LCARS is a console.",
         },
         Example {
+            args: &["wallclock", "--once", "--at", T, "--gagarin", "--locale", "ru", "--height", "24"],
+            why: "A Vostok instrument panel: an enamelled plate with bezelled gauges set into it, engraved labels, and a red lamp. Cyrillic chrome; the tier names follow --locale, which is why this example passes one.",
+        },
+        Example {
+            args: &["wallclock", "--once", "--at", T, "--armstrong", "--height", "24"],
+            why: "An Apollo DSKY. VERB 16 NOUN 65 is a real pair — monitor, decimal, time — and the lamps are drawn unlit except COMP ACTY, because the rest report conditions this program does not have.",
+        },
+        Example {
             args: &["wallclock", "--once", "--at", T, "--clock-local", "mars-d", "--height", "20"],
             why: "The plain theme with a second dial. A wall clock's second face has always shown another place, and Mars is one.",
         },

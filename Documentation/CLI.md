@@ -930,7 +930,7 @@ wrong five would be useful.
 A full-screen clock showing universe time. `q`, `Esc` or `Ctrl-C` quits.
 
 ```
-ucal wallclock [--theme <KEY>] [--startrek] [--clock-local <ID>]
+ucal wallclock [--theme <KEY>] [--startrek|--gagarin|--armstrong] [--clock-local <ID>]
 ucal wallclock --once [--at <INSTANT>] [--height <N>]
 ucal wallclock --theme list
 ```
@@ -977,13 +977,32 @@ wrong before it is drawn; printing nothing would hide it.
   round the beat, the flicker riding the crosshair, and every other hand
   compressed into one strip along the bottom. Amber wireframe on black.
 
-The last two are **layouts**, not palettes, and they are opposites. LCARS is a
-console: coloured blocks, generous space, numbers set against a rail, an
-interface for reading. A gunsight is an instrument: a frame at the edge of
-vision, one number in the middle, and everything else in a strip. A theme that
-was only a different mood — the same arrangement in different colours — would be
-a palette wearing a layout's name, and a test requires the three layouts to draw
-differently with colour switched off.
+- **gagarin** — a Vostok instrument panel. An enamelled plate with bezelled
+  gauges set into it, an engraved label under each, and a red lamp. The only
+  light theme by default, because the object was. Its chrome is Cyrillic and its
+  tier names are not: `--locale` decides a name's language and a theme does not
+  get to override it, so the intended pairing is `--gagarin --locale ru`.
+- **armstrong** — an Apollo DSKY. A column of annunciator lamps, `PROG`, `VERB`
+  and `NOUN`, and three registers. `V16 N65` is a real pair: monitor, decimal,
+  time. The lamps are drawn unlit except `COMP ACTY` — the rest report
+  conditions this program does not have, and a lit lamp that means nothing is a
+  decoration pretending to be an instrument. One deliberate departure: a real
+  DSKY gives its three registers equal size, and this gives the beat the block
+  font, because it is the register that moves.
+
+`--startrek`, `--gagarin` and `--armstrong` are shorthands for the matching
+`--theme`, and are mutually exclusive.
+
+The last four are **layouts**, not palettes. LCARS is a console:
+coloured blocks, generous space, numbers set against a rail, an interface for
+reading. A gunsight is an instrument: a frame at the edge of vision, one number
+in the middle, everything else in a strip. Vostok is a *surface* you read;
+a DSKY is a *terminal you address*, two digits for a verb and two for a noun.
+
+A theme that was only a different mood — the same arrangement in different
+colours — would be a palette wearing a layout's name. A test requires the five
+layouts to draw differently with colour switched off, and requires two themes
+that share a layout to draw identically.
 
 `--theme list` prints them as an ordinary document. An unknown key is
 `UCAL-E0016` — a name that is not in a declared catalogue, the same answer

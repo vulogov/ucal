@@ -29,6 +29,10 @@ pub enum Layout {
     Lcars,
     /// A gunsight: canopy frame, reticle, crosshair, and a HUD strip.
     Targeting,
+    /// An instrument panel: bezelled gauges in a row, each on a label plate.
+    Panel,
+    /// A DSKY: a lamp column, a program register, and a stack of numbers.
+    Dsky,
 }
 
 /// A clock face's colours and chrome.
@@ -179,8 +183,88 @@ pub const TARGETING: Theme = Theme {
     blur: Color::Rgb(0xE0, 0x50, 0x20),
 };
 
+/// The instrument panel of an early Soviet spacecraft.
+///
+/// The third real-world tradition on this list, and the oldest: Vostok's panel
+/// was built in 1960 out of parts that had to work with a glove on, and it looks
+/// like it. Where LCARS is a screen and a gunsight is a projection, this is a
+/// **surface** — a pale enamelled plate with round black-bezelled gauges set
+/// into it, a red lamp, and an engraved label under each instrument.
+///
+/// The palette is that plate: eggshell, near-black bezels, an oxide red for the
+/// one thing that is a warning, and a signal green for the one thing that is a
+/// state. It is the only theme here that is light by default, and it is light
+/// because the object was.
+///
+/// **Its chrome is Cyrillic and its tier names are not.** `--locale` decides the
+/// language of a tier's name (Rule N) and a theme does not get to override it,
+/// so `--gagarin` alone draws Cyrillic chrome around English names. The intended
+/// pairing is `--gagarin --locale ru`, and the two flags stay independent for
+/// the same reason `--clock-local` is not `--locale`.
+pub const PANEL: Theme = Theme {
+    key: "gagarin",
+    about: "a Vostok instrument panel — enamelled plate, bezelled gauges, Cyrillic",
+    layout: Layout::Panel,
+    background: Color::Rgb(0xE8, 0xE2, 0xD0),
+    text: Color::Rgb(0x1C, 0x1C, 0x18),
+    label: Color::Rgb(0x55, 0x52, 0x48),
+    primary: Color::Rgb(0x0E, 0x0E, 0x0C),
+    blocks: &[
+        Color::Rgb(0x1C, 0x1C, 0x18),
+        Color::Rgb(0xA8, 0x2A, 0x1E),
+        Color::Rgb(0x2E, 0x6B, 0x3A),
+        Color::Rgb(0x55, 0x52, 0x48),
+        Color::Rgb(0x1C, 0x1C, 0x18),
+    ],
+    blur: Color::Rgb(0xA8, 0x2A, 0x1E),
+};
+
+/// The Apollo Guidance Computer's display and keyboard.
+///
+/// The other half of the pair with [`PANEL`], and the other answer to the same
+/// decade. Vostok's panel was a surface you read; the DSKY was a **terminal you
+/// addressed** — two digits for a verb, two for a noun, and three numeric
+/// registers that showed whatever you had just asked for. `V16 N65` is a real
+/// pair: monitor, decimal, and the time register.
+///
+/// Green electroluminescent numerals on black, a column of annunciator lamps
+/// down the left, and nothing else. The lamps are drawn unlit except `COMP
+/// ACTY`, because the others report conditions this program does not have and a
+/// lit lamp that means nothing is a decoration pretending to be an instrument.
+///
+/// **One deliberate departure.** A real DSKY gives its three registers equal
+/// size. This gives the beat the block font, because it is the register that
+/// moves and a clock whose fastest hand was the same size as its slowest would
+/// be harder to read than the thing it is imitating. Noted rather than hidden.
+pub const DSKY: Theme = Theme {
+    key: "armstrong",
+    about: "an Apollo DSKY — verb, noun, three registers, and a lamp column",
+    layout: Layout::Dsky,
+    background: Color::Black,
+    text: Color::Rgb(0x7C, 0xF9, 0x8A),
+    label: Color::Rgb(0x2E, 0x6B, 0x3A),
+    primary: Color::Rgb(0xB8, 0xFF, 0xC0),
+    blocks: &[
+        Color::Rgb(0x7C, 0xF9, 0x8A),
+        Color::Rgb(0xE8, 0xC0, 0x40),
+        Color::Rgb(0x2E, 0x6B, 0x3A),
+        Color::Rgb(0xB8, 0xFF, 0xC0),
+        Color::Rgb(0x2E, 0x6B, 0x3A),
+    ],
+    blur: Color::Rgb(0x2E, 0x6B, 0x3A),
+};
+
 /// Every theme, in the order `--theme list` prints them.
-pub const ALL: &[&Theme] = &[&PLAIN, &AMBER, &GREEN, &PAPER, &LCARS, &TARGETING];
+pub const ALL: &[&Theme] = &[
+    &PLAIN,
+    &AMBER,
+    &GREEN,
+    &PAPER,
+    &LCARS,
+    &TARGETING,
+    &PANEL,
+    &DSKY,
+];
 
 /// Look a theme up by key.
 ///
