@@ -35,6 +35,18 @@ jobs:
       - name: default backend
         run: cargo test --workspace --release
 
+      # The wall clock's tests. `--workspace` above does not reach them: `tui` is
+      # not a default feature, so `#![cfg(feature = "tui")]` compiles the whole
+      # file away and 22 tests report as zero.
+      #
+      # They were built in CI from the day they were written -- the features
+      # workflow builds `-p ucal --features tui` -- and never *run*. Found by
+      # `check-docs`' CI-covers-procedure check the moment 1.6.0's verification
+      # block listed the command, which is the same shape as the defect 1.6.0 is
+      # about: a mechanism that exists and is not wired to anything.
+      - name: the wall clock
+        run: cargo test -p ucal --release --features tui
+
       # Rule W: the two backends must agree byte for byte. Nothing checks that
       # at runtime -- backend.rs refuses to compile both at once -- so this job
       # is the only place the claim is tested.
