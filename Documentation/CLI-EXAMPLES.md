@@ -3,7 +3,7 @@
 **Generated — do not edit.** Every block below is the real output of the command above it, captured by running it. Regenerate with:
 
 ```
-cargo build --release -p ucal
+cargo build --release -p ucal --features tui
 cargo run -p xtask -- gen-examples
 ```
 
@@ -274,43 +274,68 @@ Seven derived calendars, two with anchors. A body without an anchor is the ordin
 ucal cal list
 ─────────────
 calendars:
-  calendar      kind                             body     anchor_revision
-  ────────────  ───────────────────────────────  ───────  ───────────────
-  earth-d       derived — Rule K                 earth    1
+  calendar      kind                             body       anchor_revision
+  ────────────  ───────────────────────────────  ─────────  ───────────────
+  earth-d       derived — Rule K                 earth      1
                 leap_rule  31/128 (convergent 4)
                 cycles  from moon
-  mars-d        derived — Rule K                 mars     1
+  mars-d        derived — Rule K                 mars       1
                 leap_rule  45/76 (convergent 6)
                 cycles  none — the calendar names no grouping satellite
-  titan-d       derived — Rule K                 titan    —
+  titan-d       derived — Rule K                 titan      —
                 leap_rule  88/117 (convergent 3)
                 status  no anchor: complete in units, intercalation and cycles,
                         incomplete in phase. Asking for local fields is
                         UCAL-E0062 (Rule J.3).
-  luna-d        derived — Rule K                 luna     —
+  luna-d        derived — Rule K                 luna       —
                 leap_rule  31/84 (convergent 5)
                 status  no anchor: complete in units, intercalation and cycles,
                         incomplete in phase. Asking for local fields is
                         UCAL-E0062 (Rule J.3).
-  mercury-d     derived — Rule K                 mercury  —
+  mercury-d     derived — Rule K                 mercury    —
                 leap_rule  1/2 (convergent 1)
                 status  no anchor: complete in units, intercalation and cycles,
                         incomplete in phase. Asking for local fields is
                         UCAL-E0062 (Rule J.3).
-  venus-d       derived — Rule K                 venus    —
+  venus-d       derived — Rule K                 venus      —
                 leap_rule  135/146 (convergent 5)
                 status  no anchor: complete in units, intercalation and cycles,
                         incomplete in phase. Asking for local fields is
                         UCAL-E0062 (Rule J.3).
-  jupiter-d     derived — Rule K                 jupiter  —
+  jupiter-d     derived — Rule K                 jupiter    —
                 leap_rule  68/81 (convergent 4)
                 status  no anchor: complete in units, intercalation and cycles,
                         incomplete in phase. Asking for local fields is
                         UCAL-E0062 (Rule J.3).
-  earth-civil   legacy — declared tables (§8.6)  —        —
+  io-d          derived — Rule K                 io         —
+                leap_rule  58/59 (convergent 2)
+                status  no anchor: complete in units, intercalation and cycles,
+                        incomplete in phase. Asking for local fields is
+                        UCAL-E0062 (Rule J.3).
+  europa-d      derived — Rule K                 europa     —
+                leap_rule  1/24 (convergent 2)
+                status  no anchor: complete in units, intercalation and cycles,
+                        incomplete in phase. Asking for local fields is
+                        UCAL-E0062 (Rule J.3).
+  ganymede-d    derived — Rule K                 ganymede   —
+                leap_rule  149/261 (convergent 4)
+                status  no anchor: complete in units, intercalation and cycles,
+                        incomplete in phase. Asking for local fields is
+                        UCAL-E0062 (Rule J.3).
+  callisto-d    derived — Rule K                 callisto   —
+                leap_rule  17/28 (convergent 6)
+                status  no anchor: complete in units, intercalation and cycles,
+                        incomplete in phase. Asking for local fields is
+                        UCAL-E0062 (Rule J.3).
+  enceladus-d   derived — Rule K                 enceladus  —
+                leap_rule  28/151 (convergent 5)
+                status  no anchor: complete in units, intercalation and cycles,
+                        incomplete in phase. Asking for local fields is
+                        UCAL-E0062 (Rule J.3).
+  earth-civil   legacy — declared tables (§8.6)  —          —
                 leap_rule  97/400 (NOT a convergent — declared, not derived)
                 arbitrary  4
-  earth-julian  legacy — declared tables (§8.6)  —        —
+  earth-julian  legacy — declared tables (§8.6)  —          —
                 leap_rule  1/4 (a convergent)
                 arbitrary  4
 
@@ -329,6 +354,12 @@ ucal cal show earth-d
 calendar  earth-d
 kind      derived — Rule K
 body      earth
+ladder_placement:
+  unit       rung      above_rung
+  ─────────  ────────  ──────────
+  solar_day  T1 arc    591.3
+  year       T2 sweep  69.1
+  cycle      T2 sweep  5.6
 anchor:
   phase         mean solar midnight
   revision      1
@@ -374,6 +405,7 @@ cycles:
     4131/334
     8497/687
 certification:
+  rounded, half-even, 1 digits  above_rung
   rounded, trunc, 6 digits      day_fraction
   rounded, half-even, 9 digits  cycles_per_year
   every other number above is exact: the digits shown are the value
@@ -755,6 +787,188 @@ input:
   scale      tt
   calendar   gregorian
   exactness  exact; construction never rounds (Rule R)
+```
+
+## `ucal wallclock --once --at 8070205189123984864657505252035637180530466139316558837890625 --theme startrek --height 26`
+
+LCARS. The elbow, the rail of tier readouts, the beat in block digits, and the flicker as a bar because a number would be wrong before it was drawn.
+
+```
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄   UNIVERSE CALENDAR · UC1
+████████████████
+████████████████   ABSOLUTE TIME · PLANCK TICKS · BASE FIVE
+███████▀▀▀▀▀▀▀▀▀
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄  █████ █   █ █████ █████
+        T3 SPAN       █ █   █     █     █
+           2481   █████ █████  ████    █
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄  █         █     █   █
+       T2 SWEEP   █████     █ █████   █
+           2999
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄   T1 ARC   3108  ONE STOP EVERY 2 MIN 26 S
+         T1 ARC
+           3108   ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄  T-1 FLICKER · 66 000 PER SECOND · A POSITION, NOT A NUMBER
+        T0 BEAT
+           2437
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+    T-1 FLICKER   UC1 0031·0687·2481·2999·3108·2437
+           1104
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+
+
+
+
+                  ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+                   Q TO DISENGAGE
+```
+
+## `ucal wallclock --once --at 8070205189123984864657505252035637180530466139316558837890625 --theme starwars --height 24`
+
+A targeting computer: canopy brackets, a reticle round the beat, the flicker riding the crosshair, and every other hand compressed into one strip. An instrument, where LCARS is a console.
+
+```
+┌──────                                                                  ──────┐
+  TARGETING · UC1                                                 LOCK T1 3108
+  ABSOLUTE TIME · PLANCK TICKS · BASE FIVE
+ ┌───                                                                      ───┐
+ │                          █████ █   █ █████ █████                           │
+ │                              █ █   █     █     █                           │
+ │                          █████ █████  ████    █                            │
+ │                          █         █     █   █                             │
+ │                          █████     █ █████   █                             │
+ └───                                                                      ───┘
+ ━━━━━━━━━━━━━━━━━━━━━━━━━━━────────────┼──────────────────────────────────────
+  T-1 FLICKER ON THE AXIS · 66 000 PER SECOND
+  T3 SPAN 2481   T2 SWEEP 2999   T1 ARC 3108   T0 BEAT 2437   T-1 FLICKER 1104
+
+  UC1 0031·0687·2481·2999·3108·2437
+
+  [Q] DISENGAGE
+
+
+
+
+
+
+└──────                                                                  ──────┘
+```
+
+## `ucal wallclock --once --at 8070205189123984864657505252035637180530466139316558837890625 --gagarin --locale ru --height 24`
+
+A Vostok instrument panel: an enamelled plate with bezelled gauges set into it, engraved labels, and a red lamp. Cyrillic chrome; the tier names follow --locale, which is why this example passes one.
+
+```
+ ВРЕМЯ ВСЕЛЕННОЙ · UC1
+ АБСОЛЮТНОЕ ВРЕМЯ · ПЛАНКОВСКИЕ ТИКИ · ОСНОВАНИЕ ПЯТЬ
+ ───────────────────────────────────────────────────
+ ┌────────────┐  ┌────────────┐  ┌────────────┐
+ │    2481    │  │    2999    │  │    3108    │
+ └────────────┘  └────────────┘  └────────────┘
+   T3 ПРОЛЁТ       T2 ОБХОД         T1 ДУГА
+
+ ┌──────────────────────────────┐
+ │ █████ █   █ █████ █████     │
+ │     █ █   █     █     █     │
+ │ █████ █████  ████    █      │
+ │ █         █     █   █       │
+ │ █████     █ █████   █       │
+ └──────────────────────────────┘
+        T0 БОЙ · ОСНОВНОЙ ОТСЧЁТ
+
+ ● ▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+   T-1 · 66 000 В СЕКУНДУ · ПОЛОЖЕНИЕ, НЕ ЧИСЛО
+
+ UC1 0031·0687·2481·2999·3108·2437
+
+ ● ГОТОВ     [Q] ВЫХОД
+
+```
+
+## `ucal wallclock --once --at 8070205189123984864657505252035637180530466139316558837890625 --armstrong --height 24`
+
+An Apollo DSKY. VERB 16 NOUN 65 is a real pair — monitor, decimal, time — and the lamps are drawn unlit except COMP ACTY, because the rest report conditions this program does not have.
+
+```
+┌────────────┐  PROG  01    UNIVERSE CALENDAR · UC1
+│ COMP ACTY  │  VERB  16    NOUN  65   MONITOR DECIMAL · TIME
+│UPLINK ACTY │  ──────────────────────────────────────────
+│   NO ATT   │
+│    STBY    │  R1   +02999   T2 SWEEP
+│  KEY REL   │  R2   +03108   T1 ARC
+│  OPR ERR   │
+│  TRACKER   │  R3   T0 BEAT · 21 PER SECOND
+└────────────┘  █████ █   █ █████ █████
+                    █ █   █     █     █
+                █████ █████  ████    █
+                █         █     █   █
+                █████     █ █████   █
+
+                ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯
+                T-1 FLICKER · TOO FAST FOR A REGISTER
+
+                UC1 0031·0687·2481·2999·3108·2437
+
+                [Q] KEY REL
+
+
+
+
+```
+
+## `ucal wallclock --once --at 8070205189123984864657505252035637180530466139316558837890625 --theme orbit --height 22`
+
+Hands, on dials, in braille. Every tier has 3125 stops because every rung is 5^5 of the one below, so each tier is a circle and they nest. Drawn with integer CORDIC: there is no float in this program and a clock face is a bad place to make the first exception.
+
+```
+ UCAL — universe calendar, on dials
+ every tier has 3125 stops, because every rung is 5^5 of the one below
+⠀⠀⠀⠀⢀⡠⠤⠴⠤⠤⣀⠀⠀⠀⠀ ⠀⠀⠀⠀⢀⡠⢤⠴⠤⠤⣀⠀⠀⠀⠀ ⠀⠀⠀⠀⢀⡠⠤⢴⠤⠤⣀⠀⠀⠀⠀ ⠀⠀⠀⠀⢀⡠⠤⠴⠤⠤⣀⠀⠀⠀⠀ ⠀⠀⠀⠀⢀⡠⠤⠴⠤⠤⣀⠀⠀⠀⠀
+⠀⠀⢠⠞⠁⠀⠀⠀⠀⠀⠀⠙⢦⠀⠀ ⠀⠀⢠⠞⠁⠀⠸⡀⠀⠀⠀⠙⢦⠀⠀ ⠀⠀⢠⠞⠁⠀⠀⢸⠀⠀⠀⠙⢦⠀⠀ ⠀⠀⢠⠞⠁⠀⠀⠀⠀⠀⠀⠙⢦⠀⠀ ⠀⠀⢠⠞⠁⠀⠀⠀⠀⠀⠀⠙⢦⠀⠀
+⠀⢠⣃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢣⠀ ⠀⢠⠃⠀⠀⠀⠀⢇⠀⠀⠀⠀⠀⢣⠀ ⠀⢠⠃⠀⠀⠀⠀⢸⠀⠀⠀⠀⠀⢣⠀ ⠀⢠⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢣⠀ ⠀⢠⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢣⠀
+⠀⢸⠀⠉⠑⠒⠢⠤⠀⠀⠀⠀⠀⢸⠀ ⠀⢸⠀⠀⠀⠀⠀⠸⠀⠀⠀⠀⠀⢸⠀ ⠀⢸⠀⠀⠀⠀⠀⠸⠀⠀⠀⠀⠀⢸⠀ ⠀⢸⠉⠒⠒⠢⠤⠤⠀⠀⠀⠀⠀⢸⠀ ⠀⢸⠀⠀⠀⠀⠀⠠⣀⠀⠀⠀⠀⢸⠀
+⠀⠸⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡸⠀ ⠀⠸⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡸⠀ ⠀⠸⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡸⠀ ⠀⠸⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡸⠀ ⠀⠸⡀⠀⠀⠀⠀⠀⠀⠓⠤⡀⠀⡸⠀
+⠀⠀⠱⣄⠀⠀⠀⠀⠀⠀⠀⢀⡴⠁⠀ ⠀⠀⠱⣄⠀⠀⠀⠀⠀⠀⠀⢀⡴⠁⠀ ⠀⠀⠱⣄⠀⠀⠀⠀⠀⠀⠀⢀⡴⠁⠀ ⠀⠀⠱⣄⠀⠀⠀⠀⠀⠀⠀⢀⡴⠁⠀ ⠀⠀⠱⣄⠀⠀⠀⠀⠀⠀⠀⢉⡶⠁⠀
+⠀⠀⠀⠈⠑⠢⠤⠤⠤⠤⠒⠉⠀⠀⠀ ⠀⠀⠀⠈⠑⠢⠤⠤⠤⠤⠒⠉⠀⠀⠀ ⠀⠀⠀⠈⠑⠢⠤⠤⠤⠤⠒⠉⠀⠀⠀ ⠀⠀⠀⠈⠑⠢⠤⠤⠤⠤⠒⠉⠀⠀⠀ ⠀⠀⠀⠈⠑⠢⠤⠤⠤⠤⠒⠉⠀⠀⠀
+     2481            2999            3108            2437            1104
+    T3 span        T2 sweep         T1 arc          T0 beat       T-1 flicker
+ ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+ the finest hand has no dial: 66 000 stops a second is not a hand
+
+ UC1 0031·0687·2481·2999·3108·2437
+
+ q to quit
+
+
+
+
+
+```
+
+## `ucal wallclock --once --at 8070205189123984864657505252035637180530466139316558837890625 --clock-local mars-d --height 20`
+
+The plain theme with a second dial. A wall clock's second face has always shown another place, and Mars is one.
+
+```
+UCAL — universe calendar
+█████ █   █ █████ █████
+    █ █   █     █     █
+█████ █████  ████    █
+█         █     █   █
+█████     █ █████   █
+
+T3 span       2481
+T2 sweep      2999
+T1 arc        3108
+T0 beat       2437
+T-1 flicker   1104
+
+MARS-D        year 82  day 83   counted from the anchor — year 1 began there
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░ 44% through the local day
+anchor revision 1 — an anchor is an observation and is versioned (Rule J)
+
+
+UC1 0031·0687·2481·2999·3108·2437
+q to quit
 ```
 
 ## `ucal explain abc`

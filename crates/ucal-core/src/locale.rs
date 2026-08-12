@@ -294,13 +294,25 @@ pub fn validate(locale: LocaleId) -> Result<()> {
     for (_, key) in NAMED {
         let count = t.iter().filter(|(k, _)| k == key).count();
         if count != 1 {
+            // Not E0010: a table that is compiled in did not fail to *load*.
+            // It loaded and is wrong, which is E0017's condition (D-A22).
             return Err(TimeError::with_context(
-                Code::E0010,
+                Code::E0017,
                 "locale table does not cover every named tier exactly once",
             ));
         }
     }
-    // No two display names may collide, singular or plural.
+    no_collisions(t)
+}
+
+/// The collision half of [`validate`], over any table.
+///
+/// Split out so the `E0011` branch is reachable from a test. Every shipped table
+/// is collision-free — which is the point of shipping them — so the only way to
+/// exercise the check on the real tables is to never exercise it, and a branch
+/// no test can reach is a branch that is not known to work. This one had been
+/// raising the wrong code for three releases.
+pub fn no_collisions(t: &[(TierName, Names)]) -> Result<()> {
     for (i, (_, a)) in t.iter().enumerate() {
         for (_, b) in t.iter().skip(i + 1) {
             if a.singular == b.singular
@@ -308,8 +320,14 @@ pub fn validate(locale: LocaleId) -> Result<()> {
                 || a.singular == b.plural
                 || a.plural == b.singular
             {
+                // E0011, which is *declared* as this condition. It raised
+                // E0014 — "name not found in the active locale table" — from
+                // 1.2.0 until 1.5.0, which is the inverse of what happened, and
+                // is the same inversion D-A17 was written to fix. D-A17 added
+                // E0014 for the not-found lookups and this branch was moved on
+                // to it as well, leaving E0011 with no raiser at all. See D-A23.
                 return Err(TimeError::with_context(
-                    Code::E0014,
+                    Code::E0011,
                     "duplicate name in the active locale table",
                 ));
             }
@@ -321,6 +339,33 @@ pub fn validate(locale: LocaleId) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A colliding table is `UCAL-E0011`, which is what `E0011` means.
+    ///
+    /// The branch raised `E0014` — *name not found in the active locale table* —
+    /// from 1.2.0 until 1.5.0, stating the inverse of what happened, and no test
+    /// caught it because no shipped table collides and nothing could construct
+    /// one that does. `E0011` was left with no raiser anywhere in the workspace,
+    /// which is the same shape D-A20 found in `E0012` and is now a lint.
+    #[test]
+    fn a_colliding_table_is_e0011() {
+        let names = Names {
+            singular: "beat",
+            plural: "beats",
+            short: Some("b"),
+        };
+        let collide = [(NAMED[0].1, names), (NAMED[1].1, names)];
+        let e = no_collisions(&collide).expect_err("a collision must be refused");
+        assert_eq!(e.code, Code::E0011);
+    }
+
+    /// And a table without one is accepted, so the check is not simply refusing.
+    #[test]
+    fn a_distinct_table_passes_that_check() {
+        for l in LocaleId::ALL {
+            no_collisions(table(*l)).unwrap_or_else(|e| panic!("{}: {e}", l.tag()));
+        }
+    }
 
     #[test]
     fn every_shipped_locale_is_valid() {

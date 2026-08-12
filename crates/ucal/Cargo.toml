@@ -38,6 +38,13 @@ anstyle = "1"
 # Also already in the tree through clap. Used for one call: how many columns the
 # terminal has, when there is one.
 terminal_size = "0.4"
+# The wall clock, and nothing else. Optional and **not** in `default`:
+# `GE-U4-tier-navigator.md` recorded that ratatui and crossterm are a large tree
+# and that `cargo install ucal` should stay lean. The release workflow builds
+# with `--features tui`, so the published binaries have it and a source install
+# opts in.
+ratatui = { version = "0.29", optional = true, default-features = false, features = ["crossterm"] }
+crossterm = { version = "0.28", optional = true }
 
 [features]
 default = ["u512", "std", "civil", "body", "events", "cosmo"]
@@ -48,6 +55,24 @@ civil = ["dep:ucal-civil", "ucal-civil/hifitime"]
 body = ["dep:ucal-body"]
 events = ["dep:ucal-events"]
 cosmo = ["dep:ucal-cosmo"]
+# The `ucal wallclock` TUI. Not default: see the dependency's comment.
+#
+# `civil` and `body` are not optional here, and both had to be learned the same
+# way.
+#
+# `civil`: the clock reads the system clock, which arrives as UTC and has to
+# come through the bundled leap table — the one quantity §8.4 says cannot be
+# computed and must be looked up.
+#
+# `body`: `--clock-local <ID>` puts a body's own calendar on the face as a
+# second dial, and that reaches `ucal_body`.
+#
+# Both were missing, both built fine for as long as `default` happened to supply
+# them, and both failed the moment it did not. The features workflow caught each
+# by building a combination nobody would type — the same class twice in one
+# afternoon, on the same feature, which is a fair measure of how invisible this
+# is without a machine looking.
+tui = ["dep:ratatui", "dep:crossterm", "std", "civil", "body"]
 
 [dev-dependencies]
 ucal-events = { workspace = true }

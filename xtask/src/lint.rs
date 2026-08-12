@@ -452,6 +452,7 @@ pub const LINT_NAMES: &[&str] = &[
     "no-indent-in-literal",
     "version-lockstep",
     "no-panic-in-cli",
+    "codes-have-raisers",
 ];
 
 /// Constructs that abort the process instead of returning a diagnostic.
@@ -796,6 +797,7 @@ pub fn run(workspace_root: &Path) -> Vec<Violation> {
 
     v.extend(version_lockstep(workspace_root));
     v.extend(public_types_are_classified(&crates_dir));
+    v.extend(codes_have_raisers(&crates_dir));
 
     v
 }
@@ -887,6 +889,7 @@ const CLOSED_VOCABULARIES: &[(&str, &str)] = &[
     ("Provenance", "Rule C's binary: measured, or derived from something measured"),
     ("ColorChoice", "auto, always, never — the universal triple"),
     ("Frame", "already #[non_exhaustive]; listed so the pair with Rule F is visible"),
+    ("Layout", "a wall-clock layout is drawing code in this crate, not a value a caller supplies"),
 ];
 
 /// The two operations that can discard information in this tree.
@@ -1448,4 +1451,93 @@ let c = 2;
         assert_eq!(quoted_after_eq("\"0.3.0\""), None);
         assert_eq!(quoted_after_eq(".workspace = true"), None);
     }
+}
+
+/// Every declared diagnostic code must be raised somewhere.
+///
+/// # Why this lint exists
+///
+/// A code with no raiser is a diagnostic for a condition the program cannot
+/// report. It is invisible, because nothing fails: the enum compiles, the
+/// documentation lists it, and the string is never printed. This project has
+/// found the shape three times and each time by accident.
+///
+/// `UCAL-E0012` — *unknown key in an HJSON data file* — had no raiser from the
+/// day it was declared. It became visible only in 1.2.0, when D-A19 moved
+/// `ucal events show`'s misuse of it onto a code that means what it says: the
+/// one wrong caller had been concealing the fact that there were no right ones.
+/// That is what produced D-A20, the `UNIMPLEMENTED` delta class, and eventually
+/// the §15.1 loader.
+///
+/// `UCAL-E0011` — *duplicate name in the active locale table* — had none either,
+/// and for a worse reason. The collision branch in `locale::validate` was
+/// raising `E0014`, which means *name not found in the active locale table*, so
+/// the one condition E0011 exists for reported its own inverse. D-A17 had fixed
+/// that exact inversion once already, on the same pair of codes, and the fix
+/// left this branch behind. It survived three releases and was found by writing
+/// this lint. See D-A23.
+///
+/// # What it does not check
+///
+/// That the raiser is the *right* one. Nothing here would have caught D-A17 or
+/// D-A18 or D-A22, all of which were codes raised for conditions they do not
+/// describe. This is the cheap half of the problem, and the cheap half is the
+/// half that can be automated: a wrong raiser needs a reader, a missing one
+/// needs a grep.
+fn codes_have_raisers(crates_dir: &Path) -> Vec<Violation> {
+    let error_rs = crates_dir.join("ucal-core/src/error.rs");
+    let Ok(decl) = std::fs::read_to_string(&error_rs) else {
+        return Vec::new();
+    };
+
+    // Declared variants: `    E0012,` at the enum's indentation.
+    let declared: Vec<(usize, String)> = decl
+        .lines()
+        .enumerate()
+        .filter_map(|(i, l)| {
+            let t = l.strip_prefix("    ")?.strip_suffix(',')?;
+            let ok = t.len() == 5
+                && t.starts_with('E')
+                && t[1..].bytes().all(|b| b.is_ascii_digit());
+            ok.then(|| (i + 1, t.to_string()))
+        })
+        .collect();
+
+    let mut raised: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    for file in rust_files(crates_dir) {
+        if file == error_rs {
+            continue; // its own match arms are not raisers
+        }
+        let Ok(src) = std::fs::read_to_string(&file) else {
+            continue;
+        };
+        // Code, not comments or strings: a code named in prose is not a raiser.
+        // And shipped code only — `assert_eq!(e.code, Code::E0011)` in a test
+        // is an *assertion about* a raiser, not one. The first version of this
+        // lint counted them, so removing the E0011 raiser left the lint silent
+        // because the test that checks for it still mentioned the name. A lint
+        // that a test can satisfy checks the tests.
+        let code = project(&src).code;
+        let shipped = &code[..shipped_extent(&code, &file)];
+        for (_, name) in &declared {
+            if shipped.contains(&format!("Code::{name}")) {
+                raised.insert(name.clone());
+            }
+        }
+    }
+
+    declared
+        .into_iter()
+        .filter(|(_, name)| !raised.contains(name))
+        .map(|(line, name)| Violation {
+            lint: "codes-have-raisers",
+            file: error_rs.clone(),
+            line,
+            text: format!(
+                "UCAL-{name} is declared and raised nowhere in the workspace: a \
+                 diagnostic for a condition the program cannot report"
+            ),
+            rule: "D-A20, D-A23",
+        })
+        .collect()
 }

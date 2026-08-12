@@ -74,6 +74,10 @@ cal-show.intercalation.rule	string
 cal-show.intercalation.walked	array
 cal-show.intercalation.whole_days_per_year	string
 cal-show.kind	string
+cal-show.ladder_placement	object
+cal-show.ladder_placement.*	object
+cal-show.ladder_placement.*.above_rung	string
+cal-show.ladder_placement.*.rung	string
 cosmo-age-interval.audit	object
 cosmo-age-interval.audit.0. how to read this	string
 cosmo-age-interval.audit.1. substitution	string

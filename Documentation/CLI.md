@@ -394,20 +394,44 @@ mechanism doing something Earth would never ask of it:
 | `calendar` / `kind` / `body` | Which calendar this is. |
 | `anchor.method` | How the anchor was determined, cited. |
 | `anchor.uncertainty` | The observation's stated uncertainty. |
+| `ladder_placement.unit` | Which of this body's own periods a row places: its solar day, its year, and its grouping cycle where it has one. |
+| `ladder_placement.rung` | The coarsest universal tier that is no longer than that period — where the body's unit sits on the grid of §4.3. |
+| `ladder_placement.above_rung` | How many of that tier the period holds. Earth's day is 591.3 arcs and Mars's sol is 607.5, on a ladder whose steps are a factor of 3125: two planets, two independent measurements, one rung. |
 | `intercalation.rule` | The derived leap rule, as a fraction. |
 | `intercalation.whole_days_per_year` | The integer part: how many whole days a year holds before intercalation. |
 | `intercalation.bound` | The drift bound the rule was derived against — a **rate** in local units, not a duration (D-A13). |
 | `intercalation.walked` | How many continued-fraction steps were taken to reach it. |
-| `fields.year`, `fields.month`, `fields.day`, `fields.hour`, `fields.minute`, `fields.second`, `fields.weekday` | The instant in this calendar's local fields. |
+| `fields.year`, `fields.month`, `fields.day`, `fields.hour`, `fields.minute`, `fields.second`, `fields.weekday` | The instant in this calendar's local fields. **`year` counts from the anchor and starts at 1** — see below. |
 | `fields.day_fraction` | How far through the local day the instant falls. |
 | `cycles.satellite` | Which satellite the grouping cycle is derived from, if any. |
 | `cycles.cycles_per_year` | The satellite's period as a fraction of the body's year. |
 | `cycles.convergents` | The continued-fraction convergents of that ratio — the candidate cycle lengths, with the chosen one marked. |
 
+**`year` is not a Gregorian year, and is not an offset from one.** It counts
+local years from the calendar's anchor, and **year 1 is the year that began at
+the anchor**. `earth-d` is anchored at mean solar midnight, Greenwich, on
+2000-01-01, so its year 27 is the twenty-seventh year of that reckoning and
+falls in Gregorian 2026 — one less than subtracting naively suggests, because
+the count starts at one and not at zero.
+
+The day-of-year drifts from the Gregorian one for the same reason the calendar
+exists: `earth-d` intercalates by the derived `31/128`, and the Gregorian
+calendar by the declared `97/400`, which is not a convergent of anything. Two
+rules, two placements, and a widening gap.
+
+No Gregorian equivalent is printed beside it. An Earth label next to a local one
+is the substitution Rule A.5 refuses; `ucal to-civil` is the conversion, and it
+is a command you ask for.
+
+§15.5 defines the fields and gives derived calendars no era structure — no way
+to say "year 1 of this reckoning is the anchor plus N" — which
+[`X1-authoring-local-calendars.md`](Proposals/X1-authoring-local-calendars.md)
+records as a gap. Until there is one, the number's meaning is this paragraph.
+
 ### `cal derive`
 
 ```
-ucal cal derive <FILE>
+ucal cal derive <FILE> [--anchor <FILE>] [--at <INSTANT>]
 ```
 
 Read a body file (§15.1) and show the calendar it derives — intercalation,
@@ -415,6 +439,36 @@ cycles, and what is missing. This is how a body that does not ship gets a
 calendar without editing the crate;
 [`Documentation/examples/europa.hjson`](examples/europa.hjson) is a complete
 one.
+
+**`--anchor` supplies the missing half, and `--at` asks for a date.** §15.1 names
+body files *and* anchor files, versioned independently because parameters change
+with better measurement and anchors with re-determination. A body file yields
+intercalation and cycles; it cannot yield a date, because a date needs a phase
+and Rule J makes phase empirical — determined and cited, never derived.
+
+```
+ucal cal derive Documentation/examples/earth.hjson \
+  --anchor Documentation/examples/earth-anchor.hjson \
+  --at 8070205189123984864657505252035637180530466139316558837890625
+```
+
+That pair states exactly what `data::earth` and `anchors::earth` state, and
+produces the same local fields as `ucal cal show earth-d` for the same instant.
+A test asserts it: if the two disagreed, the file route would be a second
+implementation of the calendar agreeing with the first only by coincidence.
+
+**The loader adds no checks of its own, and must not.** Every refusal comes from
+`Anchor::new`, which the compiled-in anchors also pass through — the phase must
+name a physical event of the body (`UCAL-E0063` for a foreign epoch, clock or
+calendar), the uncertainty window must contain its own tick (`UCAL-E0062`), and
+the determination must state a method, a citation and what dominates the
+uncertainty. A file cannot reach a state a Rust constant could not; what it can
+do is reach that state without editing the crate.
+
+The window is **stated, never computed**. Nothing derives it from an uncertainty
+or an uncertainty from it, because a loader that widened or narrowed a window by
+a rule of its own would be narrowing by assumption, which GE-3 forbids and which
+a file makes far easier than a constant does.
 
 | field | meaning |
 |---|---|
@@ -425,13 +479,43 @@ one.
 | `leap_rule.whole_days_per_year` | The integer part. |
 | `leap_rule.placement` | The placement convention, declared by D-A21. |
 | `cycles` | The grouping cycle from the first satellite the file lists, or a statement that the body names none. §15.3 forbids a fallback, so no month is invented. |
-| `anchor` | Always `none`. Phase is empirical (Rule J) and is never derived. |
+| `anchor` | Without `--anchor`: `none`, with the count of shipped calendars in the same state. With one: the phase, revision, method, uncertainty, window and citation the file declares. |
+| `fields` | Only with `--anchor` **and** `--at`: the instant in the derived calendar's local fields, interval-valued and carrying the anchor revision. |
 
 **Every parameter needs Rule C's obligations** — the published value verbatim,
 its unit (`s`, `d` or `yr`), a citation, and the half-width of its validity
 window in Julian years. A file omitting any of them is refused rather than
 defaulted, because a format that let them be optional would be a second and
 laxer way of declaring a body.
+
+**A parameter may be derived instead of measured.** `derived: synodic` computes
+the solar day as `1 / (1/rotation_period - 1/orbital_period)`, exactly, in ticks:
+
+```hjson
+solar_day: {
+  derived: synodic
+  citation: derived from the two published figures cited in this file
+  valid_years: 10000
+}
+```
+
+A derived parameter states no `value` and no `unit` — it has neither, and a file
+giving both a `value` and a `derived` is refused. It still needs a citation: a
+derived value is not an uncited one, it is cited to the derivation and to the
+figures underneath it, and `ucal cal derive` prints all three.
+
+`synodic` is the only relation, because it is the only one the shipped data
+needs — six of the twelve derived calendars use it. It exists for the reason
+below: no source publishes a solar day for a tidally locked body, and the exact
+value cannot be written as a decimal without choosing a calendar by choosing a
+precision.
+
+**A body tidally locked to its primary has no solar day at all.** `derived:
+synodic` on a body whose rotation equals its year says so rather than dividing
+by zero: the star does not move in that sky, there is no noon, and there is no
+sequence of days to count. A body whose year is a whole number of its solar days
+is told that too — it needs no intercalation, which is an answer and not a
+failure to find one.
 
 **One key per line.** HJSON runs an unquoted string to the end of the line, so
 `citation: NASA fact sheet` must be alone on its line.
@@ -443,6 +527,13 @@ derivation by 3.9 × 10⁻⁷ days, and the continued fraction diverges at the f
 term: `[1, 3, 35, 1, 1, 1, 5, 1]` becomes `[1, 3, 35, 1, 106, 6, 3, 1]`, and the
 chosen convergent changes with it. That is Rule K working, not a defect — but it
 means a rounded parameter is a different calendar.
+
+Europa's rule moves through `47/105`, `2/27`, `5/126`, `5/116` and then `1/24`
+across the first six decimals of its solar day. Six settle it, and that is a
+fact about Europa rather than a rule anyone can apply to a body they have not
+tried. Use `derived:` where the quantity is derivable, and where it is not,
+shorten the value until `ucal cal derive` reports a different rule and then put
+a digit back.
 
 **Loaded by the binary, not by `ucal-body`.** §15.1 puts the loader in the
 library; [D-A20](../spec/SPEC-DELTAS.md) records that it is not there. Every
@@ -831,6 +922,167 @@ wrong five would be useful.
 | `steps.<command>.shows` | A real value from running that command just now. |
 | `steps.<command>.why` | Why that output looks like that. |
 | `next` | Where to go after the five. |
+
+---
+
+## `ucal wallclock`
+
+A full-screen clock showing universe time. `q`, `Esc` or `Ctrl-C` quits.
+
+```
+ucal wallclock [--theme <KEY>] [--startrek|--gagarin|--armstrong] [--clock-local <ID>]
+ucal wallclock --once [--at <INSTANT>] [--height <N>]
+ucal wallclock --theme list
+```
+
+**Only in a build with the `tui` feature.** `ratatui` and `crossterm` are a
+large tree and [`GE-U4-tier-navigator.md`](Proposals/GE-U4-tier-navigator.md)
+asked in as many words that `cargo install ucal` stay lean, so the feature is not
+in `default`. The published release binaries are built with it; a source install
+opts in with `cargo install ucal --features tui`.
+
+### What is on the face, and what is not
+
+Which of this calendar's units *move* at a rate a person can watch is a question
+with a numeric answer, and it decides the design:
+
+- **T3 span**, one of them 45 years — a rail readout.
+- **T2 sweep**, 5.3 days — a rail readout.
+- **T1 arc**, 2 min 26 s — the hand you read the time from.
+- **T0 beat**, 46.8 ms — the big readout, about 21 per second.
+- **T-1 flicker**, 15 µs — a bar, not a number.
+
+Above `T3` a hand does not move within a human lifetime — one `T4` is 141 000
+years. Below `T-1` a hand moves 66 000 times a second, which no refresh rate
+reaches. Both ends are off the face for the same reason.
+
+The flicker is a **bar** because it is a real quantity moving too fast to read
+and not too fast to see. Printing it as a number would print a number that is
+wrong before it is drawn; printing nothing would hide it.
+
+### Themes
+
+- **plain** — monochrome, no chrome. The default, and deliberately dull: a clock
+  that only looked right in one aesthetic would be a demo. It uses the
+  terminal's own colours and commits to nothing.
+- **amber** — DEC VT220 phosphor. One warm hue on near-black, no second one.
+- **green** — IBM 3270 phosphor, the other half of the same idea.
+- **paper** — dark on light, committed. The useful one rather than the
+  evocative one: `plain` inherits whatever the terminal has, which is right
+  until a frame lands on a light background and the labels go faint.
+- **startrek** — LCARS, in its production palette. Warm orange elbows, peach and
+  lilac rails, black behind everything. `--startrek` is shorthand for
+  `--theme startrek`.
+- **starwars** — a targeting computer. Canopy brackets at the corners, a reticle
+  round the beat, the flicker riding the crosshair, and every other hand
+  compressed into one strip along the bottom. Amber wireframe on black.
+
+- **gagarin** — a Vostok instrument panel. An enamelled plate with bezelled
+  gauges set into it, an engraved label under each, and a red lamp. The only
+  light theme by default, because the object was. Its chrome is Cyrillic and its
+  tier names are not: `--locale` decides a name's language and a theme does not
+  get to override it, so the intended pairing is `--gagarin --locale ru`.
+- **armstrong** — an Apollo DSKY. A column of annunciator lamps, `PROG`, `VERB`
+  and `NOUN`, and three registers. `V16 N65` is a real pair: monitor, decimal,
+  time. The lamps are drawn unlit except `COMP ACTY` — the rest report
+  conditions this program does not have, and a lit lamp that means nothing is a
+  decoration pretending to be an instrument. One deliberate departure: a real
+  DSKY gives its three registers equal size, and this gives the beat the block
+  font, because it is the register that moves.
+
+- **orbit** — hands on dials, in braille, and the only face here with no big
+  numerals. The calendar makes this natural rather than decorative: every tier
+  has exactly 3125 stops, because every rung of the ladder is `5^5` of the one
+  below, so each tier *is* a circle and they nest the way an hour hand nests in
+  a minute hand.
+
+  Drawn with **integer CORDIC** — shifts, adds, and a table of sixteen
+  constants. There is no floating point anywhere in this program (Rule E) and a
+  clock face is a bad place to make the first exception, since it is the part a
+  reader looks at. The table is re-derived by a test rather than trusted.
+
+  A dial this size resolves about one stop in thirty, so no tick marks are
+  drawn: 3125 marks on a rim of seventy dots is a solid ring claiming a
+  precision it does not have. The hand says which part of the tier you are in
+  and the numeral beneath says which stop, which is the division of labour a
+  clock with numerals on its face has always had.
+
+`--startrek`, `--gagarin` and `--armstrong` are shorthands for the matching
+`--theme`, and are mutually exclusive.
+
+The last five are **layouts**, not palettes. LCARS is a console:
+coloured blocks, generous space, numbers set against a rail, an interface for
+reading. A gunsight is an instrument: a frame at the edge of vision, one number
+in the middle, everything else in a strip. Vostok is a *surface* you read;
+a DSKY is a *terminal you address*, two digits for a verb and two for a noun.
+
+A theme that was only a different mood — the same arrangement in different
+colours — would be a palette wearing a layout's name. A test requires the six
+layouts to draw differently with colour switched off, and requires two themes
+that share a layout to draw identically.
+
+`--theme list` prints them as an ordinary document. An unknown key is
+`UCAL-E0016` — a name that is not in a declared catalogue, the same answer
+`ucal cal show` gives for a calendar that does not exist.
+
+### One frame: `--once`
+
+```
+ucal wallclock --once --at <INSTANT> --theme startrek --height 26
+```
+
+Draw a single frame to stdout and exit. With `--at` fixing the instant and
+`--width` fixing the columns, the output is **byte-for-byte reproducible** — the
+same on any machine, in any terminal, redirected or not.
+
+That is what makes it committable, and two of the frames in
+[`CLI-EXAMPLES.md`](CLI-EXAMPLES.md) are generated by it. Until `--once` existed,
+every claim about what the clock looks like was held up by a test that renders
+into a buffer and greps the result: a real mechanism and an invisible one.
+Nobody reading this page could see a face, so this page described one in prose,
+and prose rots.
+
+`--height` sets the rows; the columns come from the global `--width`, which off a
+terminal is the 80-column baseline like everywhere else. Colour follows the
+usual rules, so a redirected frame is plain text and a terminal gets ANSI —
+an escape sequence in a committed file is a diff nobody can read.
+
+`--at` without `--once` is refused: a live clock's instant is now.
+
+### A second dial: `--clock-local <ID>`
+
+A wall clock's second face has always shown another *place*, and so does this
+one. `--clock-local mars-d` puts Mars beside the universal readout: local year,
+local day, how far through the local day the instant falls, and which anchor
+revision produced it.
+
+```
+ucal wallclock --startrek --clock-local mars-d
+```
+
+**`--clock-local` and not `--locale`.** `--locale` is this program's *language*
+flag — Rule N makes a tier's name locale-scoped and display-only — and it now
+applies to the clock too: `--locale ru` draws the face as `T0 бой` rather than
+`T0 beat`. The tier *index* is never localised, because that is what a reader
+compares when two machines are set to different languages. The two flags are
+different vocabularies and compose:
+
+```
+ucal wallclock --startrek --locale ru --clock-local earth-d
+```
+
+Only an **anchored** calendar can be a second dial. Local fields need a phase,
+phase is empirical (Rule J.3), and ten of the twelve derived calendars that ship
+have no anchor — the ordinary case, for the reason
+[`D5-titan-anchor.md`](Proposals/D5-titan-anchor.md) records. Asking for one of
+them is `UCAL-E0062`, reported **before** the clock takes over the terminal, so
+the failure is a message rather than a full-screen panel with nothing in it.
+
+**No Earth unit appears on the face as a unit** (Rule A.5), and a test asserts
+it. A clock is where that temptation lives: every clock a reader has ever seen
+counts in hours, minutes and seconds, and the point of this one is that it does
+not. The two places a second is named — the arc's pace and the flicker's rate —
+are statements *about the display*, not units the clock counts in.
 
 ---
 

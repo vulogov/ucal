@@ -18,6 +18,10 @@ pub mod cert;
 // reason every other body-dependent item here is — `ucal` builds without that
 // feature, and the features workflow catches it when it does not.
 #[cfg(feature = "body")]
+pub mod anchor_file;
+#[cfg(feature = "tui")]
+pub mod wallclock;
+#[cfg(feature = "body")]
 pub mod body_file;
 pub mod emit;
 pub mod style;
@@ -831,6 +835,53 @@ pub fn cmd_verify() -> CmdResult {
 // ucal between — a duration, on the ladder
 // ---------------------------------------------------------------------------
 
+/// Where a duration *sits* on the universal ladder: the rung, and how far above it.
+///
+/// Not to be confused with `between`'s `on_the_ladder`, which decomposes a
+/// duration into a count of every tier. This one answers a different question —
+/// which single rung is this period's size — and so carries different columns
+/// under a different key, because one name with two shapes in the
+/// `ucal-json/1` surface is a consumer's problem, not a saving.
+///
+/// Y1, and the one thing [`W4-two-ladders.md`] recommended keeping. Its step 1
+/// placed every unit of every shipped body and found Earth's day and Mars's sol
+/// on the *same rung* — 591 arcs and 607 — on a ladder whose steps are a factor
+/// of 3125. Two separate planets, two separate measurements, and a grid built
+/// from powers of five with no knowledge of either.
+///
+/// That is worth a row and is not worth a view: every unit of every body lands
+/// on `T1` or `T2`, two adjacent rungs out of forty-five, so a two-column
+/// display would be forty-three empty lines and two full ones.
+///
+/// [`W4-two-ladders.md`]: https://github.com/vulogov/ucal/blob/main/Documentation/Proposals/W4-two-ladders.md
+#[cfg(feature = "body")]
+fn ladder_placement(length: &Ratio) -> Option<(Tier, Ratio)> {
+    let tier = Tier::all_descending()
+        .find(|t| Ratio::from_int(t.ticks()).cmp_exact(length) != core::cmp::Ordering::Greater)?;
+    let above = length.div(&Ratio::from_int(tier.ticks())).ok()?;
+    Some((tier, above))
+}
+
+/// A `(rung, above)` pair as a row.
+#[cfg(feature = "body")]
+fn ladder_row(name: &str, length: &Ratio) -> Option<(String, Value)> {
+    let (tier, above) = ladder_placement(length)?;
+    let label = match ucal_core::tier::name_of(tier) {
+        Some(n) => format!("{tier} {}", n.key()),
+        None => tier.to_string(),
+    };
+    Some((
+        name.to_string(),
+        Value::Section(vec![
+            ("rung".into(), Value::text(label)),
+            (
+                "above_rung".into(),
+                Value::quantity(&above, 1, Rounding::HalfEven),
+            ),
+        ]),
+    ))
+}
+
 /// The named tiers, coarsest first.
 ///
 /// The grid has forty-five rungs and ten of them have names (Rule N). A
@@ -1114,14 +1165,14 @@ pub fn cmd_to_civil(
     Ok(doc)
 }
 
-/// `ucal now` — the system clock, converted through the bundled leap table.
+/// The system clock as a `UC1` instant, through the bundled leap table.
 ///
-/// §8.4: the clock is read as UTC and converted offline. Unix time does not count
-/// leap seconds, so its value is a *label-linear* count and is converted as a UTC
-/// label rather than as an elapsed duration — which is exactly the distinction
-/// Rule L exists to keep visible.
-#[cfg(all(feature = "civil", feature = "std"))]
-pub fn cmd_now(precision: Tier, form: Form) -> CmdResult {
+/// Extracted so `ucal wallclock` reads *now* by the same route `ucal now` does.
+/// A clock with its own path to the system time would be a second
+/// implementation, and the two would eventually disagree by a leap second — the
+/// one quantity §8.4 says cannot be computed and must be looked up.
+#[cfg(feature = "civil")]
+pub fn now_instant() -> Result<Instant<UC1>, TimeError> {
     use std::time::{SystemTime, UNIX_EPOCH};
     let d = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -1132,7 +1183,7 @@ pub fn cmd_now(precision: Tier, form: Form) -> CmdResult {
     let days = 719_528 + unix_secs.div_euclid(86_400);
     let sod = unix_secs.rem_euclid(86_400);
     let (y, mo, dd) = ucal_civil::calendar::civil_from_days(days, CivilCalendar::Gregorian);
-    let t = si::from_civil(
+    si::from_civil(
         y,
         mo,
         dd,
@@ -1142,7 +1193,19 @@ pub fn cmd_now(precision: Tier, form: Form) -> CmdResult {
         SubSecond::new(nanos as u128, 9)?,
         Scale::Utc,
         CivilCalendar::Gregorian,
-    )?;
+    )
+}
+
+/// `ucal now` — the system clock, converted through the bundled leap table.
+///
+/// §8.4: the clock is read as UTC and converted offline. Unix time does not count
+/// leap seconds, so its value is a *label-linear* count and is converted as a UTC
+/// label rather than as an elapsed duration — which is exactly the distinction
+/// Rule L exists to keep visible.
+#[cfg(all(feature = "civil", feature = "std"))]
+#[cfg(feature = "civil")]
+pub fn cmd_now(precision: Tier, form: Form) -> CmdResult {
+    let t = now_instant()?;
 
     let fmt = Fmt::default()
         .with_form(form)
@@ -1523,11 +1586,26 @@ pub fn cmd_cal_show(id: &str, input: &str) -> CmdResult {
         })
         .collect();
 
+    // Y1: where this body's own units sit on the universal grid.
+    let mut ladder: Vec<(String, Value)> = Vec::new();
+    if let Some(r) = ladder_row("solar_day", c.body().solar_day().value_at_epoch()) {
+        ladder.push(r);
+    }
+    if let Some(r) = ladder_row("year", c.body().orbital_period().value_at_epoch()) {
+        ladder.push(r);
+    }
+    if let Some(cy) = c.cycles().first() {
+        if let Some(r) = ladder_row("cycle", &cy.synodic_period) {
+            ladder.push(r);
+        }
+    }
+
     let mut doc = Doc::new()
         .title(format!("ucal cal show {id}"))
         .field("calendar", Value::text(id))
         .field("kind", Value::text("derived — Rule K"))
         .field("body", Value::text(c.body().id()))
+        .field("ladder_placement", Value::rows("unit", ladder))
         .field(
             "anchor",
             Value::Section(vec![
@@ -2319,6 +2397,39 @@ struct Step {
 /// itself as a considered curriculum.
 ///
 /// [`Documentation/CLI.md`]: https://github.com/vulogov/ucal/blob/main/Documentation/CLI.md
+/// `ucal wallclock --theme list` — the themes, as a document.
+///
+/// A catalogue, so it is enumerable: a caller told "no such theme" should be
+/// able to find out what there is, which is the same reason `ucal cal list`
+/// exists.
+#[cfg(feature = "tui")]
+pub fn cmd_wallclock_themes() -> Doc {
+    Doc::new()
+        .title("ucal wallclock themes")
+        .field(
+            "themes",
+            Value::rows(
+                "theme",
+                wallclock::theme::ALL
+                    .iter()
+                    .map(|t| {
+                        (
+                            t.key.to_string(),
+                            Value::Section(vec![("about".into(), Value::text(t.about))]),
+                        )
+                    })
+                    .collect::<Vec<_>>(),
+            ),
+        )
+        .note(
+            "The clock shows T3 span down to T-1 flicker. Above T3 a hand does not move \
+             within a human lifetime — one T4 is 141 000 years — and below T-1 it moves \
+             66 000 times a second, which no refresh rate reaches.",
+        )
+}
+
+/// `ucal tour` — the first five minutes.
+#[allow(clippy::doc_markdown)]
 pub fn cmd_tour() -> CmdResult {
     let t = "8070205189123984864657505252035637180530466139316558837890625";
 
@@ -2451,14 +2562,67 @@ pub fn cmd_tour() -> CmdResult {
 /// an anchor is cited and determined, never derived, and D5's literature search
 /// established what one costs to establish honestly. A body file therefore
 /// produces a calendar that is complete in units, intercalation and cycles and
-/// incomplete in phase — the ordinary case, and the state five of the seven
-/// shipped calendars are in.
+/// incomplete in phase — the ordinary case, and the state most shipped calendars
+/// are in. The count is taken from the registry rather than written down: it was
+/// written down once, said "five of the seven", and was wrong the moment Y3
+/// added five bodies.
+#[cfg(feature = "body")]
+fn anchorless_note() -> String {
+    let derived = ucal_body::calendar::registered();
+    let total = derived.len();
+    let anchorless = derived
+        .iter()
+        .filter(|(id, _, _)| ucal_body::anchors::for_calendar(id).is_none())
+        .count();
+    format!(
+        "none. Phase is empirical (Rule J): it is determined and cited, never derived and \
+         never borrowed from another body. Without one this calendar is complete in units, \
+         intercalation and cycles and incomplete in phase, which is the ordinary case — \
+         {anchorless} of the {total} derived calendars that ship are in it"
+    )
+}
+
+/// Derive a calendar from a body file (§15.1), and say what it is missing.
+///
+/// See [`body_file`] for why the loader lives in the binary.
 #[cfg(feature = "body")]
 pub fn cmd_cal_derive(path: &str) -> CmdResult {
+    cmd_cal_derive_with(path, None, None)
+}
+
+/// Y2 — the same derivation, optionally given §15.1's other file.
+///
+/// A body file yields intercalation and cycles. It cannot yield a **date**,
+/// because a date needs a phase, and Rule J makes phase empirical: determined
+/// and cited, never derived. That is the whole reason `cal derive` has always
+/// ended with a paragraph about what is missing.
+///
+/// With an anchor file, the missing half arrives — from a file, subject to the
+/// identical checks `Anchor::new` applies to the compiled-in anchors. The
+/// loader adds none of its own and must not: a file is a much easier place to
+/// narrow a window by assumption than a Rust constant, which is what GE-3
+/// forbids and what `X1.3` named as this feature's kill criterion.
+#[cfg(feature = "body")]
+pub fn cmd_cal_derive_with(path: &str, anchor: Option<&str>, at: Option<&str>) -> CmdResult {
     let body = body_file::load(std::path::Path::new(path))?;
 
     let solar = body.solar_day().value_at_epoch();
     let year = body.orbital_period().value_at_epoch();
+    // Z1.3: a year that is a whole number of solar days needs no intercalation,
+    // and that is an answer rather than a failure. The derivation reports it as
+    // UCAL-E0061 — *no convergent meets the drift bound* — advising a wider
+    // bound or a greater depth, neither of which can help: there is no
+    // fractional part to approximate. Checked here because it can only arise
+    // from a file; no shipped body is in this state.
+    let days_per_year = year.div(solar)?;
+    if days_per_year.is_integer() {
+        return Err(TimeError::with_context(
+            Code::E0060,
+            "this body's year is a whole number of its solar days, so its calendar needs no \
+             intercalation at all: there is no fractional day to distribute, and Rule K has \
+             nothing to derive. That is the answer, not a gap",
+        ));
+    }
     let rule = ucal_body::derive_leap_rule(solar, year, ucal_body::DriftBound::DEFAULT, 32)?;
 
     let mut doc = Doc::new()
@@ -2470,7 +2634,7 @@ pub fn cmd_cal_derive(path: &str) -> CmdResult {
         )
         .field(
             "days_per_year",
-            Value::quantity(&year.div(solar)?, 6, Rounding::HalfEven),
+            Value::quantity(&days_per_year, 6, Rounding::HalfEven),
         )
         .field(
             "leap_rule",
@@ -2534,20 +2698,92 @@ pub fn cmd_cal_derive(path: &str) -> CmdResult {
         },
     );
 
-    Ok(doc
-        .field(
-            "anchor",
-            Value::text(
-                "none. Phase is empirical (Rule J): it is determined and cited, never derived \
-                 and never borrowed from another body. Without one this calendar is complete \
-                 in units, intercalation and cycles and incomplete in phase, which is the \
-                 ordinary case — five of the seven shipped calendars are in it",
-            ),
-        )
-        .note(
-            "Loaded by the binary, not by ucal-body. §15.1 puts the loader in the library and \
-             D-A20 records that it is not there: every string in the data model is a \
-             `&'static str`, so a runtime loader must either leak or change a published type. \
-             This one leaks, bounded by a process that exits.",
-        ))
+    let doc = match anchor {
+        None => {
+            if at.is_some() {
+                return Err(TimeError::with_context(
+                    Code::E0062,
+                    "--at asks for a date, and a date needs a phase: pass --anchor <FILE> as \
+                     well. Phase is empirical (Rule J) and is never derived from a body file",
+                ));
+            }
+            doc.field("anchor", Value::text(anchorless_note()))
+        }
+        Some(a) => {
+            let anchor = anchor_file::load(std::path::Path::new(a))?;
+            let id: &'static str = body_file::leak(format!("{}-d", body.id()));
+            if anchor.calendar_id() != id {
+                return Err(TimeError::with_context(
+                    Code::E0062,
+                    body_file::leak(format!(
+                        "the anchor file names calendar `{}`, and this body file derives `{id}`",
+                        anchor.calendar_id()
+                    )),
+                ));
+            }
+            let satellite = body.satellites().first().map(|s| s.id());
+            let cal = ucal_body::calendar::BodyCalendar::build(
+                id,
+                body.clone(),
+                anchor,
+                satellite,
+                ucal_body::DriftBound::DEFAULT,
+                32,
+            )?;
+            let a = cal.anchor();
+            let doc = doc.field(
+                "anchor",
+                Value::Section(vec![
+                    ("phase".into(), Value::text(a.phase().label())),
+                    ("revision".into(), Value::number(a.revision().to_string())),
+                    ("method".into(), Value::text(a.method().method)),
+                    (
+                        "uncertainty".into(),
+                        Value::text(a.method().uncertainty_note),
+                    ),
+                    (
+                        "window_ticks".into(),
+                        Value::number(a.uncertainty().ticks().to_dec_string()),
+                    ),
+                    ("citation".into(), Value::text(a.citation().source)),
+                ]),
+            );
+            match at {
+                None => doc.note(
+                    "An anchor is present, so this calendar can produce a date: pass \
+                     --at <INSTANT> for one.",
+                ),
+                Some(t) => {
+                    let (t, _) = parse_instant(t)?;
+                    let f = cal.fields(&t)?;
+                    doc.field(
+                        "fields",
+                        Value::Section(vec![
+                            ("year".into(), Value::number(f.year.to_string())),
+                            ("day".into(), Value::number(f.day.to_string())),
+                            (
+                                "day_fraction".into(),
+                                Value::quantity(&f.day_fraction, 6, Rounding::Trunc),
+                            ),
+                            (
+                                "anchor_revision".into(),
+                                Value::number(f.anchor_revision.to_string()),
+                            ),
+                            (
+                                "window_ticks".into(),
+                                Value::number(f.window.width().ticks().to_dec_string()),
+                            ),
+                        ]),
+                    )
+                }
+            }
+        }
+    };
+
+    Ok(doc.note(
+        "Loaded by the binary, not by ucal-body. §15.1 puts the loader in the library and \
+         D-A20 records that it is not there: every string in the data model is a \
+         `&'static str`, so a runtime loader must either leak or change a published type. \
+         This one leaks, bounded by a process that exits.",
+    ))
 }

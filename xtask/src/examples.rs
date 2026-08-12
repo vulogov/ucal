@@ -111,6 +111,35 @@ fn examples() -> Vec<Example> {
             args: &["from-civil", "2026-08-07"],
             why: "And back. Exact or an error, never rounded.",
         },
+        // The wall clock, as a frame. Deterministic because `--once --at`
+        // fixes the instant and `COLUMNS` fixes the width, which is the whole
+        // reason `--once` exists: until it did, the only thing holding a claim
+        // about the clock's appearance was a test that greps a buffer, and
+        // nobody reading the documentation could see a face.
+        Example {
+            args: &["wallclock", "--once", "--at", T, "--theme", "startrek", "--height", "26"],
+            why: "LCARS. The elbow, the rail of tier readouts, the beat in block digits, and the flicker as a bar because a number would be wrong before it was drawn.",
+        },
+        Example {
+            args: &["wallclock", "--once", "--at", T, "--theme", "starwars", "--height", "24"],
+            why: "A targeting computer: canopy brackets, a reticle round the beat, the flicker riding the crosshair, and every other hand compressed into one strip. An instrument, where LCARS is a console.",
+        },
+        Example {
+            args: &["wallclock", "--once", "--at", T, "--gagarin", "--locale", "ru", "--height", "24"],
+            why: "A Vostok instrument panel: an enamelled plate with bezelled gauges set into it, engraved labels, and a red lamp. Cyrillic chrome; the tier names follow --locale, which is why this example passes one.",
+        },
+        Example {
+            args: &["wallclock", "--once", "--at", T, "--armstrong", "--height", "24"],
+            why: "An Apollo DSKY. VERB 16 NOUN 65 is a real pair — monitor, decimal, time — and the lamps are drawn unlit except COMP ACTY, because the rest report conditions this program does not have.",
+        },
+        Example {
+            args: &["wallclock", "--once", "--at", T, "--theme", "orbit", "--height", "22"],
+            why: "Hands, on dials, in braille. Every tier has 3125 stops because every rung is 5^5 of the one below, so each tier is a circle and they nest. Drawn with integer CORDIC: there is no float in this program and a clock face is a bad place to make the first exception.",
+        },
+        Example {
+            args: &["wallclock", "--once", "--at", T, "--clock-local", "mars-d", "--height", "20"],
+            why: "The plain theme with a second dial. A wall clock's second face has always shown another place, and Mars is one.",
+        },
         Example {
             args: &["explain", "abc"],
             why: "A rejection: an Appendix E code, an exit status, and — since 1.2.0 — what a good input would have looked like.",
@@ -120,6 +149,9 @@ fn examples() -> Vec<Example> {
 
 /// Run one example against the built binary and return its output.
 fn capture(bin: &Path, args: &[&str]) -> Result<String, String> {
+    // `wallclock` needs the non-default `tui` feature. A binary without it
+    // rejects the subcommand, and the resulting file would silently document a
+    // program that is missing a command — so this is an error and names the fix.
     let out = Command::new(bin)
         .args(args)
         .env("NO_COLOR", "1")
@@ -130,6 +162,13 @@ fn capture(bin: &Path, args: &[&str]) -> Result<String, String> {
         .map_err(|e| format!("{}: {e}", bin.display()))?;
     let mut text = String::from_utf8_lossy(&out.stdout).into_owned();
     let err = String::from_utf8_lossy(&out.stderr);
+    if err.contains("unrecognized subcommand") || err.contains("unexpected argument") {
+        return Err(format!(
+            "`ucal {}` was rejected by the binary: it is probably built without \
+             `--features tui`. Run `cargo build --release -p ucal --features tui`.",
+            args.join(" ")
+        ));
+    }
     if !err.trim().is_empty() {
         text.push_str(err.trim_end());
         text.push('\n');
@@ -142,7 +181,7 @@ pub fn generate(root: &Path, bin: &Path) -> Result<String, String> {
     let mut out = String::new();
     out.push_str("# Worked examples\n\n");
     out.push_str("**Generated — do not edit.** Every block below is the real output of the command above it, captured by running it. Regenerate with:\n\n");
-    out.push_str("```\ncargo build --release -p ucal\ncargo run -p xtask -- gen-examples\n```\n\n");
+    out.push_str("```\ncargo build --release -p ucal --features tui\ncargo run -p xtask -- gen-examples\n```\n\n");
     out.push_str("`cargo run -p xtask -- check-docs` fails if this file is not what a fresh run produces, so an example cannot describe output the program does not produce. Field-by-field documentation is in [`CLI.md`](CLI.md).\n\n");
     out.push_str("`ucal now` and `ucal tour` are absent on purpose: `now` reads the system clock, so its output differs on every run and could never match a committed file.\n\n");
     out.push_str("Colour is off and the width is 80 columns, so these match a redirected run rather than a terminal.\n\n---\n");
@@ -166,7 +205,7 @@ fn binary(root: &Path) -> Result<std::path::PathBuf, String> {
         Ok(bin)
     } else {
         Err(format!(
-            "{} is missing; run `cargo build --release -p ucal` first",
+            "{} is missing; run `cargo build --release -p ucal --features tui` first",
             bin.display()
         ))
     }

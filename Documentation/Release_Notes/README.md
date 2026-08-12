@@ -12,6 +12,7 @@ knows only what it did.
 
 | version | date | state |
 |---|---|---|
+| [1.5.0](1.5.0.md) | 2026-08-11 | released — spend what the research found, and build a clock |
 | [1.4.0](1.4.0.md) | 2026-08-10 | released — decide 2.0 before it is forced |
 | [1.3.0](1.3.0.md) | 2026-08-09 | released — find the defects nobody is going to report |
 | [1.2.0](1.2.0.md) | 2026-08-08 | released — the questions a stranger asks first |

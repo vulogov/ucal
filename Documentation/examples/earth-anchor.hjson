@@ -1,0 +1,67 @@
+// An anchor file (§15.1), stating exactly what `anchors::earth` states.
+//
+// # Why this is a separate file from earth.hjson
+//
+// §15.1 requires it, and gives the reason: parameters change with better
+// measurement, anchors with re-determination. Those are different events on
+// different schedules. A revised rotation period does not invalidate a phase,
+// and a re-determined phase does not change a rotation period. One file would
+// tie them together and make a revision of either look like a revision of both
+// — which is what the `revision` field below exists to distinguish.
+//
+// # What an anchor file cannot be used to do
+//
+// Invent a phase. Rule J makes phase empirical: determined and cited, never
+// derived and never borrowed from another body. Two of the twelve derived
+// calendars that ship have an anchor, and that ratio is not a gap in the
+// program — `D5-titan-anchor.md` records a full literature search that ended in
+// "no anchor for Titan", because its rotational elements are published and its
+// mean-solar-time convention is not.
+//
+// The loader adds no checks of its own and must not. Every refusal below comes
+// from `Anchor::new`, which the compiled-in anchors go through as well:
+//
+//   - the phase must name a physical event of the body itself (Rule J.1), so a
+//     custom description mentioning a foreign epoch, clock or calendar is
+//     UCAL-E0063;
+//   - the window must contain the tick (Rule J.2), because a window that
+//     excludes its own best estimate is a contradiction and not an uncertainty
+//     — UCAL-E0062;
+//   - the determination must state a method, a citation, and what dominates the
+//     uncertainty. None of the three is optional.
+//
+// So a file cannot reach a state a Rust constant could not. It can reach that
+// state without editing the crate, which is the entire feature.
+//
+// # The window is stated, never computed
+//
+// Nothing here derives the window from an uncertainty, or the uncertainty from
+// the window. A loader that widened or narrowed a window by a rule of its own
+// would be narrowing by assumption, which GE-3 forbids and which is far easier
+// to do accidentally in a file than in a constant.
+
+calendar_id: earth-d
+
+// Mean solar midnight at Greenwich on 2000-01-01, in ticks.
+tick: 8070205173569172848597429796163475680530466139316558837890625
+
+// +/- 1 ms about that tick. Both bounds written out; see above.
+window_lo: 8070205173569172848578881211763614680530466139316558837890625
+window_hi: 8070205173569172848615978380563336680530466139316558837890625
+
+phase: {
+  kind: mean_solar_midnight
+  meridian: greenwich
+  meridian_citation: BIPM, the Metre Convention and the treaty establishing the prime meridian
+}
+
+determination: {
+  method: mean solar midnight at the prime meridian on 2000-01-01, i.e. 00:00:00 UT1, converted through TT = UT1 + Delta-T with Delta-T(2000.0) = 63.8285 s
+  citation: IERS Conventions (2010) and the IERS Earth Orientation Centre's published Delta-T series; the original document is available in the Internet Archive
+  locator: https://web.archive.org/web/2024/https://www.iers.org/
+  uncertainty_note: dominated by the resolution of the published Delta-T series, which is quoted to 0.0001 s near 2000.0; the window is widened to 1 ms to cover the series' own stated scatter
+}
+
+// Anchors are versioned because they are observations, and a re-determination
+// is a new revision rather than an edit.
+revision: 1

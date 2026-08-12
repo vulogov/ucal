@@ -104,7 +104,7 @@ jobs:
       # manifest would let the two drift apart silently in the direction that
       # matters -- a manifest lowered by hand and a job that follows it proves
       # nothing.
-      - uses: dtolnay/rust-toolchain@1.87
+      - uses: dtolnay/rust-toolchain@1.88
       - uses: Swatinem/rust-cache@v2
 
       # `rust-version` was 1.85 until 0.6.0 and had been false since bnum was
@@ -112,8 +112,8 @@ jobs:
       - name: msrv matches the manifest
         run: |
           declared=$(grep -m1 '^rust-version' Cargo.toml | grep -oE '[0-9]+\.[0-9]+')
-          test "$declared" = "1.87" || {
-            echo "Cargo.toml declares $declared but this job pins 1.87."
+          test "$declared" = "1.88" || {
+            echo "Cargo.toml declares $declared but this job pins 1.88."
             echo "Change both, and say so in the release notes: an MSRV bump is"
             echo "a minor-version change (Documentation/STABILITY.md)."
             exit 1
@@ -121,6 +121,21 @@ jobs:
 
       - name: workspace builds at the MSRV
         run: cargo build --workspace --all-targets
+
+      # Every *buildable* feature, not just the default set. 1.5.0 raised the
+      # floor to 1.88 for `tui` and carried a documented exception for one
+      # release-in-progress instead; this is what removes the need for one. A
+      # feature that cannot be built at the declared MSRV is a second, unstated
+      # MSRV.
+      #
+      # `--all-features` and not `--features tui` would be the obvious spelling
+      # and does not work: it enables `u512` and `bigint` together and the
+      # backend guard fires. That is item 1 of ROAD-TO-2.0 turning up in a third
+      # tool, after `cargo semver-checks` needing `--default-features` and the
+      # dependency-graph hazard the proposal is actually about.
+      - name: the tui feature builds at the MSRV too
+        run: cargo build -p ucal --features tui --all-targets
+
 
   checks:
     name: harness, lints, docs, vectors
@@ -138,6 +153,18 @@ jobs:
       # Exemptions are printed, so one is a visible cost rather than a silence.
       - name: workspace lints
         run: cargo run -p xtask -- lint
+
+      # check-docs verifies the committed worked examples against a fresh run,
+      # and needs the binary to do it. Without this step it reported
+      #
+      #     --    worked examples not checked: target/release/ucal is absent
+      #
+      # in every run since the check was written, which is precisely the silent
+      # skip its own comment in xtask/src/main.rs warns is how a stale file
+      # survives. `--features tui` because two of the examples are wall-clock
+      # frames.
+      - name: the binary the documentation is generated from
+        run: cargo build --release --locked -p ucal --features tui
 
       # §13.5's single source of truth, every citation resolving against spec/,
       # and Documentation/CLI.md covering the command surface.

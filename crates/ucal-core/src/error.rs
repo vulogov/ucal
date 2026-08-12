@@ -140,6 +140,33 @@ pub enum Code {
     /// for the whole class ends that; a fourth borrowed code would not have
     /// been an accident. See D-A19.
     E0016,
+
+    /// A data file cannot be read, is not well-formed, or holds a value its
+    /// field cannot take.
+    ///
+    /// The read failure is here rather than in a code of its own because a
+    /// missing file and an unparseable one are the same answer to the caller —
+    /// *this path did not yield a data file* — and the context string carries
+    /// which. The first draft named this variant "malformed data file", and a
+    /// missing path then reported `malformed data file (no such body file)`,
+    /// which is two statements that disagree.
+    ///
+    /// §15.1's body files and anchor files. Distinct from [`Code::E0012`], which
+    /// is the narrower *unknown key*, and from [`Code::E0010`], which is a
+    /// **locale table** — a different file, read by a different loader, for a
+    /// different purpose.
+    ///
+    /// `E0010` is what the body-file loader raised until 1.5.0, so a malformed
+    /// body file was reported as `UCAL-E0010: locale table load failure`. That is
+    /// the third time a code has been borrowed for its exit status and carried a
+    /// name describing something else — D-A17 and D-A18 each fixed one — and the
+    /// second time it happened in the release that *also* gave `E0012` its first
+    /// raiser. Naming the condition is cheaper than the next investigation into
+    /// why the diagnostic says "locale". See D-A22.
+    ///
+    /// Appended for the same reason as [`Code::E0014`]: the variants carry
+    /// implicit discriminants and the enum derives `PartialOrd`.
+    E0017,
 }
 
 impl Code {
@@ -160,6 +187,7 @@ impl Code {
             Code::E0014 => "UCAL-E0014",
             Code::E0015 => "UCAL-E0015",
             Code::E0016 => "UCAL-E0016",
+            Code::E0017 => "UCAL-E0017",
             Code::E0020 => "UCAL-E0020",
             Code::E0021 => "UCAL-E0021",
             Code::E0022 => "UCAL-E0022",
@@ -203,6 +231,7 @@ impl Code {
             Code::E0014 => "name not found in the active locale table",
             Code::E0015 => "this build does not reproduce the declared constants",
             Code::E0016 => "no such entry in a declared catalogue",
+            Code::E0017 => "data file cannot be read or is not well-formed",
             Code::E0020 => "result precedes the datum",
             Code::E0021 => "result exceeds DOMAIN",
             Code::E0022 => "window inversion, lo > hi",
@@ -249,7 +278,7 @@ impl Code {
             | Code::E0065 => 7,
             Code::E0070 | Code::E0071 => 8,
             Code::E0010 | Code::E0011 | Code::E0012 | Code::E0013 | Code::E0014
-            | Code::E0016 => 6,
+            | Code::E0016 | Code::E0017 => 6,
             Code::E0025 | Code::E0015 => 9,
         }
     }

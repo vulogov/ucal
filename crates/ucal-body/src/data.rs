@@ -231,19 +231,30 @@ pub fn saturn() -> Body {
 /// published parameters, and Appendix I.5's convergent table remains pinned in
 /// `ucal-core` against its own printed ratio. Feeding the mechanism the published
 /// parameters gives a different, and physically correct, intercalation.
-pub fn titan() -> Body {
-    let rotation = param(15_945_421, 6, MeasuredUnit::SiDay, NASA_FACT_SHEET, 10_000);
-    let year = param(10_759_2058, 4, MeasuredUnit::SiDay, NASA_FACT_SHEET, 10_000);
-
-    // The solar day is **derived**, not measured. No source publishes it, it
-    // follows exactly from the rotation and the year, and writing it back as a
-    // decimal would invent a measurement and round an exact quantity at once.
-    //
-    //   solar_day = 1 / (1/P_rotation − 1/P_year)
-    //
-    // computed here in ticks, so nothing passes through a foreign unit.
+/// A tidally locked moon, which is the ordinary case in the outer solar system.
+///
+/// Every satellite this module ships rotates synchronously — the fact sheets
+/// print `S` in the rotation column — so one published figure is both the
+/// orbital period about the primary and the rotation period. What is *not*
+/// published anywhere is the solar day, and it is not the rotation:
+///
+/// ```text
+///   solar_day = 1 / (1/P_rotation - 1/P_year)
+/// ```
+///
+/// Tidal lock fixes the moon's face towards its primary, not towards the Sun.
+/// The Sun moves relative to the pair as the primary orbits, so a solar day is
+/// the synodic period. It follows exactly from two published figures, and is
+/// computed here in ticks so nothing passes through a foreign unit — writing it
+/// back as a decimal would invent a measurement and round an exact quantity at
+/// once. [D-A21]'s neighbour finding is the reason that matters: a rounded
+/// parameter derives a different intercalation rule, demonstrated for this very
+/// body in `crates/ucal/tests/body_file.rs`.
+///
+/// [D-A21]: https://github.com/vulogov/ucal/blob/main/spec/SPEC-DELTAS.md
+fn locked_moon(id: &'static str, primary: &'static str, period: RatedParam, year: RatedParam) -> Body {
     let solar = {
-        let a = rotation.value_at_epoch().recip().expect("non-zero rotation");
+        let a = period.value_at_epoch().recip().expect("non-zero rotation");
         let b = year.value_at_epoch().recip().expect("non-zero year");
         a.abs_diff(&b)
             .and_then(|d| d.recip())
@@ -254,15 +265,97 @@ pub fn titan() -> Body {
         j2000(),
         window(10_000),
         "1 / (1/P_rotation - 1/P_orbital_period)",
-        "tidal lock fixes Titan's face towards Saturn, not towards the Sun; the \
-         Sun moves relative to the pair as Saturn orbits, so a solar day is the \
-         synodic period. No source publishes it, and it follows exactly from two \
-         that are published.",
+        "tidal lock fixes the moon's face towards its primary, not towards the \
+         Sun; the Sun moves relative to the pair as the primary orbits, so a \
+         solar day is the synodic period. No source publishes it, and it follows \
+         exactly from two that are published.",
         &[NASA_FACT_SHEET],
     )
     .expect("derived from positive published parameters");
 
-    Body::new("titan", rotation, solar_day, year).orbiting("saturn")
+    Body::new(id, period, solar_day, year).orbiting(primary)
+}
+
+/// Jupiter's year, which is the year every Galilean moon keeps.
+///
+/// Rule K.2: a satellite's year is its primary's orbit about the Sun, not its
+/// own about the primary. Its own is the *cycle*, and for a moon with no moon
+/// of its own there is no cycle at all (§15.3).
+fn jovian_year() -> RatedParam {
+    param(4_332_589, 3, MeasuredUnit::SiDay, NASA_FACT_SHEET, 10_000)
+}
+
+/// Saturn's year, shared by Titan and Enceladus.
+fn saturnian_year() -> RatedParam {
+    param(10_759_2058, 4, MeasuredUnit::SiDay, NASA_FACT_SHEET, 10_000)
+}
+
+/// Titan, whose calendar is complete in units and cycles and has no phase.
+///
+/// [`D5-titan-anchor.md`] records the literature search that established why:
+/// the rotational elements are published and the mean-solar-time convention is
+/// not. Rule J does not permit inventing one.
+///
+/// [`D5-titan-anchor.md`]: https://github.com/vulogov/ucal/blob/main/Documentation/Proposals/D5-titan-anchor.md
+pub fn titan() -> Body {
+    locked_moon(
+        "titan",
+        "saturn",
+        param(15_945_421, 6, MeasuredUnit::SiDay, NASA_FACT_SHEET, 10_000),
+        saturnian_year(),
+    )
+}
+
+/// Io, innermost of the Galilean moons, and the fastest calendar that ships.
+///
+/// Its year holds roughly 2 448 solar days. Nothing about Rule K minds.
+pub fn io() -> Body {
+    locked_moon(
+        "io",
+        "jupiter",
+        param(1_769_138, 6, MeasuredUnit::SiDay, NASA_FACT_SHEET, 10_000),
+        jovian_year(),
+    )
+}
+
+/// Europa, and the body the documented example file authors by hand.
+pub fn europa() -> Body {
+    locked_moon(
+        "europa",
+        "jupiter",
+        param(3_551_181, 6, MeasuredUnit::SiDay, NASA_FACT_SHEET, 10_000),
+        jovian_year(),
+    )
+}
+
+/// Ganymede, the largest moon in the solar system, and larger than Mercury.
+pub fn ganymede() -> Body {
+    locked_moon(
+        "ganymede",
+        "jupiter",
+        param(7_154_553, 6, MeasuredUnit::SiDay, NASA_FACT_SHEET, 10_000),
+        jovian_year(),
+    )
+}
+
+/// Callisto, outermost of the four and the only one outside the Laplace resonance.
+pub fn callisto() -> Body {
+    locked_moon(
+        "callisto",
+        "jupiter",
+        param(16_689_017, 6, MeasuredUnit::SiDay, NASA_FACT_SHEET, 10_000),
+        jovian_year(),
+    )
+}
+
+/// Enceladus, and the only body here that is not Jovian or Earth-adjacent.
+pub fn enceladus() -> Body {
+    locked_moon(
+        "enceladus",
+        "saturn",
+        param(1_370_218, 6, MeasuredUnit::SiDay, NASA_FACT_SHEET, 10_000),
+        saturnian_year(),
+    )
 }
 
 /// Mercury.
@@ -385,6 +478,11 @@ pub fn all() -> alloc::vec::Vec<Body> {
         mercury(),
         venus(),
         jupiter(),
+        io(),
+        europa(),
+        ganymede(),
+        callisto(),
+        enceladus(),
     ]
 }
 

@@ -1,0 +1,53 @@
+// Earth as a body file (§15.1), stating exactly what `data::earth` states.
+//
+// The point of this file is that it is checkable. Deriving it and giving it the
+// anchor file beside it must produce the same date as `ucal cal show earth-d`
+// for the same instant, and a test asserts it. Rule K.5 says Earth is an
+// ordinary instance and §15.4 says its entry has no special code path; this is
+// the form of that claim an outside author can verify.
+//
+// The satellite is here because Earth's calendar has a grouping cycle and most
+// do not. A body naming no satellite gets no month, and that is the output
+// rather than a gap (§15.3).
+
+id: earth
+primary: sun
+
+// Sidereal rotation: 86164.0905 s.
+rotation_period: {
+  value: 86164.0905
+  unit: s
+  citation: IAU Working Group on Cartographic Coordinates and Rotational Elements
+  valid_years: 1000
+}
+
+// Mean solar day: 86400 s exactly. Stated, not derived — this one is published.
+solar_day: {
+  value: 86400
+  unit: s
+  citation: The Astronomical Almanac
+  valid_years: 1000
+}
+
+// Tropical year: 365.242190 mean solar days = 31 556 925.216 s.
+orbital_period: {
+  value: 31556925.216
+  unit: s
+  citation: The Astronomical Almanac
+  valid_years: 10000
+}
+
+satellites: [
+  {
+    id: moon
+    // Tropical month: 27.321582 d. Paired with the tropical year this gives a
+    // synodic month of 29.530589 d, which is Appendix I.2's ratio to seven
+    // decimals.
+    orbital_period: {
+      value: 27.321582
+      unit: d
+      citation: The Astronomical Almanac
+      valid_years: 10000
+    }
+  }
+]

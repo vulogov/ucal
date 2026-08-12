@@ -211,6 +211,40 @@ enum Command {
     Verify,
     /// The first five minutes: what to type, what it shows, and why.
     Tour,
+    /// A full-screen clock showing universe time. `q` quits.
+    #[cfg(feature = "tui")]
+    Wallclock {
+        /// Theme key, or `list` to name them all.
+        #[arg(long, default_value = "plain")]
+        theme: String,
+        /// Shorthand for `--theme startrek`, which is LCARS.
+        #[arg(long, conflicts_with_all = ["gagarin", "armstrong"])]
+        startrek: bool,
+        /// Shorthand for `--theme gagarin`, a Vostok instrument panel.
+        #[arg(long, conflicts_with_all = ["startrek", "armstrong"])]
+        gagarin: bool,
+        /// Shorthand for `--theme armstrong`, an Apollo DSKY.
+        #[arg(long, conflicts_with_all = ["startrek", "gagarin"])]
+        armstrong: bool,
+        /// A body's own calendar, shown as a second dial: `earth-d`, `mars-d`.
+        ///
+        /// `--clock-local` and not `--locale`, which is already this program's
+        /// *language* flag (Rule N). The two are different vocabularies and one
+        /// name for both is the confusion this project spends its time removing:
+        /// `--locale ru` translates the tier names on the face, and
+        /// `--clock-local mars-d` puts Mars beside them.
+        #[arg(long = "clock-local", value_name = "ID")]
+        clock_local: Option<String>,
+        /// Draw one frame to stdout and exit, instead of taking over the screen.
+        #[arg(long)]
+        once: bool,
+        /// The instant to draw. Requires `--once`; without it the clock is live.
+        #[arg(long, value_name = "INSTANT")]
+        at: Option<String>,
+        /// Rows for `--once`. Columns come from the global `--width`.
+        #[arg(long, default_value = "32", value_name = "N")]
+        height: u16,
+    },
     /// Shell completions, generated from this program's own argument parser.
     Completions {
         /// bash, zsh, fish, powershell or elvish.
@@ -297,6 +331,12 @@ enum CalCommand {
     Derive {
         /// Path to a body file.
         file: String,
+        /// Path to an anchor file (§15.1), which turns the derivation into a date.
+        #[arg(long, value_name = "FILE")]
+        anchor: Option<String>,
+        /// The instant to render in the derived calendar. Requires --anchor.
+        #[arg(long, value_name = "INSTANT")]
+        at: Option<String>,
     },
 }
 
@@ -528,7 +568,9 @@ fn main() {
             CalCommand::List => ucal::cmd_cal_list(),
             CalCommand::Show { id, instant } => ucal::cmd_cal_show(id, instant),
             CalCommand::Anchor { id } => ucal::cmd_cal_anchor(id),
-            CalCommand::Derive { file } => ucal::cmd_cal_derive(file),
+            CalCommand::Derive { file, anchor, at } => {
+                ucal::cmd_cal_derive_with(file, anchor.as_deref(), at.as_deref())
+            }
         },
         #[cfg(all(feature = "body", feature = "civil"))]
         Command::Show {
@@ -543,6 +585,10 @@ fn main() {
         }
         Command::Verify => ucal::cmd_verify(),
         Command::Tour => ucal::cmd_tour(),
+        // Only `--theme list` reaches here; every other value ran the clock and
+        // returned above.
+        #[cfg(feature = "tui")]
+        Command::Wallclock { .. } => Ok(ucal::cmd_wallclock_themes()),
         // Handled by the early return above; this arm exists only because a
         // `match` must be exhaustive. A diagnostic rather than `unreachable!()`
         // — the CLI crate carries no panicking construct (`no-panic-in-cli`),
@@ -607,20 +653,78 @@ fn main() {
         }
     };
     let style = resolve_for_output(choice, cli.json);
+    let terminal = terminal_width();
+    // Also not a `Doc`: it owns the terminal until the user quits, and its
+    // output is the screen rather than a document. `--theme list` *is* a Doc,
+    // and falls through to the dispatch below.
+    #[cfg(feature = "tui")]
+    if let Command::Wallclock {
+        theme,
+        startrek,
+        gagarin,
+        armstrong,
+        clock_local,
+        once,
+        at,
+        height,
+    } = &cli.command
+    {
+        // The shorthands are mutually exclusive by `conflicts_with_all`, so at
+        // most one is set and the order here cannot hide a second choice.
+        let key = match (*startrek, *gagarin, *armstrong) {
+            (true, _, _) => "startrek",
+            (_, true, _) => "gagarin",
+            (_, _, true) => "armstrong",
+            _ => theme.as_str(),
+        };
+        if key != "list" {
+            // `--width` is the global flag, and off a terminal it resolves to
+            // the 80-column baseline — which is the size a committed frame
+            // should be, and the reason this reuses it rather than adding a
+            // second width nobody would keep in step with the first.
+            let cols = Render::resolve_width(cli.width, terminal) as u16;
+            let result = LocaleId::parse(&cli.locale).and_then(|l| {
+                if *once {
+                    ucal::wallclock::run_once(
+                        key,
+                        l,
+                        clock_local.as_deref(),
+                        at.as_deref(),
+                        cols,
+                        *height,
+                        // The *resolved* style, not the raw `--color` choice.
+                        // `NO_COLOR` and "is this a terminal" are decided in
+                        // `resolve_for_output`, so asking the choice gets the
+                        // answer before those applied — which put ANSI escapes
+                        // into the frame `gen-examples` commits, the one thing
+                        // `frame.rs` says must not happen.
+                        !style.is_plain(),
+                    )
+                    .map(|frame| print!("{frame}"))
+                } else if at.is_some() {
+                    Err(ucal_core::TimeError::with_context(
+                        ucal_core::Code::E0060,
+                        "--at draws a fixed instant and only makes sense with --once; \
+                         a live clock's instant is now",
+                    ))
+                } else {
+                    ucal::wallclock::run(key, l, clock_local.as_deref())
+                }
+            });
+            if let Err(e) = result {
+                eprintln!("{e}");
+                std::process::exit(exit_code(&e));
+            }
+            return;
+        }
+    }
+
     let sep = match cli.tick_sep.as_deref().map(parse_group_sep).transpose() {
         Ok(c) => c,
         Err(e) => {
             eprintln!("{e}");
             std::process::exit(exit_code(&e));
         }
-    };
-    // Off a terminal the width is the baseline, always: if it followed the
-    // terminal on a redirected stream, `ucal ladder > f` and `ucal ladder | cat`
-    // would differ, and so would the same command on two machines.
-    let terminal = if std::io::stdout().is_terminal() {
-        terminal_size::terminal_size().map(|(terminal_size::Width(w), _)| w as usize)
-    } else {
-        None
     };
     let render = Render::styled(style)
         .group(sep)
@@ -686,4 +790,22 @@ fn run_now(_locale: &str, _precision: &str, _form: &str) -> ucal::CmdResult {
         ucal_core::Code::E0001,
         "`ucal now` requires the `civil` and `std` features",
     ))
+}
+
+/// The terminal's columns, or `None` off a terminal.
+///
+/// Off a terminal the width is the baseline, always: if it followed the terminal
+/// on a redirected stream, `ucal ladder > f` and `ucal ladder | cat` would
+/// differ, and so would the same command on two machines.
+///
+/// `wallclock --once` depends on that being true. A frame committed into the
+/// documentation must not change width with the window it was generated in, and
+/// `gen-examples` redirects, so it gets the baseline by the same rule everything
+/// else does rather than by a special case.
+fn terminal_width() -> Option<usize> {
+    if std::io::stdout().is_terminal() {
+        terminal_size::terminal_size().map(|(terminal_size::Width(w), _)| w as usize)
+    } else {
+        None
+    }
 }

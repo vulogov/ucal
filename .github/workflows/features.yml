@@ -50,6 +50,16 @@ jobs:
       - run: cargo build -p ucal --no-default-features --features u512,std,body,civil
       - run: cargo build -p ucal --no-default-features --features u512,std,events
       - run: cargo build -p ucal --no-default-features --features u512,std,cosmo
+      # The wall clock. `tui` needs `civil` (it reads the system clock through
+      # the leap table) and `body` (`--clock-local` puts a body's calendar on the
+      # face). Both were missing from the feature declaration and both built
+      # fine for as long as `default` happened to supply them. The bare
+      # `u512,tui` line is the one that matters: it supplies neither, so the
+      # feature has to declare what it needs.
+      - run: cargo build -p ucal --no-default-features --features u512,tui
+      - run: cargo build -p ucal --no-default-features --features u512,std,tui
+      - run: cargo build -p ucal --no-default-features --features u512,std,civil,tui
+      - run: cargo build -p ucal --features tui
 
   refused:
     name: every unsupported combination fails with a sentence

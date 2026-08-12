@@ -1043,3 +1043,130 @@ one level down.
 `crates/ucal-body/tests/leap_placement.rs` implements the clumped alternative,
 confirms it satisfies the same `LeapRule`, and asserts the two disagree — so the
 convention is pinned by something other than the code that implements it.
+
+---
+
+## D-A22 — the body-file loader reported a locale-table failure
+
+**Status: CORRECTION.** A new diagnostic code, `UCAL-E0017`.
+
+### What was wrong
+
+§15.1's loader landed in 1.4.0. A body file that could not be read, or that was
+not well-formed HJSON, was reported as:
+
+```
+UCAL-E0017: data file cannot be read or is not well-formed   (now)
+UCAL-E0010: locale table load failure                        (1.4.0)
+```
+
+`UCAL-E0010` is declared as *locale table load failure*. A body file is not a
+locale table: different file, different loader, different purpose. The code was
+borrowed for its exit status, and the name it carries describes something the
+user did not do.
+
+### Why this entry exists rather than a quiet fix
+
+**This is the third time.** [D-A17](#d-a17) found `E0011` — *duplicate name in
+the locale table* — raised for an unknown tier name, so the diagnostic stated
+the opposite of what happened. [D-A18](#d-a18) found `ucal verify` reporting
+`E0025`, which means `BIG_BANG_CLAIM` was used as an operand, purely for its
+exit code. [D-A19](#d-a19) then moved `ucal events show`'s misuse of `E0012` onto
+a code that means what it says, which is what made D-A20 visible: removing the
+one wrong caller left `E0012` with no callers at all, and a diagnostic defined
+for a loader that did not exist.
+
+So the pattern is established and its cost is known: a borrowed code conceals
+what it is attached to. The fourth occurrence was introduced by the same release
+that fixed the third, in code written with D-A19 in front of it.
+
+The general remedy was supposed to be `E0016`, declared in 1.2.0 as "the last of
+its kind" for the whole *not found* class. It is — this is not a *not found*
+condition. What is added here is the class that had no code at all: **a data
+file that will not load**, as distinct from `E0012`'s narrower *unknown key in
+one*.
+
+### The correction
+
+`UCAL-E0017`, appended to the end of `Code` — the variants carry implicit
+discriminants and the enum derives `PartialOrd`, so inserting one in the middle
+is a breaking change, as `cargo semver-checks` established when `E0014` was
+first written in reading order.
+
+It covers both the unreadable file and the unparseable one, because a missing
+path and a corrupt file are the same answer to the caller — *this path did not
+yield a data file* — and the context string says which. The variant was first
+named "malformed data file", under which a missing path reported `malformed data
+file (no such body file)`: two statements that disagree, caught before it
+shipped.
+
+### Enforcement
+
+`crates/ucal/tests/body_file.rs` asserts the code for both conditions. `xtask
+lint`'s new `codes-have-raisers` check, added by [D-A23](#d-a23), holds every
+declared code to having one.
+
+
+---
+
+## D-A23 — `UCAL-E0011` reported its own inverse, and nothing could have noticed
+
+**Status: CORRECTION.**
+
+### What was wrong
+
+`locale::validate` refuses a table in which two tiers share a display name,
+because a collision makes a name ambiguous on input while still looking fine on
+output. Rule N makes that condition `UCAL-E0011`, the function's own
+documentation says so, and the branch raised:
+
+```rust
+Code::E0014,  // "name not found in the active locale table"
+"duplicate name in the active locale table",
+```
+
+A duplicate name reported as a name not found. `UCAL-E0011` — *duplicate name in
+the active locale table* — was therefore raised nowhere in the workspace.
+
+### This is D-A17 again, on the same pair of codes
+
+[D-A17](#d-a17) found `E0011` raised for an *unknown tier name*, so the
+diagnostic read `duplicate name in the active locale table (unknown tier name)`.
+The correction added `E0014` for the not-found lookups. This branch was moved on
+to `E0014` along with them — and it is the one branch that was already correct.
+The fix for an inversion introduced the inversion in the other direction, and
+left the code it was defending with no raiser at all.
+
+It survived from 1.2.0 to 1.5.0.
+
+### Why no test caught it
+
+No shipped locale table contains a collision, which is the point of shipping
+them, and `validate` took a `LocaleId` — so the only tables reachable from a
+test were the ones guaranteed to pass. **The branch was unreachable by
+construction from every test that existed.**
+
+The collision check is now `locale::no_collisions`, taking any table, so a
+synthetic colliding table can be handed to it. A branch no test can reach is a
+branch that is not known to work.
+
+### The general remedy
+
+`xtask lint` gains **`codes-have-raisers`**: every variant declared in `Code`
+must appear as `Code::E00nn` in shipped code somewhere in the workspace.
+
+It counts shipped code only. The first version counted test files too, and
+verifying it by removing the `E0011` raiser produced *zero violations* — because
+the test asserting `e.code == Code::E0011` still mentioned the name. A lint a
+test can satisfy is a lint that checks the tests.
+
+It would have found `E0012` in 1.2.0, three releases before D-A20 found it by
+hand. What it does not check is whether a raiser is the *right* one: D-A17,
+D-A18, D-A22 and this entry are all codes raised for conditions they do not
+describe, and none of them is detectable by grep. That half needs a reader. This
+half needed a lint, and did not have one.
+
+### Enforcement
+
+`crates/ucal-core/src/locale.rs::tests::a_colliding_table_is_e0011`, its
+companion asserting the shipped tables still pass, and the lint.

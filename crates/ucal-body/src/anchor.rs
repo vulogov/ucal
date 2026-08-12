@@ -51,6 +51,21 @@ pub struct Meridian {
     pub citation: Citation,
 }
 
+impl Meridian {
+    /// Name a meridian and say who fixed it.
+    ///
+    /// Added in 1.5.0, because the struct is `#[non_exhaustive]` and had no
+    /// constructor — so it could be built inside this crate and nowhere else.
+    /// §15.1 requires anchor **files**, and a loader outside `ucal-body` could
+    /// not construct one of these at all. That was invisible for as long as
+    /// nobody tried: the body-file loader landed in 1.4.0 and worked, because
+    /// `Body`, `Measured` and `RatedParam` all have public constructors and
+    /// these two did not.
+    pub const fn new(name: &'static str, citation: Citation) -> Meridian {
+        Meridian { name, citation }
+    }
+}
+
 /// What physical event of the body fixes where local counting begins (Rule J.1).
 ///
 /// D-15 makes this an open enum: bodies vary more than a closed set can
@@ -178,6 +193,26 @@ pub struct Determination {
     pub citation: Citation,
     /// What dominates the uncertainty, and why the window is the width it is.
     pub uncertainty_note: &'static str,
+}
+
+impl Determination {
+    /// Record how an anchor instant was obtained.
+    ///
+    /// All three arguments, because Rule J.3 makes all three obligations and a
+    /// constructor that let one be omitted would be a laxer way of declaring an
+    /// anchor than the struct literal it replaces. See [`Meridian::new`] for why
+    /// this exists at all.
+    pub const fn new(
+        method: &'static str,
+        citation: Citation,
+        uncertainty_note: &'static str,
+    ) -> Determination {
+        Determination {
+            method,
+            citation,
+            uncertainty_note,
+        }
+    }
 }
 
 /// Where a calendar's local counting begins (Rule J).

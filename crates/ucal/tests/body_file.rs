@@ -58,6 +58,25 @@ mod tempdir {
     }
 }
 
+/// Europa, with the solar-day block left as a hole the tests fill.
+const GOOD_EUROPA: &str = r#"
+id: europa
+primary: jupiter
+rotation_period: {
+  value: 3.551181
+  unit: d
+  citation: NASA fact sheet
+  valid_years: 10000
+}
+SOLAR_DAY
+orbital_period: {
+  value: 4332.589
+  unit: d
+  citation: NASA fact sheet
+  valid_years: 10000
+}
+"#;
+
 const GOOD: &str = r#"
 id: europa
 primary: jupiter
@@ -103,6 +122,21 @@ fn an_unknown_key_is_e0012() {
     assert_eq!(e.code, Code::E0012);
 }
 
+/// D-A22: a file that will not load is `UCAL-E0017`, not a locale-table failure.
+///
+/// Both conditions, because they were one code before and the context string is
+/// what distinguishes them.
+#[test]
+fn an_unloadable_file_is_e0017() {
+    let missing = std::path::Path::new("/nonexistent/ucal-no-such-body.hjson");
+    let e = body_file::load(missing).expect_err("a missing file must be refused");
+    assert_eq!(e.code, Code::E0017);
+
+    let (_d, p) = tmp("not-hjson", "id: europa\n  {{{ this is not hjson");
+    let e = body_file::load(&p).expect_err("a malformed file must be refused");
+    assert_eq!(e.code, Code::E0017);
+}
+
 /// Rule C is not optional in a file.
 ///
 /// The obligations are what make the compiled-in data trustworthy. A loader that
@@ -134,6 +168,118 @@ fn a_parameter_without_its_obligations_is_refused() {
             "a parameter missing `{missing}` was accepted"
         );
     }
+}
+
+/// Z1.1 — a derived parameter reproduces the exact value, not a rounded one.
+///
+/// This is the whole point of the form. The measured version of this file needs
+/// twelve decimals written by hand to reach the same calendar; the derived
+/// version states no figure at all and reaches it exactly, because the value is
+/// never a decimal.
+#[test]
+fn a_derived_solar_day_reproduces_the_shipped_body() {
+    let derived = GOOD_EUROPA.replace(
+        "SOLAR_DAY",
+        "solar_day: {\n  derived: synodic\n  citation: derived from the two figures cited here\n  valid_years: 10000\n}",
+    );
+    let (_d, p) = tmp("derived-synodic", &derived);
+    let from_file = rule_of(&body_file::load(&p).expect("loads"));
+    let shipped = rule_of(&ucal_body::data::europa());
+    assert_eq!(
+        from_file.chosen.value.denom().to_dec_string(),
+        shipped.chosen.value.denom().to_dec_string(),
+        "a derived solar day did not reproduce the compiled-in body"
+    );
+}
+
+/// And it is exact, not merely close: one fewer decimal than the measured form
+/// needs would already disagree.
+#[test]
+fn the_derived_form_beats_every_decimal_short_of_exact() {
+    let derived = GOOD_EUROPA.replace(
+        "SOLAR_DAY",
+        "solar_day: {\n  derived: synodic\n  citation: derived\n  valid_years: 10000\n}",
+    );
+    let (_d1, p1) = tmp("derived-exact", &derived);
+    let exact = body_file::load(&p1).expect("loads");
+
+    let five = GOOD_EUROPA.replace(
+        "SOLAR_DAY",
+        "solar_day: {\n  value: 3.55409\n  unit: d\n  citation: rounded\n  valid_years: 10000\n}",
+    );
+    let (_d2, p2) = tmp("derived-five", &five);
+    let rounded = body_file::load(&p2).expect("loads");
+
+    assert_ne!(
+        rule_of(&exact).chosen.value.denom().to_dec_string(),
+        rule_of(&rounded).chosen.value.denom().to_dec_string(),
+        "five decimals already reproduce the derivation, so the form saves nothing"
+    );
+}
+
+/// A parameter is measured or derived, and never both or neither.
+#[test]
+fn a_parameter_cannot_be_measured_and_derived_at_once() {
+    for (label, block) in [
+        (
+            "both",
+            "solar_day: {\n  value: 3.554094\n  unit: d\n  derived: synodic\n  citation: c\n  valid_years: 10000\n}",
+        ),
+        ("neither", "solar_day: {\n  citation: c\n  valid_years: 10000\n}"),
+        (
+            "derived-with-unit",
+            "solar_day: {\n  derived: synodic\n  unit: d\n  citation: c\n  valid_years: 10000\n}",
+        ),
+        (
+            "unknown-relation",
+            "solar_day: {\n  derived: sidereal\n  citation: c\n  valid_years: 10000\n}",
+        ),
+    ] {
+        let bad = GOOD_EUROPA.replace("SOLAR_DAY", block);
+        let (_d, p) = tmp(&format!("ambiguous-{label}"), &bad);
+        assert!(
+            body_file::load(&p).is_err(),
+            "`{label}` was accepted as a parameter"
+        );
+    }
+}
+
+/// Z1.3 — a tidally locked body has no solar day, and the derivation says so.
+///
+/// The most likely habitable-zone case around an M dwarf, and the state of every
+/// large moon in the outer solar system. Deriving the synodic day of a body
+/// whose rotation equals its year divides by zero, and the honest answer is that
+/// the star does not move in that sky.
+#[test]
+fn a_tidally_locked_body_is_told_it_has_no_day() {
+    let locked = GOOD_EUROPA
+        .replace("SOLAR_DAY", "solar_day: {\n  derived: synodic\n  citation: c\n  valid_years: 10000\n}")
+        .replace("value: 4332.589", "value: 3.551181");
+    let (_d, p) = tmp("locked", &locked);
+    let e = body_file::load(&p).expect_err("a locked body has no solar day");
+    let msg = e.to_string();
+    assert!(msg.contains("tidally locked"), "{msg}");
+    assert!(msg.contains("unbounded"), "{msg}");
+}
+
+/// Z1.3 — a whole number of days per year is an answer, not a bound failure.
+///
+/// Reported as `UCAL-E0061` — *no convergent meets the drift bound* — advising a
+/// wider bound or a greater depth, when neither can help: there is no fractional
+/// part to approximate.
+#[test]
+fn a_whole_number_of_days_per_year_is_not_a_bound_failure() {
+    let whole = GOOD_EUROPA
+        .replace(
+            "SOLAR_DAY",
+            "solar_day: {\n  value: 1\n  unit: d\n  citation: c\n  valid_years: 10000\n}",
+        )
+        .replace("value: 4332.589", "value: 4332");
+    let (_d, p) = tmp("whole-days", &whole);
+    let e = ucal::cmd_cal_derive(p.to_str().expect("utf-8")).expect_err("no intercalation");
+    let msg = e.to_string();
+    assert!(msg.contains("whole number of its solar days"), "{msg}");
+    assert!(!msg.contains("widen the bound"), "{msg}");
 }
 
 /// A file cannot smuggle in a value the type system would refuse.
@@ -295,16 +441,89 @@ fn a_derived_calendar_states_that_it_has_no_phase() {
     assert!(text.contains("never derived"), "{text}");
 }
 
+/// The example file in the documentation derives the body it names.
+///
+/// It used to only have to *load*, and that was too weak a check. The file
+/// stated a solar day of `3.552106` and cited the NASA fact sheet for it — a
+/// figure that source does not publish, wrong in the third decimal — and it
+/// loaded perfectly for a full release cycle. Y3 added `europa-d` to the
+/// catalogue and the two could finally be compared: `202/279` against `1/24`.
+///
+/// So the check is now that the documented example and the compiled-in body
+/// agree on the calendar. An example nobody can check is a claim with no
+/// mechanism.
+#[test]
+fn the_documented_example_derives_the_body_it_names() {
+    let body = body_file::load(&example_path()).expect("the documented example loads");
+    let from_file = rule_of(&body);
+    let shipped = rule_of(&ucal_body::data::europa());
+    assert_eq!(
+        (
+            from_file.chosen.value.numer().to_dec_string(),
+            from_file.chosen.value.denom().to_dec_string()
+        ),
+        (
+            shipped.chosen.value.numer().to_dec_string(),
+            shipped.chosen.value.denom().to_dec_string()
+        ),
+        "Documentation/examples/europa.hjson derives a different calendar from \
+         the europa this program ships"
+    );
+}
+
+/// The example's own table is checked against the example.
+///
+/// The file carries a table of what each precision yields and says six decimals
+/// are the fewest that reach `1/24`. This substitutes the measured form at five
+/// into the real file and requires the agreement to break, so the table cannot
+/// rot into decoration.
+///
+/// An earlier version of this test trimmed to eight decimals and passed for the
+/// wrong reason: it had read the *fourth* convergent from a table rather than
+/// the convergent the derivation chooses, which for Europa is the second and is
+/// reached long before the far terms start moving.
+#[test]
+fn the_examples_precision_table_is_true_of_the_example() {
+    let text = std::fs::read_to_string(example_path()).expect("read");
+    let block = text
+        .split("solar_day: {")
+        .nth(1)
+        .and_then(|t| t.split_once("\n}"))
+        .map(|(b, _)| format!("solar_day: {{{b}\n}}"))
+        .expect("the example states a solar_day block");
+    assert!(
+        block.contains("derived: synodic"),
+        "the example no longer uses the derived form this test substitutes for"
+    );
+
+    let five = text.replace(
+        &block,
+        "solar_day: {\n  value: 3.55409\n  unit: d\n  citation: rounded to five\n  valid_years: 10000\n}",
+    );
+    let (_d, p) = tmp("example-five", &five);
+    let rounded = rule_of(&body_file::load(&p).expect("loads"));
+    let shipped = rule_of(&ucal_body::data::europa());
+    assert_ne!(
+        rounded.chosen.value.denom().to_dec_string(),
+        shipped.chosen.value.denom().to_dec_string(),
+        "five decimals reproduce the shipped calendar, so the example's table is wrong"
+    );
+}
+
 /// The example file in the documentation is a file this loader accepts.
 #[test]
 fn the_documented_example_loads() {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(|p| p.parent())
-        .expect("workspace root")
-        .join("Documentation/examples/europa.hjson");
-    let body = body_file::load(&path).unwrap_or_else(|e| {
+    let body = body_file::load(&example_path()).unwrap_or_else(|e| {
         panic!("the documented example does not load: {e}");
     });
     assert_eq!(body.id(), "europa");
+}
+
+/// The one documented example file.
+fn example_path() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(|p| p.parent())
+        .expect("workspace root")
+        .join("Documentation/examples/europa.hjson")
 }
