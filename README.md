@@ -235,8 +235,8 @@ cargo run -p xtask -- verify-vectors  # conformance vectors re-derive
 
 ## Status
 
-Released **1.4.0** on crates.io, all six crates. `main` carries the released
-line; `1.5.0` is where development happens.
+Released **1.5.0** on crates.io, all six crates. `main` carries the released
+line; `1.6.0` is where development happens.
 
 The API is **stable**: within `1.x` no public item is removed, no signature
 changes, and nothing that compiled stops compiling. What is promised above the
@@ -247,7 +247,10 @@ repository has used the API.
 
 **Prebuilt binaries** for Linux, macOS and Windows are attached to each
 [release](https://github.com/vulogov/ucal/releases) — unpack and run, no
-toolchain needed. `cargo install ucal` if you have one.
+toolchain needed. They are built with `--features tui`, so they include
+`ucal wallclock`. `cargo install ucal` if you have a toolchain, and
+`cargo install ucal --features tui` if you want the clock: `ratatui` and
+`crossterm` are a large tree and a lean default install matters more.
 
 Release notes: [`Documentation/Release_Notes`](Documentation/Release_Notes).
 
