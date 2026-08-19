@@ -1,7 +1,8 @@
 # V1 — an audit of every check this project claims to run
 
-**Status: complete. Every row below was established by running something, and
-the probes that established it are committed as tests.**
+**Status: complete, and every finding closed by V2 in the same cycle. Every row
+below was established by running something, and the probes that established it
+are committed as tests.**
 
 ---
 
@@ -62,8 +63,10 @@ reported success in its place. Nothing anywhere would show it. This is the exact
 shape of the defect the cycle is named for, sitting in the dispatcher of the tool
 that runs all the other checks.
 
-**Fix (V2):** an unknown mode is an error and a non-zero exit, and the harness
-gets a name of its own.
+**Fixed.** `MODES` is a declared list, an unrecognised argument exits 2 with the
+list printed, and the harness is `report` — a name of its own, rather than being
+reachable only by falling off the end, which is how it came to be the thing
+typos ran.
 
 ---
 
@@ -92,11 +95,21 @@ The three that fail do so because they need a *specific value* to exist, not
 because anyone decided they should. The distinction is an accident of what each
 happens to look for.
 
-**Fix (V2):** a floor. Each check declares the smallest population it can be
-believed at — there are at least a hundred citations, at least twenty commands,
-at least twenty deltas — and reports `FAIL` below it. The floor is not a
-guess about the future; it is a statement that a number this small means the
-check has stopped reading rather than that the problem was solved.
+**Fixed, with a division worth stating.** The check functions still return the
+population they found — that is the honest thing for them to do — and every one
+of them is now announced through a single `report`, which fails below a floor:
+100 citations, 20 CLI items, 15 deltas, 200 schema lines, 5 CI commands, 4
+contact constants, 3 signing-key sites.
+
+The floors are set well under where the project has been. They are not targets
+and not predictions: a number that far below means the check has stopped reading,
+not that the problem was solved.
+
+The cost of putting the floor at the announcement rather than inside each check
+is that a future check announced *without* `report` would be vacuous again.
+That is pinned by two tests rather than left implicit — the probe still asserts
+these three return `Ok` on an empty population, and `floors::a_population_below_
+the_floor_is_a_failure` asserts what `report` does with it.
 
 ---
 
@@ -122,8 +135,15 @@ All ten go quiet together — `float-free`, `no-wrapping-arithmetic`,
 `no-panic-in-cli`, `codes-have-raisers` — and the output is the same output as a
 clean run.
 
-**Fix (V2):** report the population — *`0 violations across 148 files`* — and
-fail below a floor.
+**Fixed.** `run_with_population` returns the violations *and* the file count, the
+summary line reads `0 violations across 73 files`, and `run_lints` fails below a
+floor of 40. Verified by pointing it at a tree whose `crates/` exists and is
+empty: population 0, and the run refuses.
+
+(The walk reads **73** files: 84 `.rs` files under `crates/`, less the 11 inside
+the two `compile_fail` fixture directories, which are meant not to compile. Not
+the ~148 guessed when this paragraph was first drafted. Counted and reconciled,
+which is the third number this audit had to correct after recalling it.)
 
 ---
 
@@ -140,7 +160,9 @@ the others — the checks are hardcoded calls rather than a directory walk — b
 is the same missing statement, and the harness is the thing the whole
 specification's numbers rest on.
 
-**Fix (V2):** the same floor.
+**Fixed.** `0 passed, 0 failed` no longer meets the exit criterion; below 60
+checks it fails with *"a harness that asserts nothing agrees with everything"*.
+Verified by raising the floor above 96 and watching it fire.
 
 ---
 
@@ -216,6 +238,24 @@ the first numbers were recalled rather than counted: the lints are ten and not
 twelve, and `xtask lint` prints five summary lines for them because several
 lints share one. An audit that miscounts its own subject is not worth much, so
 the counts above come from `LINT_NAMES` and from running the commands.
+
+## The skip, which was the fifth kind
+
+1.5.0's original finding was not a vacuous check but a **skipped** one:
+`worked examples not checked: target/release/ucal is absent`, printed on every CI
+run for four releases.
+
+The skip is right locally — the check genuinely cannot run without a binary — and
+never right in CI. So it is now conditioned on the `CI` environment variable:
+
+```
+  --    worked examples not checked: ... (a skip; fatal in CI)     exit 0
+  FAIL  worked examples not checked: ... in CI a skip is a failure  exit 6
+```
+
+Verified by moving the binary aside and running `check-docs` with and without
+`CI` set. That is V2's third state made real: **ok, FAIL, or a skip that fails
+CI.**
 
 ## What the audit says about the method
 

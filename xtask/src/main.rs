@@ -99,8 +99,44 @@ impl Report {
     }
 }
 
+/// Every mode this tool accepts.
+///
+/// Declared as a list so an unrecognised one can be refused. The dispatch below
+/// used to be a chain of `if mode == ...` that fell through to the constants
+/// harness, which meant **any** unrecognised argument ran the harness, printed
+/// `UC-P0 exit criterion met` and exited 0. A typo in a CI step — `check-doc`,
+/// `verify-vector`, `lints` — was a green run in which the intended check never
+/// executed and a different one reported success in its place. See
+/// [`V1-check-audit.md`] Finding 1.
+///
+/// `report` is the harness, and it now has a name: it was reachable only by
+/// falling off the end, which is how it came to be the thing typos ran.
+///
+/// [`V1-check-audit.md`]: https://github.com/vulogov/ucal/blob/main/Documentation/Proposals/V1-check-audit.md
+const MODES: &[(&str, &str)] = &[
+    ("report", "the UC-P0 constants harness (the default)"),
+    ("lint", "workspace lints"),
+    ("check-docs", "generated docs, citations, and the CLI surface"),
+    ("gen-docs", "write the generated documentation"),
+    ("gen-examples", "write Documentation/CLI-EXAMPLES.md"),
+    ("gen-schema", "write the ucal-json/1 schema"),
+    ("check-links", "resolve every cited URL (opt-in; makes network requests)"),
+    ("verify-vectors", "re-derive the conformance vectors"),
+    ("publish", "the release procedure"),
+];
+
 fn main() {
     let mode = std::env::args().nth(1).unwrap_or_else(|| "report".into());
+
+    if !MODES.iter().any(|(m, _)| *m == mode) {
+        eprintln!("xtask: no such mode `{mode}`.\n");
+        eprintln!("Modes:");
+        for (m, about) in MODES {
+            eprintln!("  {m:<15} {about}");
+        }
+        // §19.5 exit code 2: the caller asked for something that is not a thing.
+        std::process::exit(2);
+    }
 
     if mode == "lint" {
         std::process::exit(run_lints());
@@ -574,6 +610,22 @@ fn main() {
     }
 
     println!("  {passed} passed, {failed} failed");
+
+    // V1 Finding 4. The exit was `if failed > 0`, so a run with zero checks
+    // printed `0 passed, 0 failed` and met its exit criterion. Less reachable
+    // than the other four — these are hardcoded calls, not a directory walk —
+    // and the same missing statement, on the thing every number in the
+    // specification rests on.
+    const LEAST_CHECKS: usize = 60;
+    if passed + failed < LEAST_CHECKS {
+        println!(
+            "\n  FAIL  {} checks ran, and UC-P0 is not met below {LEAST_CHECKS}. \
+             A harness that asserts nothing agrees with everything.",
+            passed + failed
+        );
+        std::process::exit(6);
+    }
+
     if failed > 0 {
         println!("\n  FAILURES:");
         for c in r.failures() {
@@ -824,8 +876,24 @@ fn run_lints() -> i32 {
         .expect("xtask lives under the workspace root")
         .to_path_buf();
     println!("UC lint — workspace {}\n", root.display());
-    let violations = lint::run(&root);
+    let (violations, scanned) = lint::run_with_population(&root);
     let allowed = lint::suppressions(&root);
+
+    // V1 Finding 3. Ten lints reporting nothing across zero files is the same
+    // output as ten lints reporting nothing across every file, and the second is
+    // the only one that means anything. Well under the ~150 the workspace has:
+    // this is not a target, it is the point below which silence is evidence of a
+    // broken walk rather than of clean code.
+    const LEAST_FILES: usize = 40;
+    if scanned < LEAST_FILES {
+        eprintln!(
+            "  FAIL  the lints read {scanned} files, and are not believable below \
+             {LEAST_FILES}. Either the walk is broken or `crates/` is not where \
+             this thinks it is; both make every lint below vacuous."
+        );
+        return 6;
+    }
+
     if violations.is_empty() {
         println!("  ok    Rule E: no float token in a shipped crate");
         println!("  ok    Rules A.2/Y: ucal-core names no foreign unit");
@@ -833,7 +901,7 @@ fn run_lints() -> i32 {
         println!("  ok    Rule Q.1: no overclaiming prose about tick 0");
         println!("  ok    §12: dependency direction");
         print_suppressions(&root, &allowed);
-        println!("\n  0 violations");
+        println!("\n  0 violations across {scanned} files");
         return 0;
     }
     print_suppressions(&root, &allowed);
@@ -852,7 +920,7 @@ fn run_lints() -> i32 {
             println!("          ... and {} more", vs.len() - 20);
         }
     }
-    println!("\n  {} violations", violations.len());
+    println!("\n  {} violations across {scanned} files", violations.len());
     6
 }
 
@@ -937,6 +1005,39 @@ fn workspace_root() -> std::path::PathBuf {
 }
 
 /// `gen-docs` writes the generated tables; `check-docs` fails if they are stale.
+/// The smallest population a check can be believed at.
+///
+/// V1 found that every `check-docs` check ends `if bad.is_empty() { Ok(count) }`
+/// — the count is printed and never examined — so a population of **zero**
+/// passes and reads exactly like a thorough run:
+///
+/// ```text
+///   ok    citations resolve against spec/ (0 distinct)
+/// ```
+///
+/// A floor turns that into a failure. It is not a prediction about the future
+/// and not a target: it says that a number this far below where the project has
+/// been means **the check has stopped reading**, not that the problem was
+/// solved. Each is set well under the current value, so ordinary shrinkage does
+/// not trip it and a collapse does.
+///
+/// [`V1-check-audit.md`] Finding 2 has the evidence.
+///
+/// [`V1-check-audit.md`]: https://github.com/vulogov/ucal/blob/main/Documentation/Proposals/V1-check-audit.md
+/// Report a check that returns a population, holding it to its floor.
+fn report(name: &str, unit: &'static str, least: usize, got: usize) -> i32 {
+    if got < least {
+        eprintln!(
+            "  FAIL  {name}: {got} {unit} examined, and this check is not \
+             believable below {least}. Either it has stopped reading the tree \
+             or the tree has collapsed; both are defects."
+        );
+        return 6;
+    }
+    println!("  ok    {name} ({got} {unit})");
+    0
+}
+
 fn run_docs(mode: &str) -> i32 {
     let root = workspace_root();
     if mode == "gen-docs" {
@@ -964,7 +1065,7 @@ fn run_docs(mode: &str) -> i32 {
         // Citation integrity. A dangling `§` or `Rule` is a lost explanation,
         // and the only thing that keeps a thousand of them honest is a check.
         match citations::check(&root) {
-            Ok(n) => println!("  ok    citations resolve against spec/ ({n} distinct)"),
+            Ok(n) => code |= report("citations resolve against spec/", "distinct", 100, n),
             Err(bad) => {
                 eprintln!("  FAIL  {} citation(s) resolve to nothing:", bad.len());
                 for d in bad.iter().take(20) {
@@ -981,7 +1082,12 @@ fn run_docs(mode: &str) -> i32 {
         // that exists and is undocumented, or a section for a command that no
         // longer exists, are defects a reader hits and nothing else catches.
         match citations::check_contact_constants(&root) {
-            Ok(n) => println!("  ok    contact materials quote vectors.json ({n} constants)"),
+            Ok(n) => code |= report(
+                "contact materials quote vectors.json",
+                "constants",
+                4,
+                n,
+            ),
             Err(bad) => {
                 eprintln!("  FAIL  the contact materials have drifted from the vectors:");
                 for b in &bad {
@@ -1003,8 +1109,21 @@ fn run_docs(mode: &str) -> i32 {
         // file survives.
         match examples::check(&root) {
             Ok(Some(n)) => println!("  ok    the worked examples match a fresh run ({n})"),
+            // A skip is right locally — the check genuinely cannot run without
+            // a binary — and never right in CI, where it was the state that hid
+            // this check for four releases (1.5.0's finding). `CI` is set by
+            // every runner; when it is, a skip is a failure.
+            Ok(None) if std::env::var_os("CI").is_some() => {
+                eprintln!(
+                    "  FAIL  worked examples not checked: target/release/ucal is \
+                     absent, and in CI a skip is a failure. Build it first: \
+                     `cargo build --release -p ucal --features tui`."
+                );
+                code = 6;
+            }
             Ok(None) => println!(
-                "  --    worked examples not checked: target/release/ucal is absent"
+                "  --    worked examples not checked: target/release/ucal is absent \
+                 (a skip; fatal in CI)"
             ),
             Err(e) => {
                 eprintln!("  FAIL  {e}");
@@ -1012,14 +1131,14 @@ fn run_docs(mode: &str) -> i32 {
             }
         }
         match schema::check(&root) {
-            Ok(n) => println!("  ok    the ucal-json/1 schema matches the surface ({n} lines)"),
+            Ok(n) => code |= report("the ucal-json/1 schema matches the surface", "lines", 200, n),
             Err(e) => {
                 eprintln!("  FAIL  {e}");
                 code = 6;
             }
         }
         match citations::check_deltas_are_applied(&root) {
-            Ok(n) => println!("  ok    every standing spec delta is applied ({n})"),
+            Ok(n) => code |= report("every standing spec delta is applied", "deltas", 15, n),
             Err(bad) => {
                 eprintln!("  FAIL  the normative spec has not absorbed its deltas:");
                 for b in &bad {
@@ -1029,7 +1148,7 @@ fn run_docs(mode: &str) -> i32 {
             }
         }
         match citations::check_signing_key(&root) {
-            Ok(n) => println!("  ok    the signing key is published identically ({n} places)"),
+            Ok(n) => code |= report("the signing key is published identically", "places", 3, n),
             Err(bad) => {
                 eprintln!("  FAIL  the published copies of the signing key disagree:");
                 for b in &bad {
@@ -1039,7 +1158,12 @@ fn run_docs(mode: &str) -> i32 {
             }
         }
         match citations::check_ci_covers_the_procedure(&root) {
-            Ok(n) => println!("  ok    CI runs the documented verification block ({n} commands)"),
+            Ok(n) => code |= report(
+                "CI runs the documented verification block",
+                "commands",
+                5,
+                n,
+            ),
             Err(bad) => {
                 eprintln!("  FAIL  CI and the release procedure have drifted:");
                 for b in &bad {
@@ -1049,7 +1173,7 @@ fn run_docs(mode: &str) -> i32 {
             }
         }
         match citations::check_cli_docs(&root) {
-            Ok(n) => println!("  ok    Documentation/CLI.md covers the CLI surface ({n} items)"),
+            Ok(n) => code |= report("Documentation/CLI.md covers the CLI surface", "items", 20, n),
             Err(bad) => {
                 eprintln!("  FAIL  Documentation/CLI.md is out of step:");
                 for b in &bad {
@@ -1059,5 +1183,49 @@ fn run_docs(mode: &str) -> i32 {
             }
         }
         code
+    }
+}
+
+#[cfg(test)]
+mod floors {
+    use super::*;
+
+    /// **Where the floor lives, pinned.**
+    ///
+    /// V1 Finding 2 is that `citations.rs`'s checks return `Ok(0)` on an empty
+    /// population. V2 does *not* change that — the functions still report what
+    /// they found, which is the honest thing for them to do — it adds
+    /// [`report`], through which every one of them is announced, and which
+    /// refuses a count below a floor.
+    ///
+    /// That division is deliberate and it has a cost: a caller that bypasses
+    /// `report` gets the old behaviour back. This test states the division so
+    /// the cost is visible rather than discovered.
+    #[test]
+    fn a_population_below_the_floor_is_a_failure() {
+        assert_eq!(report("probe", "things", 100, 124), 0, "a healthy count passes");
+        assert_eq!(report("probe", "things", 100, 100), 0, "the floor itself passes");
+        assert_eq!(report("probe", "things", 100, 99), 6, "one below fails");
+        assert_eq!(report("probe", "things", 100, 0), 6, "and nothing examined fails");
+    }
+
+    /// Every mode is dispatchable, and nothing else is.
+    ///
+    /// V1 Finding 1: the dispatch fell through to the constants harness, so any
+    /// unrecognised argument ran it and exited 0. The list is now the authority
+    /// and `report` — the harness — has a name of its own rather than being
+    /// reachable only by falling off the end.
+    #[test]
+    fn the_mode_list_is_the_authority() {
+        for (m, about) in MODES {
+            assert!(!m.is_empty() && !about.is_empty(), "every mode is described");
+        }
+        for typo in ["chekc-docs", "lints", "verify-vector", "", "--help"] {
+            assert!(
+                !MODES.iter().any(|(m, _)| *m == typo),
+                "`{typo}` must not be a mode"
+            );
+        }
+        assert!(MODES.iter().any(|(m, _)| *m == "report"), "the harness is named");
     }
 }

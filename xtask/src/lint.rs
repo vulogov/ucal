@@ -529,10 +529,25 @@ pub fn suppressions(workspace_root: &Path) -> Vec<Suppression> {
 
 /// Run every lint over the shipped crates.
 pub fn run(workspace_root: &Path) -> Vec<Violation> {
+    run_with_population(workspace_root).0
+}
+
+/// The violations, and **how many files were read to find them**.
+///
+/// V1 Finding 3: `run` returned early on a missing `crates/` and an empty
+/// violation list is indistinguishable from a clean workspace, so all ten lints
+/// reported `0 violations` and exited 0 having read nothing. The same held for a
+/// `crates/` that exists and is empty — the likelier accident, a path that
+/// resolves to the wrong place.
+///
+/// The count is the fix. A caller that prints `0 violations` without saying
+/// across how many files has said nothing, and one that checks the number
+/// against a floor cannot be fooled by an empty tree.
+pub fn run_with_population(workspace_root: &Path) -> (Vec<Violation>, usize) {
     let mut v = Vec::new();
     let crates_dir = workspace_root.join("crates");
     if !crates_dir.exists() {
-        return v;
+        return (v, 0);
     }
 
     for file in rust_files(&crates_dir) {
@@ -798,8 +813,9 @@ pub fn run(workspace_root: &Path) -> Vec<Violation> {
     v.extend(version_lockstep(workspace_root));
     v.extend(public_types_are_classified(&crates_dir));
     v.extend(codes_have_raisers(&crates_dir));
+    let scanned = rust_files(&crates_dir).len();
 
-    v
+    (v, scanned)
 }
 
 /// How far into a file the *shipped* code extends.
@@ -1551,27 +1567,31 @@ mod vacuity_probe {
     /// `run` returns early when there is no `crates/` directory, and an empty
     /// violation list is indistinguishable from a clean workspace. Pointed at
     /// the wrong root — a moved manifest, a renamed directory, a `cargo run`
-    /// from somewhere unexpected — every lint in this file reports `ok` and has
+    /// from somewhere unexpected — every lint in this file reported `ok` and had
     /// read nothing.
+    ///
+    /// **Closed in V2.** The population is returned alongside the violations and
+    /// `run_lints` fails below a floor. This probe now pins the other half of
+    /// the fix: that an empty tree reports a population of *zero* rather than
+    /// quietly counting something else.
     #[test]
-    fn every_lint_passes_on_a_workspace_that_does_not_exist() {
+    fn an_empty_workspace_reports_a_population_of_zero() {
         let dir = std::env::temp_dir().join("ucal-vacuity-probe-lint");
         let _ = std::fs::create_dir_all(&dir);
-        let v = run(&dir);
-        assert!(
-            v.is_empty(),
-            "`run` now reports something on a workspace that does not exist, so \
-             the hole this documents is closed; update \
-             Documentation/Proposals/V1-check-audit.md and delete this probe"
-        );
+        // V2 closed this. `run` still finds nothing — there is nothing to find
+        // — but `run_with_population` now says *across how many files*, and
+        // `run_lints` refuses to report a clean workspace below its floor.
+        let (v, scanned) = run_with_population(&dir);
+        assert!(v.is_empty());
+        assert_eq!(scanned, 0, "nothing was read, and the count must say so");
 
-        // And the same on a tree that has `crates/` and nothing in it, which is
-        // the likelier accident: a path that resolves but to the wrong place.
-        let with_crates = dir.join("crates");
-        let _ = std::fs::create_dir_all(&with_crates);
-        assert!(
-            run(&dir).is_empty(),
-            "twelve lints, zero files read, zero violations, exit 0"
+        // The likelier accident: a path that resolves, to the wrong place.
+        let _ = std::fs::create_dir_all(dir.join("crates"));
+        let (v, scanned) = run_with_population(&dir);
+        assert!(v.is_empty());
+        assert_eq!(
+            scanned, 0,
+            "an empty crates/ reads no files, and the population must show it"
         );
     }
 }

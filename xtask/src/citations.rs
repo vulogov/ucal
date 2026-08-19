@@ -808,14 +808,23 @@ mod vacuity_probe {
         if let Ok(_) = check_deltas_are_applied(&dir) {
             vacuous.push("deltas-applied");
         }
-        // Pinned exactly. When V2 gives one of these a floor, this test fails
-        // and has to be edited — which is the point: a finding that can be fixed
-        // without anyone noticing is a finding that comes back.
+        // Still exactly these three, and that is now the *intended* state.
+        //
+        // V2 did not change what these functions return — reporting the
+        // population they found is the honest thing for them to do. It added
+        // `report` in main.rs, through which all of them are announced, and
+        // which refuses a count below a floor. So the vacuity is contained at
+        // one place instead of being spread across six.
+        //
+        // The pin stays because the containment is the fragile part: a future
+        // check announced without `report` would be vacuous again, and this
+        // list plus `floors::a_population_below_the_floor_is_a_failure` are what
+        // say where the guarantee actually lives.
         assert_eq!(
             vacuous,
             ["citations", "cli-docs", "deltas-applied"],
-            "the set of checks that pass having examined nothing has changed; \
-             update Documentation/Proposals/V1-check-audit.md to match"
+            "the set of checks that return Ok on an empty population has \
+             changed; update Documentation/Proposals/V1-check-audit.md to match"
         );
     }
 
