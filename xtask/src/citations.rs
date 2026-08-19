@@ -761,3 +761,98 @@ pub fn check_deltas_are_applied(root: &Path) -> Result<usize, Vec<String>> {
         Err(bad)
     }
 }
+
+#[cfg(test)]
+mod vacuity_probe {
+    use super::*;
+
+    /// **V1's central question, asked of every `check-docs` check at once.**
+    ///
+    /// Each of these ends `if bad.is_empty() { Ok(count) } else { Err(..) }`.
+    /// A *population* of zero therefore passes, and the count is printed but
+    /// never examined — `ok    citations resolve against spec/ (0 distinct)`
+    /// reads exactly like a pass.
+    ///
+    /// Pointed at a *missing* tree every one of them fails, which is the right
+    /// answer and not the interesting one. Pointed at a tree where every file
+    /// they read **exists and is empty**, the population is zero and the
+    /// `is_empty()` at the end cannot tell that from clean.
+    ///
+    /// This test records which pass on that skeleton. The list is the evidence
+    /// behind `Documentation/Proposals/V1-check-audit.md`.
+    #[test]
+    fn checks_pointed_at_an_empty_workspace() {
+        let dir = std::env::temp_dir().join("ucal-vacuity-probe-citations");
+        let _ = std::fs::create_dir_all(&dir);
+        skeleton(&dir);
+
+        let mut vacuous: Vec<&str> = Vec::new();
+        // Written out rather than macro'd: the return types differ and the point
+        // is to be readable as evidence.
+        if let Ok(n) = check(&dir) {
+            vacuous.push("citations");
+            assert_eq!(n, 0, "an empty tree cannot contain citations");
+        }
+        if let Ok(_) = check_cli_docs(&dir) {
+            vacuous.push("cli-docs");
+        }
+        if let Ok(_) = check_ci_covers_the_procedure(&dir) {
+            vacuous.push("ci-covers-procedure");
+        }
+        if let Ok(_) = check_contact_constants(&dir) {
+            vacuous.push("contact-constants");
+        }
+        if let Ok(_) = check_signing_key(&dir) {
+            vacuous.push("signing-key");
+        }
+        if let Ok(_) = check_deltas_are_applied(&dir) {
+            vacuous.push("deltas-applied");
+        }
+        // Pinned exactly. When V2 gives one of these a floor, this test fails
+        // and has to be edited — which is the point: a finding that can be fixed
+        // without anyone noticing is a finding that comes back.
+        assert_eq!(
+            vacuous,
+            ["citations", "cli-docs", "deltas-applied"],
+            "the set of checks that pass having examined nothing has changed; \
+             update Documentation/Proposals/V1-check-audit.md to match"
+        );
+    }
+
+    /// Every path these checks read, present and empty.
+    ///
+    /// Deliberately built from the checks' own expectations rather than a
+    /// hardcoded list of guesses: if a check reads a file this skeleton does not
+    /// create, it fails for a missing file and is reported as not-vacuous, which
+    /// understates the finding rather than overstating it.
+    fn skeleton(root: &std::path::Path) {
+        for d in [
+            "spec",
+            "Documentation",
+            "Documentation/Release_Notes",
+            "Documentation/Proposals",
+            "fixtures",
+            ".github/workflows",
+            "crates/ucal/src",
+        ] {
+            let _ = std::fs::create_dir_all(root.join(d));
+        }
+        for f in [
+            "spec/UCAL-1.1.md",
+            "spec/SPEC-DELTAS.md",
+            "spec/RULES.md",
+            "spec/CONFORMANCE.md",
+            "Documentation/CLI.md",
+            "Documentation/CONTACT.md",
+            "Documentation/STABILITY.md",
+            "Documentation/RELEASING.md",
+            "fixtures/vectors.json",
+            "fixtures/ucal.pub",
+            ".github/workflows/verify.yml",
+            "crates/ucal/src/main.rs",
+            "README.md",
+        ] {
+            let _ = std::fs::write(root.join(f), "");
+        }
+    }
+}

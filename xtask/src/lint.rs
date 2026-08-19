@@ -1541,3 +1541,37 @@ fn codes_have_raisers(crates_dir: &Path) -> Vec<Violation> {
         })
         .collect()
 }
+
+#[cfg(test)]
+mod vacuity_probe {
+    use super::*;
+
+    /// **The audit's question, asked of the lints themselves.**
+    ///
+    /// `run` returns early when there is no `crates/` directory, and an empty
+    /// violation list is indistinguishable from a clean workspace. Pointed at
+    /// the wrong root — a moved manifest, a renamed directory, a `cargo run`
+    /// from somewhere unexpected — every lint in this file reports `ok` and has
+    /// read nothing.
+    #[test]
+    fn every_lint_passes_on_a_workspace_that_does_not_exist() {
+        let dir = std::env::temp_dir().join("ucal-vacuity-probe-lint");
+        let _ = std::fs::create_dir_all(&dir);
+        let v = run(&dir);
+        assert!(
+            v.is_empty(),
+            "`run` now reports something on a workspace that does not exist, so \
+             the hole this documents is closed; update \
+             Documentation/Proposals/V1-check-audit.md and delete this probe"
+        );
+
+        // And the same on a tree that has `crates/` and nothing in it, which is
+        // the likelier accident: a path that resolves but to the wrong place.
+        let with_crates = dir.join("crates");
+        let _ = std::fs::create_dir_all(&with_crates);
+        assert!(
+            run(&dir).is_empty(),
+            "twelve lints, zero files read, zero violations, exit 0"
+        );
+    }
+}
