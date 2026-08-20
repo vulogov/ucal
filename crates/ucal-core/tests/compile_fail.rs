@@ -14,6 +14,11 @@ fn rule_q3_and_rule_p_are_enforced_by_the_type_system() {
     t.compile_fail("tests/compile_fail/signed_window_into_delta.rs");
     t.compile_fail("tests/compile_fail/signed_window_arithmetic.rs");
     t.compile_fail("tests/compile_fail/frame_bridge_claim_as_operand.rs");
+
+    // And the other direction: `Profile` must stay implementable from outside
+    // this crate. `cargo semver-checks` does not catch a required method added
+    // to a trait, so this is what does. See the fixture's header.
+    t.pass("tests/compile_pass/profile_is_implementable.rs");
     // Rule U — a window cannot silently collapse to an instant.
     t.compile_fail("tests/compile_fail/window_into_instant.rs");
     // Rule T — a stated value cannot be used as a tick-precise one.

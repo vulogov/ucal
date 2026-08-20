@@ -185,6 +185,64 @@ reports 41 tests in the suite it had been skipping.
 
 ---
 
+## Finding 6 — a check that is not ours, and is a false negative
+
+Added after the audit closed, because V4 walked into it.
+
+`cargo semver-checks` runs in CI against every published version and is the
+mechanism behind `STABILITY.md`'s central promise: *within `1.x`, nothing that
+compiled stops compiling*. **It does not catch a required method added to a
+public trait.**
+
+Verified against 0.50.0 with a real external crate — not reasoned about:
+
+| | |
+|---|---|
+| an outside crate implementing `Profile`, against 1.5.0 | compiles |
+| the same crate, after `fn frame_bridge_claim() -> SignedWindow;` is made required | `error[E0046]: not all trait items implemented` |
+| `cargo semver-checks check-release -p ucal-core` on that change | `Summary no semver update required` |
+
+The relevant lint, `trait_method_added`, is present and reports `PASS`. It is not
+skipped — 196 pass, 58 skip, and this is among the 196. So the failure is not the
+silent-skip shape V2 fixed; it is a check that ran, examined the change, and said
+nothing.
+
+### The investigation nearly reached the wrong answer
+
+Halfway through, `Bridge` looked like a seal: it is `#[non_exhaustive]` with
+public fields and **no constructor**, so an outsider cannot build one, and
+`Profile` requires `fn bridge() -> Bridge`. That reads as *the trait cannot be
+implemented externally at all*, which would have made `semver-checks` right and
+this entry unnecessary.
+
+It is wrong, and the in-crate fixture is what showed it: `UC1Prime` never
+constructs a `Bridge`, it **delegates** to `UC1::bridge()`. So can an outsider.
+The constraint is real but narrower than it looked — a second profile cannot
+invent a bridge, only borrow one — and it does not seal the trait.
+
+Recorded because the near-miss is the lesson: *`Bridge` has no constructor*
+supports the conclusion *the trait is sealed* right up until someone checks how
+the existing implementor gets one.
+
+### The fix, which cannot be a floor
+
+V2's remedy does not apply. This check is not ours, it does not report a
+population, and its output is one line of English.
+
+What is available is the thing the tool is standing in for. A trybuild fixture is
+compiled **as its own crate** depending on `ucal-core`, which is exactly a
+downstream implementor's position, so
+`tests/compile_pass/profile_is_implementable.rs` is a downstream implementor kept
+in the test suite. It passing means an outsider can still implement `Profile`; it
+failing means something was added that they must now write.
+
+Verified strict the same way as everything else: making `frame_bridge_claim`
+required again makes the fixture fail with the outsider's own error message.
+
+**This does not generalise.** One fixture covers one trait. Every other public
+trait in the workspace has the same exposure and no such fixture, and the honest
+statement is that `semver-checks` is trusted for the rest.
+
 ## What is wired, and what is not
 
 | invoked by CI | not invoked by CI |
@@ -211,9 +269,10 @@ be rediscovered:
 
 ## The count
 
-**Twenty-two named checks**, counted from the code rather than from memory: one
-constants harness, **ten** lints (`xtask lint`'s `LINT_NAMES`), nine
-`check-docs` checks, one vector verifier, one link checker.
+**Twenty-three named checks**, counted from the code rather than from memory:
+one constants harness, **ten** lints (`xtask lint`'s `LINT_NAMES`), nine
+`check-docs` checks, one vector verifier, one link checker, and — added after the
+audit closed — `cargo semver-checks`, which is Finding 6.
 
 **Eight are sound under every condition tested.** Fourteen are not:
 
