@@ -1170,3 +1170,89 @@ half needed a lint, and did not have one.
 
 `crates/ucal-core/src/locale.rs::tests::a_colliding_table_is_e0011`, its
 companion asserting the shipped tables still pass, and the lint.
+
+---
+
+## D-A24 — argument validation had no code, and used two that mean other things
+
+**Status: CORRECTION.** A new diagnostic code, `UCAL-E0018`.
+
+### The survey
+
+`UCAL-E0001` is declared *malformed timestamp*. The CLI raised it twelve times,
+and only **two** were malformed timestamps. `UCAL-E0060` is declared *body
+parameter missing required provenance or as-measured value*, and among its
+sixteen raisers were an arithmetic overflow and a flag combination.
+
+| what the caller did | raised | that code means |
+|---|---|---|
+| `--color mauve` | `E0001` | malformed timestamp |
+| `--scale gps`, `--calendar mayan`, `--form runic` | `E0001` | malformed timestamp |
+| `--tick-sep ab`, `--tick-sep 7` | `E0001` | malformed timestamp |
+| `--z -1` | `E0001` | malformed timestamp |
+| a frame smaller than 20×10 | `E0001` | malformed timestamp |
+| `--at` without `--once` | `E0060` | body parameter missing provenance |
+| `unit: parsec` in a body file | `E0060` | body parameter missing provenance |
+| `kind: whenever` in an anchor file | `E0060` | body parameter missing provenance |
+| a Julian year overflowing the domain | `E0060` | body parameter missing provenance |
+
+### The finding, which is not one class
+
+The cycle's scope said: *if `--color bogus` and a frame size out of range want
+different codes, that is a finding and the answer is two codes with two reasons,
+not one code with a vague name.*
+
+They do not want different codes. Four shapes — a **closed vocabulary** missed, a
+**shape constraint** broken, a **range** left, a **combination** that cannot hold
+— have one remedy: *supply a different value*. That is one class, and it is one
+code.
+
+What the survey **did** separate out, and did not fold in:
+
+- **Arithmetic overflow** — *"year overflows"*, *"tolerance overflows"* — is
+  `UCAL-E0021`, *result exceeds DOMAIN*, which already exists and already means
+  exactly that. Moved, not invented.
+- **A derivation with no answer** — a tidally locked body has no solar day; a
+  body whose year is a whole number of its days needs no intercalation. These are
+  **results**, not input defects, and calling them invalid input would be a
+  second inversion of the kind D-A23 fixed. Left on `E0060` and recorded below.
+- **A build without a feature** — *"`ucal now` requires the `civil` and `std`
+  features"* — is a fact about the binary, not about the call. One site.
+- **An unreachable internal arm** — the dispatch match arm for commands handled
+  by an early return. Not caller-facing at all. One site.
+
+The last three are single sites each. A code with one raiser is what D-A20
+warned about when `E0012` had none, so they stay where they are with this entry
+naming them. **If a second site of any of them appears, that is the trigger to
+give it a code**, and this paragraph is the record of the decision not to.
+
+### The correction
+
+`UCAL-E0018`, *value not accepted for this option or field*, exit 2 — the same
+exit `E0001` gave, because the caller's situation has not changed, only the
+sentence describing it.
+
+It covers the command line **and** data files, because the condition is the same
+and so is the remedy. `kind: whenever` in an anchor file and `--scale gps` on the
+command line differ in where the value came from, not in what is wrong with it.
+
+`E0001` keeps its meaning and its two correct raisers: a string that was meant to
+be an instant and is not.
+
+### Why this is the fifth entry of its kind
+
+D-A17, D-A18, D-A19 and D-A22 each moved one borrowed code. This one moves
+seventeen sites across two codes, and it is the first to start from a survey
+rather than from tripping over a single wrong message.
+
+The pattern behind all five is now visible: **a general-purpose code becomes a
+dumping ground**, because it is always cheaper to reach for one that exists than
+to name the condition. `E0016` was declared in 1.2.0 as "the last of its kind"
+for the *not found* class and has held. `E0001` and `E0060` were never declared
+general and became so anyway.
+
+### Enforcement
+
+`crates/ucal/tests/argument_codes.rs` asserts the code for each shape and that
+`E0001` is raised only for an instant that will not parse. `xtask lint`'s
+`codes-have-raisers` holds `E0018` to having one.

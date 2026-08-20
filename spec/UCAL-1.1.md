@@ -1,7 +1,7 @@
 <!--
   NORMATIVE. This is the corrected specification.
 
-  It is RFC UCAL-1 with the twenty-two standing deltas applied in place. The
+  It is RFC UCAL-1 with the twenty-three standing deltas applied in place. The
   original is kept verbatim at RFC-UCAL-1.md; the reasoning behind each change
   is in SPEC-DELTAS.md. Section and rule numbering is unchanged from the
   original and MUST NOT be renumbered: the implementation cites it 494 times.
@@ -9,12 +9,12 @@
 
 > ## UCAL-1.1 — the normative specification
 >
-> RFC UCAL-1 with the **twenty-two standing deltas applied in place**. Every
+> RFC UCAL-1 with the **twenty-three standing deltas applied in place**. Every
 > amended passage is marked inline with the delta that changed it and its class:
 >
 > | class | meaning | count |
 > |---|---|---|
-> | **CORRECTION** | the original is wrong | 8 |
+> | **CORRECTION** | the original is wrong | 9 |
 > | **AMENDMENT** | a normative change adopted by decision | 8 |
 > | **EDITORIAL** | no behavioural effect | 5 |
 > | **UNIMPLEMENTED** | the RFC is right and this implementation does not do it | 1 |
@@ -355,6 +355,8 @@ The present epoch is 31.22 deeps. For scale, `BIG_BANG_CLAIM`'s half-width is 14
 **4.2** The tier grid is the **universal** ladder: body-independent, and the canonical way to state any duration. Calendar units (§9) are a local overlay, never a replacement.
 
 **Rule N (Names are display-only).** The canonical identity of a tier is its exponent. Names come from a locale table (Appendix D). Implementations MUST accept `T[k]` and `5^e` notation wherever a name is accepted. A name collision within an active table is `UCAL-E0011`; a name **not found** in it is `UCAL-E0014`.
+
+> **[D-A24 · CORRECTION]** **Argument validation needs a code of its own.** The original named `UCAL-E0001` for a *malformed timestamp* and nothing for *a value you supplied is not one this program accepts*. Implementations borrowed: twelve `E0001` raisers of which two were timestamps, plus `E0060` — a body parameter's provenance — for a flag combination and an arithmetic overflow. `UCAL-E0018`, exit 2, covering a closed vocabulary missed, a shape constraint broken, a range left, and a combination that cannot hold, from the command line or a data file alike. Arithmetic overflow moves to `UCAL-E0021`, which already meant it.
 
 > **[D-A23 · CORRECTION]** **A collision reported a miss.** D-A17 gave lookup misses `UCAL-E0014` and, in doing so, moved the one branch that was already correct — the *collision* check in a locale table — on to `E0014` as well. A duplicate name was reported as a name not found, and `UCAL-E0011`, which is declared for exactly that condition, was raised nowhere. It held from 1.2.0 to 1.5.0, unreachable from any test because no shipped table collides and the check took a locale id rather than a table. The check now takes a table, and every declared code must have a raiser in shipped code.
 
@@ -1263,6 +1265,7 @@ Canonical identity is `exp`; `id` is a stable key; locale strings are display an
 | UCAL-E0015 | this build does not reproduce the declared constants (§3.3) — D-A18 |
 | UCAL-E0016 | no such entry in a declared catalogue (§17, §19.4, Rule K) — D-A19 |
 | UCAL-E0017 | data file cannot be read or is not well-formed (§15.1) — D-A22 |
+| UCAL-E0018 | value not accepted for this option or field — D-A24 |
 | UCAL-E0020 | result precedes the datum (Rule Z) |
 | UCAL-E0021 | result exceeds DOMAIN (Rules O, W) |
 | UCAL-E0022 | window inversion, lo > hi (Rule U) |

@@ -2012,7 +2012,7 @@ fn parse_redshift(s: &str) -> Result<RatInterval, TimeError> {
     // their input rather than something that is wrong about it.
     if t.starts_with('-') {
         return Err(TimeError::with_context(
-            Code::E0001,
+            Code::E0018,
             "a redshift is not negative: z = 0 is now and larger is earlier. Try `--z 1100` for recombination, or `--z 0.5`",
         ));
     }
@@ -2253,10 +2253,10 @@ pub fn cmd_cosmo_z(instant: &str, tolerance_years: u64, depth: u32, scale: u32) 
     let year = UC1::bridge()
         .ticks
         .try_mul(&<Ticks as TickInt>::from_u64(31_557_600))
-        .ok_or(TimeError::with_context(Code::E0060, "year overflows"))?;
+        .ok_or(TimeError::with_context(Code::E0021, "a Julian year in ticks overflows the domain"))?;
     let tolerance = Delta::from_ticks(
         year.try_mul(&<Ticks as TickInt>::from_u64(tolerance_years.max(1)))
-            .ok_or(TimeError::with_context(Code::E0060, "tolerance overflows"))?,
+            .ok_or(TimeError::with_context(Code::E0021, "the tolerance window overflows the domain"))?,
     );
     let out = model.z_of_t(&window, &tolerance, depth, scale)?;
 

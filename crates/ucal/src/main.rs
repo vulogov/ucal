@@ -347,7 +347,7 @@ fn parse_scale(s: &str) -> Result<Scale, ucal_core::TimeError> {
         "tai" => Ok(Scale::Tai),
         "utc" => Ok(Scale::Utc),
         _ => Err(ucal_core::TimeError::with_context(
-            ucal_core::Code::E0001,
+            ucal_core::Code::E0018,
             "scale must be tt, tai or utc",
         )),
     }
@@ -359,7 +359,7 @@ fn parse_calendar(s: &str) -> Result<CivilCalendar, ucal_core::TimeError> {
         "gregorian" => Ok(CivilCalendar::Gregorian),
         "julian" => Ok(CivilCalendar::Julian),
         _ => Err(ucal_core::TimeError::with_context(
-            ucal_core::Code::E0001,
+            ucal_core::Code::E0018,
             "calendar must be gregorian or julian",
         )),
     }
@@ -371,7 +371,7 @@ fn parse_form(s: &str) -> Result<Form, ucal_core::TimeError> {
         "digit5" => Ok(Form::Digit5),
         "named" => Ok(Form::Named),
         _ => Err(ucal_core::TimeError::with_context(
-            ucal_core::Code::E0001,
+            ucal_core::Code::E0018,
             "form must be human, digit5 or named",
         )),
     }
@@ -703,7 +703,7 @@ fn main() {
                     .map(|frame| print!("{frame}"))
                 } else if at.is_some() {
                     Err(ucal_core::TimeError::with_context(
-                        ucal_core::Code::E0060,
+                        ucal_core::Code::E0018,
                         "--at draws a fixed instant and only makes sense with --once; \
                          a live clock's instant is now",
                     ))
