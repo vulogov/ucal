@@ -1256,3 +1256,92 @@ general and became so anyway.
 `crates/ucal/tests/argument_codes.rs` asserts the code for each shape and that
 `E0001` is raised only for an instant that will not parse. `xtask lint`'s
 `codes-have-raisers` holds `E0018` to having one.
+
+---
+
+## D-A25 — Rule F requires a frame and never asked how far the bridge is from it
+
+**Status: AMENDMENT.** Rule F gains a clause; `UC-1` gains
+`FRAME_BRIDGE_CLAIM`.
+
+### What was underspecified
+
+> **Rule F (Frame).** Every profile MUST declare its frame. Implementations MUST
+> NOT convert between frames and MUST NOT claim observer-independence.
+
+`UC-1` obeys it. §1.1 declares proper time along a comoving worldline in the CMB
+rest frame, and the program prints that on request.
+
+**And §8.1 bridges to SI seconds through TT** — a scale whose rate is that of a
+clock on Earth's geoid. Earth is not comoving with the CMB. So the profile
+declares one frame, converts through another, and Rule F is satisfied by both
+statements taken separately while the pair of them is silently inconsistent.
+
+Nothing in the specification, the library or the output said how far apart they
+are, and the distance is not negligible relative to things the project does
+quote.
+
+### The magnitude
+
+| term | fractional rate |
+|---|---|
+| kinematic: solar-system barycentre vs the CMB rest frame, 369.82 km/s | 7.61 × 10⁻⁷ |
+| Galactic potential, `v_circ²/c²` at 220 km/s — **a floor, not a measurement** | 5.39 × 10⁻⁷ |
+| Sun's potential at 1 AU | 9.87 × 10⁻⁹ |
+| Earth's own surface potential | 6.96 × 10⁻¹⁰ |
+| **sum of the four** | **1.31 × 10⁻⁶** |
+
+**`5 × 10⁻⁶` is declared**, not `1.31 × 10⁻⁶`. The Galactic term is a floor —
+the well is deeper and is not precisely known — so a bound covering a potential
+several times that is honest where a value quoted to three figures would not be.
+
+Over the datum span that is **68 935 years**, or
+`40 351 020 014 477 982 581 316 × 10³³` ticks.
+
+### Why this is recorded and not answered with a second profile
+
+**`BIG_BANG_CLAIM`'s half-width is 290 times larger.** The datum's own stated
+uncertainty is ±0.020 Gyr — twenty million years — against the frame gap's
+sixty-nine thousand. A correction two orders of magnitude below the error bar
+already declared would buy precision the measurement cannot support, and a
+`UC-1-TT` profile would split the catalogue in two to chase it.
+
+The number decided this, which is the point of computing it rather than arguing
+about it.
+
+### Where it does not apply, which is almost everywhere
+
+The offset is a **rate**. It cancels exactly in any difference of two instants
+carried through the same bridge — which is every interval this library computes:
+`between`, `to-civil`, `cal show`, the whole of `ucal-body`. It bears only on
+reading an absolute tick count as elapsed *cosmological* time, which is exactly
+what a datum at the FLRW limit invites a reader to do.
+
+### The amendment
+
+Rule F gains: **a profile MUST declare the rate offset between its declared frame
+and the scale its bridge converts through, or declare that they are the same.**
+
+`Profile::frame_bridge_claim` returns a `SignedWindow` — the same inert type as
+`big_bang_claim`, with no operators and no conversion into `Delta`, `Instant` or
+`Window`, so consuming it is a compile error. It is **defaulted to zero**: a
+profile that does not override is asserting that its bridge scale is its declared
+frame, which is the ordinary case and the honest reading of silence.
+
+The default is also what keeps this non-breaking. `Profile` is public and
+unsealed; adding a required method breaks every outside implementor, and `1.x`
+promises that nothing which compiled stops compiling. This was found the direct
+way — the workspace's own `UC1Prime` test fixture stopped compiling with *not all
+trait items implemented* — after `cargo semver-checks` reported no semver update
+required.
+
+### Enforcement
+
+`crates/ucal-core/tests/frame_bridge.rs` re-derives the bound from the profile's
+own constants rather than comparing it to a copy of the literal, and asserts the
+290× ratio, so that if better cosmology ever narrows `BIG_BANG_CLAIM` by three
+orders of magnitude this decision is taken again rather than inherited.
+`tests/compile_fail/frame_bridge_claim_as_operand.rs` holds the new claim to the
+same inertness `BIG_BANG_CLAIM` has: it returns the same type, and inheritance is
+the kind of guarantee that stops holding when a signature changes for an
+unrelated reason.

@@ -170,6 +170,11 @@ ucal datum
 | `datum` | The statement itself: tick 0 is a *stipulated reference point*, conventionally identified with the FLRW `t→0` limit. Not a measurement and not an observed event. |
 | `frame` | The reference frame the count is in. |
 | `tick_zero` | `0`, by construction. |
+| `frame_bridge_claim` | How far this profile's **bridge scale** can drift from its **declared frame** (D-A25). Rule F requires a profile to declare its frame; `UC-1` declares proper time in the CMB rest frame and bridges through **TT**, a clock on Earth's geoid, which is not comoving with it. |
+| `frame_bridge_claim.bridge_scale` | The scale the bridge actually converts through. |
+| `frame_bridge_claim.half_width_ticks` | The bound as ticks over the datum span: `5 × 10⁻⁶ × 13.787 Gyr`, which is 68 935 years. **290 times smaller than `big_bang_claim`'s half-width**, which is why the gap is recorded rather than answered with a second profile. |
+| `frame_bridge_claim.bound` | The rate difference itself. Dominated by the solar system's 369.82 km/s against the CMB rest frame and by the Galactic potential — the latter a floor rather than a measurement, which is why a bound is declared and not a value. |
+| `frame_bridge_claim.cancels_in` | Where it does not apply. The offset is a **rate**, so it cancels exactly in any difference of two instants carried through the same bridge — every interval this program computes. It bears only on reading an absolute tick count as elapsed cosmological time. |
 | `big_bang_claim.window` | The published identification of the origin, as a **signed** interval of ticks. Signed because the limit may lie before the datum, which is not representable as a tick. |
 | `big_bang_claim.half_width_ticks` | Half the window, exactly. |
 | `big_bang_claim.half_width_drifts` | The same width on the ladder: 141.53 drifts. |

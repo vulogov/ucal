@@ -26,6 +26,20 @@ datum             tick 0 is a stipulated reference point, conventionally
                   identified with the FLRW t→0 limit
 frame             FLRW comoving (cosmological time, CMB rest frame)
 tick_zero         0
+frame_bridge_claim:
+  bridge_scale      TT (§8.1)
+  half_width_ticks  40351020014477982581316000000000000000000000000000000000
+  bound             5 x 10^-6 of elapsed time: the rate difference between this
+                    profile's declared frame and its bridge scale
+  citation          Planck 2018 results I: Overview, and the cosmological
+                    legacy of Planck, A&A 641, A1 (2020) -- solar dipole 369.82
+                    +/- 0.11 km/s
+  cancels_in        any difference of two instants carried through the same
+                    bridge, which is every interval this program computes. It
+                    bears only on reading an absolute tick count as elapsed
+                    cosmological time
+  status            metadata only; no arithmetic operation may consume it, for
+                    the same reason big_bang_claim may not (Rule Q.3)
 big_bang_claim:
   window             [-117069761411410698720000000000000000000000000000000000000
                      00, 1170697614114106987200000000000000000000000000000000000

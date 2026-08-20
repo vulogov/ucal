@@ -1,7 +1,7 @@
 <!--
   NORMATIVE. This is the corrected specification.
 
-  It is RFC UCAL-1 with the twenty-three standing deltas applied in place. The
+  It is RFC UCAL-1 with the twenty-four standing deltas applied in place. The
   original is kept verbatim at RFC-UCAL-1.md; the reasoning behind each change
   is in SPEC-DELTAS.md. Section and rule numbering is unchanged from the
   original and MUST NOT be renumbered: the implementation cites it 494 times.
@@ -9,13 +9,13 @@
 
 > ## UCAL-1.1 — the normative specification
 >
-> RFC UCAL-1 with the **twenty-three standing deltas applied in place**. Every
+> RFC UCAL-1 with the **twenty-four standing deltas applied in place**. Every
 > amended passage is marked inline with the delta that changed it and its class:
 >
 > | class | meaning | count |
 > |---|---|---|
 > | **CORRECTION** | the original is wrong | 9 |
-> | **AMENDMENT** | a normative change adopted by decision | 8 |
+> | **AMENDMENT** | a normative change adopted by decision | 9 |
 > | **EDITORIAL** | no behavioural effect | 5 |
 > | **UNIMPLEMENTED** | the RFC is right and this implementation does not do it | 1 |
 >
@@ -153,7 +153,9 @@ Each failure mode maps to a mechanism that prevents it and to the artifact that 
 
 **1.1 Frame.** Absolute time is proper time along a comoving worldline in an FLRW frame — cosmological time in the CMB rest frame. This is the frame in which "the universe is 13.787 Gyr old" is a meaningful statement.
 
-**Rule F (Frame).** Every profile MUST declare its frame. Implementations MUST NOT convert between frames and MUST NOT claim observer-independence.
+**Rule F (Frame).** Every profile MUST declare its frame, **and MUST declare the rate offset between that frame and the scale its bridge converts through, or declare that they are the same (D-A25)**. Implementations MUST NOT convert between frames and MUST NOT claim observer-independence.
+
+> **[D-A25 · AMENDMENT]** **Declaring a frame is not enough when the bridge runs through a different one.** `UC-1` declares proper time in the CMB rest frame (§1.1) and bridges through TT (§8.1), whose rate is that of a clock on Earth's geoid — and Earth is not comoving with the CMB. Both statements satisfied Rule F separately while the pair was silently inconsistent. `FRAME_BRIDGE_CLAIM` is a bound of `5 × 10⁻⁶` on that rate — 68 935 years over the datum span, dominated by the solar system's 369.82 km/s dipole motion and by the Galactic potential, the second being a floor rather than a measurement. It is metadata only, inert like `BIG_BANG_CLAIM`, and **defaulted to zero**: a profile that does not override asserts that its bridge scale is its declared frame. The offset is a *rate* and cancels exactly in every interval this library computes; it bears only on reading an absolute tick count as elapsed cosmological time. Recorded rather than answered with a second profile because `BIG_BANG_CLAIM`'s half-width is 290 times larger.
 
 **1.2 Domain.** Absolute time is unsigned and increases without bound within the profile domain.
 

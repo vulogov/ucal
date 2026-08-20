@@ -13,6 +13,7 @@ fn rule_q3_and_rule_p_are_enforced_by_the_type_system() {
     t.compile_fail("tests/compile_fail/signed_window_as_operand.rs");
     t.compile_fail("tests/compile_fail/signed_window_into_delta.rs");
     t.compile_fail("tests/compile_fail/signed_window_arithmetic.rs");
+    t.compile_fail("tests/compile_fail/frame_bridge_claim_as_operand.rs");
     // Rule U — a window cannot silently collapse to an instant.
     t.compile_fail("tests/compile_fail/window_into_instant.rs");
     // Rule T — a stated value cannot be used as a tick-precise one.
