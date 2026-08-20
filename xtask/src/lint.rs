@@ -528,10 +528,6 @@ pub fn suppressions(workspace_root: &Path) -> Vec<Suppression> {
 }
 
 /// Run every lint over the shipped crates.
-pub fn run(workspace_root: &Path) -> Vec<Violation> {
-    run_with_population(workspace_root).0
-}
-
 /// The violations, and **how many files were read to find them**.
 ///
 /// V1 Finding 3: `run` returned early on a missing `crates/` and an empty
@@ -540,10 +536,12 @@ pub fn run(workspace_root: &Path) -> Vec<Violation> {
 /// `crates/` that exists and is empty — the likelier accident, a path that
 /// resolves to the wrong place.
 ///
-/// The count is the fix. A caller that prints `0 violations` without saying
-/// across how many files has said nothing, and one that checks the number
-/// against a floor cannot be fooled by an empty tree.
-pub fn run_with_population(workspace_root: &Path) -> (Vec<Violation>, usize) {
+/// The count is the fix, and it is returned rather than offered: `run` used to
+/// hand back the violations alone and a second function supplied the population,
+/// which left the old signature available and dead. A caller that prints
+/// `0 violations` without saying across how many files has said nothing, so the
+/// only way to call this is to be given both.
+pub fn run(workspace_root: &Path) -> (Vec<Violation>, usize) {
     let mut v = Vec::new();
     let crates_dir = workspace_root.join("crates");
     if !crates_dir.exists() {
@@ -1378,7 +1376,7 @@ let c = 2;
         // `rounding-is-declared` needed went unreported until this test.
         let root = crate::workspace_root();
         let emitted: std::collections::BTreeSet<&str> =
-            run(&root).into_iter().map(|v| v.lint).collect();
+            run(&root).0.into_iter().map(|v| v.lint).collect();
         for lint in &emitted {
             assert!(
                 LINT_NAMES.contains(lint),
@@ -1579,15 +1577,15 @@ mod vacuity_probe {
         let dir = std::env::temp_dir().join("ucal-vacuity-probe-lint");
         let _ = std::fs::create_dir_all(&dir);
         // V2 closed this. `run` still finds nothing — there is nothing to find
-        // — but `run_with_population` now says *across how many files*, and
+        // — but `run` now says *across how many files* as well, and
         // `run_lints` refuses to report a clean workspace below its floor.
-        let (v, scanned) = run_with_population(&dir);
+        let (v, scanned) = run(&dir);
         assert!(v.is_empty());
         assert_eq!(scanned, 0, "nothing was read, and the count must say so");
 
         // The likelier accident: a path that resolves, to the wrong place.
         let _ = std::fs::create_dir_all(dir.join("crates"));
-        let (v, scanned) = run_with_population(&dir);
+        let (v, scanned) = run(&dir);
         assert!(v.is_empty());
         assert_eq!(
             scanned, 0,

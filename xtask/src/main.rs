@@ -876,7 +876,7 @@ fn run_lints() -> i32 {
         .expect("xtask lives under the workspace root")
         .to_path_buf();
     println!("UC lint — workspace {}\n", root.display());
-    let (violations, scanned) = lint::run_with_population(&root);
+    let (violations, scanned) = lint::run(&root);
     let allowed = lint::suppressions(&root);
 
     // V1 Finding 3. Ten lints reporting nothing across zero files is the same
