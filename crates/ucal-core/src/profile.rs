@@ -197,6 +197,55 @@ pub trait Profile: 'static + Copy + Clone + PartialEq + Eq + core::fmt::Debug {
     /// Citation for the `big_bang_claim` window.
     fn big_bang_claim_citation() -> Citation;
 
+    /// How far the profile's **bridge scale** can drift from its **declared
+    /// frame**, as a tick window over the datum span (Rule F, D-A25).
+    ///
+    /// Rule F requires a profile to declare its frame, and `UC-1` declares one:
+    /// proper time along a comoving worldline in the CMB rest frame. Its bridge
+    /// (§8.1) runs through **TT**, whose rate is that of a clock on Earth's
+    /// geoid — and Earth is not comoving with the CMB. The two frames tick at
+    /// different rates, so a tick count obtained through the bridge and read as
+    /// cosmological time is off by that rate times the span.
+    ///
+    /// Rule F said *declare your frame* and nothing about declaring the distance
+    /// to the scale you actually convert through. This is that distance.
+    ///
+    /// **Metadata only**, and a [`SignedWindow`] for the same reason
+    /// [`Profile::big_bang_claim`] is one: it is an inert type with no
+    /// operators and no conversion into [`Delta`], [`Instant`] or `Window`, so
+    /// consuming it is a compile error rather than a runtime diagnostic.
+    ///
+    /// **Where it does not apply.** The offset is a *rate*, so it cancels
+    /// exactly in any difference of two instants carried through the same
+    /// bridge — which is every interval this library computes. It bears only on
+    /// reading an absolute tick count as elapsed cosmological time.
+    ///
+    /// **Defaulted to zero, which is a statement and not a shrug.** A profile
+    /// that does not override this is asserting that its bridge scale *is* its
+    /// declared frame, so there is no rate to declare. That is the ordinary case
+    /// — a profile bridging to TT and declaring TT has nothing to say here — and
+    /// it is the reason this is a default rather than a required method: adding
+    /// a required method to a public unsealed trait breaks every outside
+    /// implementor, and this crate promises within `1.x` that nothing which
+    /// compiled stops compiling.
+    ///
+    /// `UC-1` overrides it, because it declares one frame and bridges through
+    /// another.
+    fn frame_bridge_claim() -> SignedWindow {
+        SignedWindow::symmetric(Delta::zero())
+    }
+
+    /// Citation for the terms behind `frame_bridge_claim`.
+    ///
+    /// Defaulted alongside it: a profile whose bridge is its frame has no terms
+    /// to cite, and says so rather than citing nothing.
+    fn frame_bridge_claim_citation() -> Citation {
+        Citation {
+            source: "not applicable: this profile's bridge scale is its declared frame",
+            locator: None,
+        }
+    }
+
     /// The datum provenance record (Rule Q.4). Absence is `UCAL-E0013`, which is
     /// why this returns a `Result` rather than an `Option`.
     fn datum_provenance() -> Result<&'static Provenance>;
@@ -273,6 +322,35 @@ pub mod uc1 {
         /// [`crate::value::SignedWindow`] (Rule Q.3, §3.3).
         pub(in crate::profile) const BIG_BANG_CLAIM_HALFWIDTH_DEC: &str =
             "11706976141141069872000000000000000000000000000000000000000";
+
+        /// Half-width of `FRAME_BRIDGE_CLAIM`, in ticks: a bound of `5 x 10^-6`
+        /// over the datum span, which is `5e-6 x 13.787 Gyr = 68 935 years`.
+        ///
+        /// The terms, each cited in `frame_bridge_claim_citation`:
+        ///
+        /// ```text
+        ///   kinematic, solar-system barycentre vs the CMB rest frame   7.61e-7
+        ///     (369.82 km/s, Planck 2018 dipole; gamma-1 to leading order)
+        ///   Galactic potential, v_circ^2/c^2                           5.39e-7
+        ///     (220 km/s; a FLOOR -- the well is deeper and is the term
+        ///      that is not precisely known, which is why this is a bound
+        ///      and not a value)
+        ///   Sun's potential at 1 AU                                    9.87e-9
+        ///   Earth's own surface potential                              6.96e-10
+        ///   ------------------------------------------------------------------
+        ///   sum of the four                                            1.31e-6
+        /// ```
+        ///
+        /// `5 x 10^-6` is declared rather than `1.31 x 10^-6` because the
+        /// Galactic term is a floor: a bound that covers a well several times
+        /// deeper is honest, and a value quoted to three figures would not be.
+        ///
+        /// **It is 290 times smaller than `BIG_BANG_CLAIM`'s half-width**, which
+        /// is the number that decides what to do about it: the frame gap is
+        /// comfortably inside an uncertainty this profile already declares, so
+        /// it needs recording and not a second profile.
+        pub(in crate::profile) const FRAME_BRIDGE_CLAIM_HALFWIDTH_DEC: &str =
+            "40351020014477982581316000000000000000000000000000000000";
     }
 
     use super::{Citation, MeasuredValue, Provenance, RoundingRecord};
@@ -281,6 +359,18 @@ pub mod uc1 {
     pub const PLANCK_2018: Citation = Citation {
         source: "Planck 2018 results VI: Cosmological parameters, A&A 641, A6 (2020)",
         locator: Some("doi:10.1051/0004-6361/201833910"),
+    };
+
+    /// The solar system's motion against the CMB rest frame, which is the
+    /// dominant *known* term in `FRAME_BRIDGE_CLAIM`.
+    ///
+    /// The Galactic potential term is larger than this one is certain, and no
+    /// single citation pins it — which is why the claim is declared as a bound
+    /// rather than a value, and why this cites the term that can be cited.
+    pub const CMB_DIPOLE: Citation = Citation {
+        source: "Planck 2018 results I: Overview, and the cosmological legacy of \
+                 Planck, A&A 641, A1 (2020) -- solar dipole 369.82 +/- 0.11 km/s",
+        locator: Some("doi:10.1051/0004-6361/201833880"),
     };
 
     /// The `UC-1` datum provenance record (§2.2, Rule Q.4).
@@ -363,6 +453,16 @@ impl Profile for UC1 {
         uc1::PLANCK_2018
     }
 
+    fn frame_bridge_claim() -> SignedWindow {
+        SignedWindow::symmetric(Delta::from_ticks(crate::backend::konst(
+            uc1::consts::FRAME_BRIDGE_CLAIM_HALFWIDTH_DEC,
+        )))
+    }
+
+    fn frame_bridge_claim_citation() -> Citation {
+        uc1::CMB_DIPOLE
+    }
+
     fn datum_provenance() -> Result<&'static Provenance> {
         Ok(&uc1::PROVENANCE)
     }
@@ -398,6 +498,12 @@ impl Profile for ProfileWithoutProvenance {
     }
     fn big_bang_claim_citation() -> Citation {
         UC1::big_bang_claim_citation()
+    }
+    fn frame_bridge_claim() -> SignedWindow {
+        UC1::frame_bridge_claim()
+    }
+    fn frame_bridge_claim_citation() -> Citation {
+        UC1::frame_bridge_claim_citation()
     }
     fn datum_provenance() -> Result<&'static Provenance> {
         Err(crate::error::TimeError::new(crate::error::Code::E0013))

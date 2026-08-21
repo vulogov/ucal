@@ -243,7 +243,7 @@ impl ColorChoice {
             "always" => Ok(ColorChoice::Always),
             "never" => Ok(ColorChoice::Never),
             _ => Err(ucal_core::TimeError::with_context(
-                ucal_core::Code::E0001,
+                ucal_core::Code::E0018,
                 "color must be auto, always or never",
             )),
         }
@@ -430,13 +430,13 @@ pub fn parse_group_sep(s: &str) -> Result<char, ucal_core::TimeError> {
     let mut it = s.chars();
     let (Some(c), None) = (it.next(), it.next()) else {
         return Err(ucal_core::TimeError::with_context(
-            ucal_core::Code::E0001,
+            ucal_core::Code::E0018,
             "the group separator must be exactly one character, e.g. `--tick-sep _`",
         ));
     };
     if c.is_ascii_digit() {
         return Err(ucal_core::TimeError::with_context(
-            ucal_core::Code::E0001,
+            ucal_core::Code::E0018,
             "the group separator must not be a digit (§6.3); try `--sep _` or `--sep :`",
         ));
     }

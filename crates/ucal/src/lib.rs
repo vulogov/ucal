@@ -194,6 +194,48 @@ pub fn cmd_datum() -> CmdResult {
         .field("frame", Value::text(UC1::FRAME.describe()))
         .field("tick_zero", Value::number("0"));
 
+    // 1b. FRAME_BRIDGE_CLAIM (D-A25). Rule F required a profile to declare its
+    // frame and said nothing about the distance to the scale it converts
+    // through, which for UC-1 is TT — a clock on Earth's geoid, and Earth is not
+    // comoving with the CMB. Printed next to the frame because that is where a
+    // reader forms the belief this bounds.
+    let fb = UC1::frame_bridge_claim();
+    let fb_citation = UC1::frame_bridge_claim_citation();
+    let fb_half = fb.hi().magnitude().ticks();
+    doc = doc.field(
+        "frame_bridge_claim",
+        Value::Section(vec![
+            ("bridge_scale".into(), Value::text("TT (§8.1)")),
+            (
+                "half_width_ticks".into(),
+                Value::number(fb_half.to_dec_string()),
+            ),
+            (
+                "bound".into(),
+                Value::text(
+                    "5 x 10^-6 of elapsed time: the rate difference between this \
+                     profile's declared frame and its bridge scale",
+                ),
+            ),
+            ("citation".into(), Value::text(fb_citation.source)),
+            (
+                "cancels_in".into(),
+                Value::text(
+                    "any difference of two instants carried through the same bridge, \
+                     which is every interval this program computes. It bears only on \
+                     reading an absolute tick count as elapsed cosmological time",
+                ),
+            ),
+            (
+                "status".into(),
+                Value::text(
+                    "metadata only; no arithmetic operation may consume it, for the \
+                     same reason big_bang_claim may not (Rule Q.3)",
+                ),
+            ),
+        ]),
+    );
+
     // 2. BIG_BANG_CLAIM, with citation
     let half = claim.hi().magnitude().ticks();
     doc = doc.field(
@@ -2012,7 +2054,7 @@ fn parse_redshift(s: &str) -> Result<RatInterval, TimeError> {
     // their input rather than something that is wrong about it.
     if t.starts_with('-') {
         return Err(TimeError::with_context(
-            Code::E0001,
+            Code::E0018,
             "a redshift is not negative: z = 0 is now and larger is earlier. Try `--z 1100` for recombination, or `--z 0.5`",
         ));
     }
@@ -2253,10 +2295,10 @@ pub fn cmd_cosmo_z(instant: &str, tolerance_years: u64, depth: u32, scale: u32) 
     let year = UC1::bridge()
         .ticks
         .try_mul(&<Ticks as TickInt>::from_u64(31_557_600))
-        .ok_or(TimeError::with_context(Code::E0060, "year overflows"))?;
+        .ok_or(TimeError::with_context(Code::E0021, "a Julian year in ticks overflows the domain"))?;
     let tolerance = Delta::from_ticks(
         year.try_mul(&<Ticks as TickInt>::from_u64(tolerance_years.max(1)))
-            .ok_or(TimeError::with_context(Code::E0060, "tolerance overflows"))?,
+            .ok_or(TimeError::with_context(Code::E0021, "the tolerance window overflows the domain"))?,
     );
     let out = model.z_of_t(&window, &tolerance, depth, scale)?;
 

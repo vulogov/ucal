@@ -528,11 +528,24 @@ pub fn suppressions(workspace_root: &Path) -> Vec<Suppression> {
 }
 
 /// Run every lint over the shipped crates.
-pub fn run(workspace_root: &Path) -> Vec<Violation> {
+/// The violations, and **how many files were read to find them**.
+///
+/// V1 Finding 3: `run` returned early on a missing `crates/` and an empty
+/// violation list is indistinguishable from a clean workspace, so all ten lints
+/// reported `0 violations` and exited 0 having read nothing. The same held for a
+/// `crates/` that exists and is empty — the likelier accident, a path that
+/// resolves to the wrong place.
+///
+/// The count is the fix, and it is returned rather than offered: `run` used to
+/// hand back the violations alone and a second function supplied the population,
+/// which left the old signature available and dead. A caller that prints
+/// `0 violations` without saying across how many files has said nothing, so the
+/// only way to call this is to be given both.
+pub fn run(workspace_root: &Path) -> (Vec<Violation>, usize) {
     let mut v = Vec::new();
     let crates_dir = workspace_root.join("crates");
     if !crates_dir.exists() {
-        return v;
+        return (v, 0);
     }
 
     for file in rust_files(&crates_dir) {
@@ -798,8 +811,9 @@ pub fn run(workspace_root: &Path) -> Vec<Violation> {
     v.extend(version_lockstep(workspace_root));
     v.extend(public_types_are_classified(&crates_dir));
     v.extend(codes_have_raisers(&crates_dir));
+    let scanned = rust_files(&crates_dir).len();
 
-    v
+    (v, scanned)
 }
 
 /// How far into a file the *shipped* code extends.
@@ -1362,7 +1376,7 @@ let c = 2;
         // `rounding-is-declared` needed went unreported until this test.
         let root = crate::workspace_root();
         let emitted: std::collections::BTreeSet<&str> =
-            run(&root).into_iter().map(|v| v.lint).collect();
+            run(&root).0.into_iter().map(|v| v.lint).collect();
         for lint in &emitted {
             assert!(
                 LINT_NAMES.contains(lint),
@@ -1540,4 +1554,42 @@ fn codes_have_raisers(crates_dir: &Path) -> Vec<Violation> {
             rule: "D-A20, D-A23",
         })
         .collect()
+}
+
+#[cfg(test)]
+mod vacuity_probe {
+    use super::*;
+
+    /// **The audit's question, asked of the lints themselves.**
+    ///
+    /// `run` returns early when there is no `crates/` directory, and an empty
+    /// violation list is indistinguishable from a clean workspace. Pointed at
+    /// the wrong root — a moved manifest, a renamed directory, a `cargo run`
+    /// from somewhere unexpected — every lint in this file reported `ok` and had
+    /// read nothing.
+    ///
+    /// **Closed in V2.** The population is returned alongside the violations and
+    /// `run_lints` fails below a floor. This probe now pins the other half of
+    /// the fix: that an empty tree reports a population of *zero* rather than
+    /// quietly counting something else.
+    #[test]
+    fn an_empty_workspace_reports_a_population_of_zero() {
+        let dir = std::env::temp_dir().join("ucal-vacuity-probe-lint");
+        let _ = std::fs::create_dir_all(&dir);
+        // V2 closed this. `run` still finds nothing — there is nothing to find
+        // — but `run` now says *across how many files* as well, and
+        // `run_lints` refuses to report a clean workspace below its floor.
+        let (v, scanned) = run(&dir);
+        assert!(v.is_empty());
+        assert_eq!(scanned, 0, "nothing was read, and the count must say so");
+
+        // The likelier accident: a path that resolves, to the wrong place.
+        let _ = std::fs::create_dir_all(dir.join("crates"));
+        let (v, scanned) = run(&dir);
+        assert!(v.is_empty());
+        assert_eq!(
+            scanned, 0,
+            "an empty crates/ reads no files, and the population must show it"
+        );
+    }
 }

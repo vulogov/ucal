@@ -168,7 +168,7 @@ impl PhaseFile {
                 })
             }
             _ => Err(TimeError::with_context(
-                Code::E0060,
+                Code::E0018,
                 "a phase kind must be one of `mean_solar_midnight`, `northward_equinox`, \
                  `southward_equinox`, `perihelion` or `custom`",
             )),

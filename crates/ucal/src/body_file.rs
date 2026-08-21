@@ -114,7 +114,7 @@ impl Relation {
         match s {
             "synodic" => Ok(Relation::Synodic),
             _ => Err(TimeError::with_context(
-                Code::E0060,
+                Code::E0018,
                 "the only derivation a body file may name is `synodic`: \
                  1 / (1/rotation_period - 1/orbital_period)",
             )),
@@ -250,7 +250,7 @@ fn unit_of(u: &str) -> Result<MeasuredUnit> {
         "d" => Ok(MeasuredUnit::SiDay),
         "yr" => Ok(MeasuredUnit::JulianYear),
         _ => Err(TimeError::with_context(
-            Code::E0060,
+            Code::E0018,
             "unit must be `s` (SI second), `d` (86 400 s) or `yr` (Julian year)",
         )),
     }

@@ -761,3 +761,107 @@ pub fn check_deltas_are_applied(root: &Path) -> Result<usize, Vec<String>> {
         Err(bad)
     }
 }
+
+#[cfg(test)]
+mod vacuity_probe {
+    use super::*;
+
+    /// **V1's central question, asked of every `check-docs` check at once.**
+    ///
+    /// Each of these ends `if bad.is_empty() { Ok(count) } else { Err(..) }`.
+    /// A *population* of zero therefore passes, and the count is printed but
+    /// never examined — `ok    citations resolve against spec/ (0 distinct)`
+    /// reads exactly like a pass.
+    ///
+    /// Pointed at a *missing* tree every one of them fails, which is the right
+    /// answer and not the interesting one. Pointed at a tree where every file
+    /// they read **exists and is empty**, the population is zero and the
+    /// `is_empty()` at the end cannot tell that from clean.
+    ///
+    /// This test records which pass on that skeleton. The list is the evidence
+    /// behind `Documentation/Proposals/V1-check-audit.md`.
+    #[test]
+    fn checks_pointed_at_an_empty_workspace() {
+        let dir = std::env::temp_dir().join("ucal-vacuity-probe-citations");
+        let _ = std::fs::create_dir_all(&dir);
+        skeleton(&dir);
+
+        let mut vacuous: Vec<&str> = Vec::new();
+        // Written out rather than macro'd: the return types differ and the point
+        // is to be readable as evidence.
+        if let Ok(n) = check(&dir) {
+            vacuous.push("citations");
+            assert_eq!(n, 0, "an empty tree cannot contain citations");
+        }
+        if let Ok(_) = check_cli_docs(&dir) {
+            vacuous.push("cli-docs");
+        }
+        if let Ok(_) = check_ci_covers_the_procedure(&dir) {
+            vacuous.push("ci-covers-procedure");
+        }
+        if let Ok(_) = check_contact_constants(&dir) {
+            vacuous.push("contact-constants");
+        }
+        if let Ok(_) = check_signing_key(&dir) {
+            vacuous.push("signing-key");
+        }
+        if let Ok(_) = check_deltas_are_applied(&dir) {
+            vacuous.push("deltas-applied");
+        }
+        // Still exactly these three, and that is now the *intended* state.
+        //
+        // V2 did not change what these functions return — reporting the
+        // population they found is the honest thing for them to do. It added
+        // `report` in main.rs, through which all of them are announced, and
+        // which refuses a count below a floor. So the vacuity is contained at
+        // one place instead of being spread across six.
+        //
+        // The pin stays because the containment is the fragile part: a future
+        // check announced without `report` would be vacuous again, and this
+        // list plus `floors::a_population_below_the_floor_is_a_failure` are what
+        // say where the guarantee actually lives.
+        assert_eq!(
+            vacuous,
+            ["citations", "cli-docs", "deltas-applied"],
+            "the set of checks that return Ok on an empty population has \
+             changed; update Documentation/Proposals/V1-check-audit.md to match"
+        );
+    }
+
+    /// Every path these checks read, present and empty.
+    ///
+    /// Deliberately built from the checks' own expectations rather than a
+    /// hardcoded list of guesses: if a check reads a file this skeleton does not
+    /// create, it fails for a missing file and is reported as not-vacuous, which
+    /// understates the finding rather than overstating it.
+    fn skeleton(root: &std::path::Path) {
+        for d in [
+            "spec",
+            "Documentation",
+            "Documentation/Release_Notes",
+            "Documentation/Proposals",
+            "fixtures",
+            ".github/workflows",
+            "crates/ucal/src",
+        ] {
+            let _ = std::fs::create_dir_all(root.join(d));
+        }
+        for f in [
+            "spec/UCAL-1.1.md",
+            "spec/SPEC-DELTAS.md",
+            "spec/RULES.md",
+            "spec/CONFORMANCE.md",
+            "Documentation/CLI.md",
+            "Documentation/CONTACT.md",
+            "Documentation/STABILITY.md",
+            "Documentation/RELEASING.md",
+            "fixtures/vectors.json",
+            "fixtures/ucal.pub",
+            ".github/workflows/verify.yml",
+            "crates/ucal/src/main.rs",
+            "README.md",
+        ] {
+            let _ = std::fs::write(root.join(f), "");
+        }
+    }
+}

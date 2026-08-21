@@ -167,6 +167,37 @@ pub enum Code {
     /// Appended for the same reason as [`Code::E0014`]: the variants carry
     /// implicit discriminants and the enum derives `PartialOrd`.
     E0017,
+
+    /// A supplied value is not one this program accepts.
+    ///
+    /// One class with one remedy — **give a different value** — covering four
+    /// shapes that had been spread across two borrowed codes:
+    ///
+    /// - a **closed vocabulary** missed: `--color mauve`, `--scale gps`,
+    ///   `--form runic`, a body file's `unit: parsec`, an anchor file's
+    ///   `kind: whenever`;
+    /// - a **shape constraint** broken: `--tick-sep` given two characters, or a
+    ///   digit, which §6.3 forbids;
+    /// - a **range** left: a negative redshift, a frame smaller than a layout
+    ///   can speak in;
+    /// - a **combination** that cannot hold: `--at` without `--once`.
+    ///
+    /// Distinct from [`Code::E0001`], which is a *malformed timestamp* — a
+    /// string that was meant to be an instant and is not. `--color mauve` is
+    /// not a malformed timestamp, and said so in twelve places.
+    ///
+    /// Distinct from [`Code::E0060`], which is a **body parameter** missing its
+    /// Rule C provenance. `--at draws a fixed instant and only makes sense with
+    /// --once` was reported as *body parameter missing required provenance*,
+    /// which is the furthest any borrowing in this project had drifted.
+    ///
+    /// Distinct from [`Code::E0012`] and [`Code::E0017`], which are about a
+    /// **file**: an unknown key, or one that will not load. This is about a
+    /// value that parsed and cannot be used.
+    ///
+    /// See D-A24 for the survey. Appended for the same reason as
+    /// [`Code::E0014`].
+    E0018,
 }
 
 impl Code {
@@ -188,6 +219,7 @@ impl Code {
             Code::E0015 => "UCAL-E0015",
             Code::E0016 => "UCAL-E0016",
             Code::E0017 => "UCAL-E0017",
+            Code::E0018 => "UCAL-E0018",
             Code::E0020 => "UCAL-E0020",
             Code::E0021 => "UCAL-E0021",
             Code::E0022 => "UCAL-E0022",
@@ -232,6 +264,7 @@ impl Code {
             Code::E0015 => "this build does not reproduce the declared constants",
             Code::E0016 => "no such entry in a declared catalogue",
             Code::E0017 => "data file cannot be read or is not well-formed",
+            Code::E0018 => "value not accepted for this option or field",
             Code::E0020 => "result precedes the datum",
             Code::E0021 => "result exceeds DOMAIN",
             Code::E0022 => "window inversion, lo > hi",
@@ -279,6 +312,9 @@ impl Code {
             Code::E0070 | Code::E0071 => 8,
             Code::E0010 | Code::E0011 | Code::E0012 | Code::E0013 | Code::E0014
             | Code::E0016 | Code::E0017 => 6,
+            // Exit 2: the caller gave something that is not a thing. Same as
+            // E0001's family, which is where these conditions used to live.
+            Code::E0018 => 2,
             Code::E0025 | Code::E0015 => 9,
         }
     }

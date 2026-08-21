@@ -40,14 +40,13 @@ pub fn once(
     color: bool,
 ) -> Result<String, TimeError> {
     if !(20..=400).contains(&width) || !(10..=200).contains(&height) {
-        // `E0001` because that is what every other argument rejection in this
-        // binary uses — `--color`, `--tick-sep` — and consistency inside one
-        // program beats a better-named code used once. It is a borrowed code
-        // all the same: `E0001` is declared as *malformed timestamp*, and a
-        // frame size is not a timestamp. Recorded rather than spot-fixed; see
-        // the 1.5.0 release notes.
+        // D-A24: a range left, which is one of the four shapes `E0018` names.
+        // This raised `E0001` — *malformed timestamp* — for one release, because
+        // that was what every other argument rejection in the binary used and
+        // consistency beat a better name. The survey that fixed all of them is
+        // in `Documentation/Proposals/V3-argument-codes.md`.
         return Err(TimeError::with_context(
-            Code::E0001,
+            Code::E0018,
             "a frame is between 20x10 and 400x200; outside that the layout has \
              nothing to say and the output would not be a clock",
         ));

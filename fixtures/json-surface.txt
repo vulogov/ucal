@@ -186,6 +186,13 @@ datum.datum_provenance.input	string
 datum.datum_provenance.unit_defs	array
 datum.earth_dependency	string
 datum.frame	string
+datum.frame_bridge_claim	object
+datum.frame_bridge_claim.bound	string
+datum.frame_bridge_claim.bridge_scale	string
+datum.frame_bridge_claim.cancels_in	string
+datum.frame_bridge_claim.citation	string
+datum.frame_bridge_claim.half_width_ticks	string
+datum.frame_bridge_claim.status	string
 datum.implied_age	object
 datum.implied_age.note	string
 datum.implied_age.seconds	string (--bridge)
