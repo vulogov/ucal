@@ -1044,6 +1044,48 @@ fn version_lockstep(workspace_root: &Path) -> Vec<Violation> {
             });
         }
     }
+
+    // And the member manifests, added in 1.7.0.
+    //
+    // Until X1 aimed a mutation at one, this lint read the root manifest and
+    // nothing else. A member crate that stopped inheriting — `version = "1.6.0"`
+    // in place of `version.workspace = true` — would publish at a version the
+    // workspace had moved past, and nothing would have said so. The mutation
+    // survived, which is how the narrower-than-its-name scope was found.
+    let crates_dir = workspace_root.join("crates");
+    for member in ["ucal-core", "ucal-civil", "ucal-body", "ucal-events", "ucal-cosmo", "ucal"] {
+        let path = crates_dir.join(member).join("Cargo.toml");
+        let Ok(src) = std::fs::read_to_string(&path) else {
+            v.push(Violation {
+                lint: "version-lockstep",
+                file: path,
+                line: 1,
+                text: format!("{member} has no manifest to check"),
+                rule: "every published member is checked, so a missing one is a defect",
+            });
+            continue;
+        };
+        // The `[package]` section only: a `[dependencies]` entry naming a
+        // version is a different statement and is checked above.
+        let package = src.split("\n[").next().unwrap_or(&src);
+        let inherits = package
+            .lines()
+            .any(|l| l.trim().replace(' ', "") == "version.workspace=true");
+        if !inherits {
+            let line = package
+                .lines()
+                .position(|l| l.trim_start().starts_with("version"))
+                .map_or(1, |i| i + 1);
+            v.push(Violation {
+                lint: "version-lockstep",
+                file: path,
+                line,
+                text: format!("{member} does not inherit `version.workspace = true`"),
+                rule: "a member that pins its own version can publish at one the \
+                       workspace has moved past",
+            });
+        }
+    }
     v
 }
 

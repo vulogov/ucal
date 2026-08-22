@@ -87,6 +87,12 @@ pub enum Verdict {
 /// One entry per check, deliberately: a second mutation of the same check is a
 /// better test of that check and a worse map of which checks are tested at all,
 /// and the map is what 1.6.0 showed was missing.
+///
+/// The exception is a check with two distinct **paths**, which is a different
+/// thing from two mutations of one path. `version-lockstep` reads the root
+/// manifest's dependency table and each member's `[package]` section, and a
+/// corpus covering one of those would report a check as tested while half of it
+/// was not — the shape of claim this whole exercise exists to refuse.
 pub const MUTATIONS: &[Mutation] = &[
     // ---- check-docs ------------------------------------------------------
     Mutation {
@@ -102,13 +108,13 @@ pub const MUTATIONS: &[Mutation] = &[
         replace: "/// See \u{a7}99.9.\n/// Digits per tier.",
     },
     Mutation {
-        // **A recorded survivor.** `cited()` walks `crates/**/*.rs` and
-        // `xtask/src/**/*.rs` and reads no Markdown at all, so a dangling `\u{a7}`
-        // reference in the documentation is invisible to a check announced as
-        // "citations resolve against spec/". Kept in the corpus so the gap has a
-        // name and a failing entry rather than a paragraph.
+        // X1 recorded this as the corpus's one survivor: `cited()` walked
+        // `crates/**/*.rs` and `xtask/src/**/*.rs` and read no Markdown at all,
+        // so a dangling reference in the documentation was invisible to a check
+        // announced as "citations resolve against spec/". X2 widened the scan
+        // and this entry is what holds it widened.
         check: "citations",
-        what: "SURVIVOR: a dangling citation in the documentation, which is not scanned",
+        what: "a dangling citation in the documentation, which is scanned since 1.7.0",
         file: "Documentation/CLI.md",
         find: "## `ucal doctor`",
         replace: "## `ucal doctor`\n\nSee \u{a7}99.9 for the details.",
@@ -247,6 +253,21 @@ pub const MUTATIONS: &[Mutation] = &[
         file: "Cargo.toml",
         find: "ucal-core = { version = \"1.7.0\"",
         replace: "ucal-core = { version = \"1.6.0\"",
+    },
+    Mutation {
+        // The second path, added when X2 widened this lint to member manifests.
+        //
+        // Note what it pins: the **current** version, not a stale one. A stale
+        // pin is caught by cargo before any tool runs — `ucal-civil` requires
+        // 1.7.0 and resolution fails — so it is not the interesting case. A
+        // member pinned to the version the workspace is already on builds
+        // perfectly and drifts silently at the next bump, and this lint is the
+        // only thing that sees it.
+        check: "lint:version-lockstep",
+        what: "a member manifest that stops inheriting the workspace version",
+        file: "crates/ucal-core/Cargo.toml",
+        find: "version.workspace = true",
+        replace: "version = \"1.7.0\"",
     },
 ];
 
@@ -449,4 +470,47 @@ mod tests {
         }
     }
 
+}
+
+#[cfg(test)]
+mod probe_markdown {
+    /// How many citations does the documentation carry, and how many resolve?
+    ///
+    /// X1's survivor is that `cited()` reads no Markdown. Before widening it,
+    /// this measures what widening would surface: a check that lands with two
+    /// hundred failures is a check nobody will turn on.
+    #[test]
+    #[ignore]
+    fn what_would_widening_the_scan_surface() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("workspace root")
+            .to_path_buf();
+        let mut files = 0usize;
+        let mut cites = 0usize;
+        let mut per: std::collections::BTreeMap<(&str, String), usize> = Default::default();
+        let mut stack = vec![root.join("Documentation"), root.join("spec"), root.join("docs")];
+        while let Some(dir) = stack.pop() {
+            let Ok(entries) = std::fs::read_dir(&dir) else { continue };
+            for e in entries.flatten() {
+                let p = e.path();
+                if p.is_dir() {
+                    stack.push(p);
+                    continue;
+                }
+                if !p.extension().is_some_and(|x| x == "md") {
+                    continue;
+                }
+                let Ok(src) = std::fs::read_to_string(&p) else { continue };
+                files += 1;
+                for (kind, c) in crate::citations::scan(&src) {
+                    cites += 1;
+                    *per.entry((kind, c)).or_default() += 1;
+                }
+            }
+        }
+        println!("markdown files scanned: {files}");
+        println!("distinct citations:     {}", per.len());
+        println!("citation sites:         {cites}");
+    }
 }

@@ -183,6 +183,15 @@ jobs:
       - name: generated docs and citations
         run: cargo run -p xtask -- check-docs
 
+      # X1/X2: every check must reject a recorded defect. Twenty mutations
+      # applied to a sandbox copy of the tree — one per check — each with a
+      # known-correct verdict. A `SURV` means a check passes on a tree wrong in
+      # exactly the way it exists to prevent; `UNAPP` and `DIRTY` mean the
+      # mutation tested nothing, which is the failure this whole line of work is
+      # about. Needs the binary for the worked-examples entry, built above.
+      - name: the defect corpus
+        run: cargo run -p xtask -- corpus
+
       # Re-derives the conformance vectors along both integer routes and checks
       # them against the committed digest. Reports UNSIGNED rather than ok when
       # no signature is present: a digest proves integrity, not provenance.

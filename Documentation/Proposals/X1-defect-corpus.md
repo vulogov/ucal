@@ -1,7 +1,8 @@
 # X1 — a defect corpus: one recorded mutation per check
 
-**Status: built and running. `cargo run -p xtask -- corpus`. Twenty mutations,
-nineteen caught, one survivor.**
+**Status: built, run, and wired. `cargo run -p xtask -- corpus`, in CI since
+1.7.0. Twenty mutations, twenty caught — the one survivor X1 found was fixed by
+X2, below.**
 
 ---
 
@@ -56,26 +57,56 @@ It does not. `cited()` walks `crates/**/*.rs` and `xtask/src/**/*.rs` and reads
 **no Markdown at all** — so a dangling section reference in `Documentation/`,
 `spec/`, or a release note is invisible to it.
 
-Demonstrated: a `§99.9` planted in `Documentation/CLI.md` passes. The same
-reference planted in `crates/ucal-core/src/tier.rs` is caught.
+Demonstrated: a section reference to a number the specification does not define,
+planted in `Documentation/CLI.md`, passes. The same reference planted in
+`crates/ucal-core/src/tier.rs` is caught.
+
+(Written without the marker on purpose. Spelled out, this paragraph would itself
+be a dangling citation once the scan is widened — which is what happened to the
+corpus's own source, one section above.)
 
 This matters more than it might look. The documentation is where citations are
 *dense* — CLI.md alone carries dozens — and it is the surface a reader checks
 against the spec. The check covers the place where a citation is least likely to
 be written by hand.
 
-Left as a failing corpus entry rather than fixed here, so the gap has a name and
-a red line rather than a paragraph. X2 decides the fix.
+### Fixed by X2
+
+`cited()` now walks `Documentation/`, `spec/` and `docs/` as well, and reads
+`.md` alongside `.rs`. The check went from 126 distinct citations to **136**, and
+found **two dangling references that had never been seen**:
+
+- **A reference to section 29, cited twice**, in `spec/RULES.md` and in the 0.5.0
+  release note. There is no section 29; the specification ends at §24. It had stood for four
+  releases — in a sentence whose entire point is *that review is not enough, and
+  the rule left to review is the one that failed*. The argument it was reaching
+  for is §21.3's, and it now cites that.
+- **A section reference in this file**, planted by the paragraph above describing
+  the survivor.
+
+**The fix has a cost worth naming: a broken citation can no longer be quoted.**
+Writing one out makes the page carrying the explanation into a second instance of
+the defect. That happened **four** times while fixing this — in the corpus
+source, in `RULES.md`, in this file's survivor paragraph, and then once more in
+the paragraph immediately above, written after the cost had been described and
+in the sentence describing it.
+
+Prose about citations now has to name them rather than show them. The check
+caught every one of the four, which is the argument for it in miniature.
+
+That is small against what it buys. Forty-three Markdown files carrying 502
+citation sites had never been checked, and the documentation is where a citation
+is written by hand rather than by someone with the spec open.
 
 ## Four mistakes the corpus made about itself
 
 Worth recording, because three of the four were mine and the fourth is a finding.
 
 **1. The corpus planted a defect in the tree under test.** The first citation
-mutation contained a literal `§99.9` in its `replace` string. `xtask/src/` is
-scanned by the citation check, so the corpus's own source became a dangling
-citation and `check-docs` failed on the real repository. The marker is now
-written as `\u{a7}` — an escape in the source, the right character at runtime.
+mutation contained a literal section marker in its `replace` string. `xtask/src/`
+is scanned by the citation check, so the corpus's own source became a dangling
+citation and `check-docs` failed on the real repository. The marker is now written
+as a `\u{a7}` escape — an escape in the source, the right character at runtime.
 
 **2. A mutation aimed at the wrong check.** `cli-docs` was given a renamed
 *field*; it checks the *command* surface. Renamed a command instead.
@@ -92,9 +123,22 @@ manifest's `[workspace.dependencies]` and nothing else. That is a narrower scope
 than the name suggests, and a member crate that stopped inheriting
 `version.workspace = true` would not be caught.
 
-The corpus entry now targets the root manifest, where the lint does look. **The
-narrower scope is recorded here rather than silently accepted** — it is a
-candidate for X2, and it is smaller than the citations survivor.
+### Also fixed by X2
+
+The lint now reads each member's `[package]` section and requires
+`version.workspace = true`, not merely a matching number.
+
+**Which case matters is not the obvious one.** A member pinned to a *stale*
+version — `1.6.0` while the workspace is on `1.7.0` — never reaches any tool:
+`ucal-civil` requires `1.7.0`, cargo's resolution fails, and nothing builds. The
+case only this lint can see is a member pinned to the version the workspace is
+**already on**. That builds perfectly, publishes correctly, and drifts silently
+at the next bump.
+
+The corpus carries both paths — the root manifest's dependency table and a member
+`[package]` — because a corpus covering one of them would report the check as
+tested while half of it was not, which is the shape of claim this exercise exists
+to refuse.
 
 ## What is not in the corpus, and why
 
@@ -119,10 +163,10 @@ hand-verified; the refactor is a candidate for X2.
 
 | | |
 |---|---|
-| mutations | 20 |
-| caught | 19 |
-| survivors | 1 (`citations` does not read Markdown) |
-| checks with a corpus entry | 17 of 21 mechanisable |
+| mutations | 21 |
+| caught | 21 |
+| survivors | 0 (the one X1 found was fixed by X2) |
+| checks with a corpus entry | 17 of 21 mechanisable (one has two, for its two paths) |
 | checks hand-verified instead | 3 (harness, `check-links`, `verify-vectors`) |
 | checks covered elsewhere | 1 (`semver-checks`, V1 Finding 6 / X3) |
 
@@ -131,8 +175,10 @@ stating plainly rather than treated as a triumph: **the checks that exist mostly
 work.** What 1.6.0 found was that several of them were not connected to anything,
 which is a different failure and was much more common.
 
-## Not yet wired into CI
+## Wired into CI
 
-Deliberately. The corpus exits 6 while a survivor stands, and wiring a known-red
-job into CI is how a red build becomes background noise. X2 fixes the survivor
-and wires it.
+X1 deliberately did not wire it: the corpus exits 6 while a survivor stands, and a
+known-red job is how a red build becomes background noise. With the survivor
+fixed, X2 added it to the `checks` job, after the release binary is built — the
+worked-examples entry needs one, and without it that mutation reports `DIRTY`
+rather than a verdict.
