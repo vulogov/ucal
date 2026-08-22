@@ -10,4 +10,7 @@ fn legacy_calendars_stay_qualified_and_stay_legacy() {
     t.compile_fail("tests/compile_fail/legacy_fields_cannot_render.rs");
     // Rule K.6 — a legacy calendar cannot stand in for a derivation.
     t.compile_fail("tests/compile_fail/legacy_is_not_derived.rs");
+
+    // X3: the trait must stay implementable from outside. See the fixture.
+    t.pass("tests/compile_pass/legacy_calendar_is_implementable.rs");
 }

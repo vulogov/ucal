@@ -243,6 +243,13 @@ required again makes the fixture fail with the outsider's own error message.
 trait in the workspace has the same exposure and no such fixture, and the honest
 statement is that `semver-checks` is trusted for the rest.
 
+*Closed in 1.7.0 by [X3](X3-public-traits.md).* The workspace has four public
+traits, all four are implementable from outside — established by building an
+external crate against each, not by reading signatures — and all four now have a
+downstream implementor in the test suite, each verified to fail on the change the
+tool passes. What remains untested is whether `semver-checks` has a *second*
+blind spot, in some category other than trait methods.
+
 ## What is wired, and what is not
 
 | invoked by CI | not invoked by CI |

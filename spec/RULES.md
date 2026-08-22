@@ -233,8 +233,20 @@ Every alignment defect found by a reader across 0.3.0 and 0.4.0 landed on it:
 twelve render sites with an undeclared mode, a year that never said which year,
 a tick's length printing as `0.000000`, and cosmological widths given in Earth
 years and nothing else. No type-enforced rule leaked once. That is the argument
-of §29 arriving from the inside, and it is why the line above now names
+of §21.3 arriving from the inside, and it is why the line above now names
 mechanisms.
+
+The citation named section 29 until 1.7.0, and there is no section 29 — the
+specification ends at §24. It stood for four releases in a sentence whose whole
+point is that review does not catch things, which is as neat a demonstration as
+the sentence could have asked for. Nothing checked it: the citation check read
+Rust source only until X2 widened it to the documentation.
+
+*Written without the marker on purpose.* Once prose is scanned, a broken citation
+can no longer be **quoted** — writing it out makes the page carrying the
+explanation into a second instance of the defect. That is a real cost of the fix
+and it is small: the alternative is a check that reads the one place citations
+are written by hand and never verified.
 
 *Not covered.* Four shipped sites round under a fixed mode and are exempt with
 a stated reason, listed by `xtask -- lint` on every run: a calendar label's

@@ -48,7 +48,18 @@ fn read(root: &Path, rel: &str) -> Result<String, String> {
 /// Collect every citation of each form that appears in the shipped source.
 fn cited(root: &Path) -> Result<Vec<(&'static str, String, usize)>, String> {
     let mut counts: std::collections::BTreeMap<(&'static str, String), usize> = Default::default();
-    let mut stack = vec![root.join("crates"), root.join("xtask").join("src")];
+    let mut stack = vec![
+        root.join("crates"),
+        root.join("xtask").join("src"),
+        // The documentation, added in 1.7.0. It had never been scanned: the
+        // check was announced as "citations resolve against spec/" and read
+        // Rust source only, which left uncovered the place where citations are
+        // densest and least likely to have been written by a compiler.
+        // X1's one surviving mutation.
+        root.join("Documentation"),
+        root.join("spec"),
+        root.join("docs"),
+    ];
     while let Some(dir) = stack.pop() {
         let Ok(entries) = std::fs::read_dir(&dir) else {
             continue;
@@ -60,7 +71,7 @@ fn cited(root: &Path) -> Result<Vec<(&'static str, String, usize)>, String> {
                 if name != "target" && name != ".git" {
                     stack.push(p);
                 }
-            } else if name.ends_with(".rs") {
+            } else if name.ends_with(".rs") || name.ends_with(".md") {
                 let Ok(src) = std::fs::read_to_string(&p) else {
                     continue;
                 };

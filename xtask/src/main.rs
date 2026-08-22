@@ -17,6 +17,7 @@
 //! Usage: `cargo run -p xtask -- [check | emit | report]`
 
 mod citations;
+mod corpus;
 mod publish;
 mod declared;
 mod derivation;
@@ -122,6 +123,7 @@ const MODES: &[(&str, &str)] = &[
     ("gen-schema", "write the ucal-json/1 schema"),
     ("check-links", "resolve every cited URL (opt-in; makes network requests)"),
     ("verify-vectors", "re-derive the conformance vectors"),
+    ("corpus", "run the defect corpus: every check must reject a known defect"),
     ("publish", "the release procedure"),
 ];
 
@@ -170,6 +172,9 @@ fn main() {
     }
     if mode == "check-links" {
         std::process::exit(links::run(&workspace_root()));
+    }
+    if mode == "corpus" {
+        std::process::exit(run_corpus());
     }
     if mode == "verify-vectors" {
         std::process::exit(run_verify_vectors());
@@ -956,6 +961,55 @@ fn print_suppressions(root: &std::path::Path, allowed: &[lint::Suppression]) {
 /// Separating the two matters. A digest proves the file was not corrupted; only
 /// a signature proves who stood behind it, and reporting the first as if it were
 /// the second is the kind of overclaim Rule Q exists to prevent.
+/// X1/X2 — run the defect corpus and report survivors.
+///
+/// A survivor is a mutation its check accepted: the check passes on a tree wrong
+/// in exactly the way it exists to prevent. That is the output worth having, and
+/// it is why this prints the whole table rather than a pass count.
+fn run_corpus() -> i32 {
+    use corpus::Verdict;
+    let root = workspace_root();
+    let into = std::env::temp_dir().join("ucal-defect-corpus");
+    println!("Defect corpus — one recorded mutation per check\n");
+    let outcomes = match corpus::run(&root, &into) {
+        Ok(o) => o,
+        Err(e) => {
+            eprintln!("  FAIL  the corpus could not build its sandbox: {e}");
+            return 6;
+        }
+    };
+    let mut bad = 0;
+    for (m, v) in &outcomes {
+        let tag = match v {
+            Verdict::Caught => "ok   ",
+            Verdict::Survived => {
+                bad += 1;
+                "SURV "
+            }
+            Verdict::Unapplied => {
+                bad += 1;
+                "UNAPP"
+            }
+            Verdict::SandboxAlreadyFailing => {
+                bad += 1;
+                "DIRTY"
+            }
+        };
+        println!("  {tag} {:<32} {}", m.check, m.what);
+    }
+    let _ = std::fs::remove_dir_all(&into);
+    println!("\n  {} mutations, {} not caught", outcomes.len(), bad);
+    if bad > 0 {
+        println!("  SURV  the check accepted a tree wrong in the way it exists to prevent");
+        println!("  UNAPP the mutation edited nothing, so nothing was tested");
+        println!("  DIRTY the check was already failing on the unmutated sandbox");
+        println!("        (for worked-examples this usually means target/release/ucal is");
+        println!("         a build without `--features tui`; a workspace test run replaces it)");
+        return 6;
+    }
+    0
+}
+
 fn run_verify_vectors() -> i32 {
     let root = workspace_root();
     let a = route_bnum::derive();

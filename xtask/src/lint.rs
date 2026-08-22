@@ -429,7 +429,20 @@ fn rust_files(root: &Path) -> Vec<PathBuf> {
             let p = e.path();
             let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
             if p.is_dir() {
-                if name != "target" && name != ".git" && name != "compile_fail" {
+                // `compile_fail` and `compile_pass` are trybuild fixtures:
+                // separate crates compiled to check that something does or does
+                // not build. They are not shipped code and the rules do not
+                // apply to them — a fixture proving `TickInt` is implementable
+                // needs a multiply, and a deliberately-useless backend is
+                // allowed a wrapping one.
+                //
+                // `compile_pass` was added to this list in 1.7.0, when X3
+                // created the first such directory and Rule O immediately
+                // objected to a fixture. The lint was right and the exclusion
+                // was missing.
+                if name != "target" && name != ".git" && name != "compile_fail"
+                    && name != "compile_pass"
+                {
                     stack.push(p);
                 }
             } else if name.ends_with(".rs") {
@@ -1041,6 +1054,58 @@ fn version_lockstep(workspace_root: &Path) -> Vec<Violation> {
                 line: n + 1,
                 text: l.to_string(),
                 rule: "internal version requirements must equal the workspace package version",
+            });
+        }
+    }
+
+    // And the member manifests, added in 1.7.0.
+    //
+    // Until X1 aimed a mutation at one, this lint read the root manifest and
+    // nothing else. The case it could not see is narrow and silent: a member
+    // pinned to the version the workspace is *already* on. A stale pin never
+    // reaches any tool — a sibling requires the current version and cargo's
+    // resolution fails first — while a matching literal builds, publishes, and
+    // drifts at the next bump.
+    //
+    // Only when there is a `crates/` to read. `lockstep_of`'s unit tests point
+    // this function at a synthetic root that is one manifest and nothing else,
+    // and a missing member there is the fixture's shape rather than a defect.
+    // The vacuity that could reintroduce is covered by `run_lints`, which
+    // refuses to report at all below its file floor.
+    let crates_dir = workspace_root.join("crates");
+    if !crates_dir.exists() {
+        return v;
+    }
+    for member in ["ucal-core", "ucal-civil", "ucal-body", "ucal-events", "ucal-cosmo", "ucal"] {
+        let path = crates_dir.join(member).join("Cargo.toml");
+        let Ok(src) = std::fs::read_to_string(&path) else {
+            v.push(Violation {
+                lint: "version-lockstep",
+                file: path,
+                line: 1,
+                text: format!("{member} has no manifest to check"),
+                rule: "every published member is checked, so a missing one is a defect",
+            });
+            continue;
+        };
+        // The `[package]` section only: a `[dependencies]` entry naming a
+        // version is a different statement and is checked above.
+        let package = src.split("\n[").next().unwrap_or(&src);
+        let inherits = package
+            .lines()
+            .any(|l| l.trim().replace(' ', "") == "version.workspace=true");
+        if !inherits {
+            let line = package
+                .lines()
+                .position(|l| l.trim_start().starts_with("version"))
+                .map_or(1, |i| i + 1);
+            v.push(Violation {
+                lint: "version-lockstep",
+                file: path,
+                line,
+                text: format!("{member} does not inherit `version.workspace = true`"),
+                rule: "a member that pins its own version can publish at one the \
+                       workspace has moved past",
             });
         }
     }
