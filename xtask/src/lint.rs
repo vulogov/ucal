@@ -429,7 +429,20 @@ fn rust_files(root: &Path) -> Vec<PathBuf> {
             let p = e.path();
             let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
             if p.is_dir() {
-                if name != "target" && name != ".git" && name != "compile_fail" {
+                // `compile_fail` and `compile_pass` are trybuild fixtures:
+                // separate crates compiled to check that something does or does
+                // not build. They are not shipped code and the rules do not
+                // apply to them — a fixture proving `TickInt` is implementable
+                // needs a multiply, and a deliberately-useless backend is
+                // allowed a wrapping one.
+                //
+                // `compile_pass` was added to this list in 1.7.0, when X3
+                // created the first such directory and Rule O immediately
+                // objected to a fixture. The lint was right and the exclusion
+                // was missing.
+                if name != "target" && name != ".git" && name != "compile_fail"
+                    && name != "compile_pass"
+                {
                     stack.push(p);
                 }
             } else if name.ends_with(".rs") {
