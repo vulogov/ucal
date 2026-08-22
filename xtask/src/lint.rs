@@ -1048,11 +1048,21 @@ fn version_lockstep(workspace_root: &Path) -> Vec<Violation> {
     // And the member manifests, added in 1.7.0.
     //
     // Until X1 aimed a mutation at one, this lint read the root manifest and
-    // nothing else. A member crate that stopped inheriting — `version = "1.6.0"`
-    // in place of `version.workspace = true` — would publish at a version the
-    // workspace had moved past, and nothing would have said so. The mutation
-    // survived, which is how the narrower-than-its-name scope was found.
+    // nothing else. The case it could not see is narrow and silent: a member
+    // pinned to the version the workspace is *already* on. A stale pin never
+    // reaches any tool — a sibling requires the current version and cargo's
+    // resolution fails first — while a matching literal builds, publishes, and
+    // drifts at the next bump.
+    //
+    // Only when there is a `crates/` to read. `lockstep_of`'s unit tests point
+    // this function at a synthetic root that is one manifest and nothing else,
+    // and a missing member there is the fixture's shape rather than a defect.
+    // The vacuity that could reintroduce is covered by `run_lints`, which
+    // refuses to report at all below its file floor.
     let crates_dir = workspace_root.join("crates");
+    if !crates_dir.exists() {
+        return v;
+    }
     for member in ["ucal-core", "ucal-civil", "ucal-body", "ucal-events", "ucal-cosmo", "ucal"] {
         let path = crates_dir.join(member).join("Cargo.toml");
         let Ok(src) = std::fs::read_to_string(&path) else {
