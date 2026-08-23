@@ -4,18 +4,17 @@
 //! a third — a regional reckoning, an ecclesiastical table — is the obvious
 //! reason someone outside would implement this trait, and nothing stops them.
 //!
-//! Note what the fixture cannot do. `DeclaredTables` is `#[non_exhaustive]` with
-//! no constructor, so an outsider cannot **build** one and must borrow a shipped
-//! calendar's. That is a real constraint on what a third legacy calendar can be
-//! and it does not seal the trait — the same shape as `Profile`, whose
-//! implementors must delegate `bridge()` rather than construct a `Bridge`.
-//!
-//! It was nearly read as a seal there, and the lesson is recorded in
-//! `Documentation/Proposals/V1-check-audit.md`: an unconstructible return type
-//! narrows what an implementor can say, and only forbids implementation
-//! entirely if nothing shipped returns one.
+//! **Updated in 1.8.0.** It used to borrow `Gregorian.tables()`, because
+//! `DeclaredTables` was `#[non_exhaustive]` with no constructor and no outsider
+//! could build one. A1 gave it one — along with `DeclaredLeapRule` and
+//! `Discontinuity`, without which the first was decorative — so this fixture now
+//! declares its **own** tables, which is what §8.6's "preserved for
+//! interoperation" was supposed to mean all along.
 
-use ucal_civil::legacy::{DeclaredTables, LegacyCalendar, LegacyFields};
+use std::sync::OnceLock;
+use ucal_civil::legacy::{
+    DeclaredLeapRule, DeclaredTables, Discontinuity, LegacyCalendar, LegacyFields,
+};
 use ucal_civil::{CivilCalendar, Gregorian, Scale};
 use ucal_core::qualified::CalendarIdentity;
 use ucal_core::{Citation, Instant, Kind, Rounding, UC1};
@@ -31,9 +30,35 @@ impl CalendarIdentity for Downstream {
     }
 }
 
+/// Tables this crate has never seen: a thirteen-month year is not expressible
+/// (the type fixes twelve), but the lengths, the cycle and the reform are the
+/// caller's own.
+static DOWNSTREAM_TABLES: OnceLock<DeclaredTables> = OnceLock::new();
+
+fn tables() -> &'static DeclaredTables {
+    DOWNSTREAM_TABLES.get_or_init(|| {
+        DeclaredTables::new(
+            [30, 30, 31, 30, 31, 30, 31, 30, 31, 30, 31, 30],
+            10,
+            DeclaredLeapRule::new(8, 33, true).expect("33 years is a cycle"),
+            Some(
+                Discontinuity::new(
+                    "a reform this crate has never heard of",
+                    (1700, 2, 18),
+                    (1700, 3, 1),
+                    11,
+                )
+                .expect("eleven days is a skip"),
+            ),
+            &["every table in this calendar was chosen by its author"],
+        )
+        .expect("the months sum to 365 and the arbitrariness is declared")
+    })
+}
+
 impl LegacyCalendar for Downstream {
     fn tables(&self) -> &'static DeclaredTables {
-        Gregorian.tables()
+        tables()
     }
     fn citation(&self) -> Citation {
         Citation::new("a downstream table, cited by its author", None)
@@ -58,4 +83,7 @@ impl LegacyCalendar for Downstream {
 fn main() {
     assert_eq!(Downstream.id(), "downstream-legacy");
     assert!(!Downstream.kind().is_derived());
+    // Its own tables, not a shipped calendar's.
+    assert_eq!(Downstream.tables().week_length, 10);
+    assert_ne!(Downstream.tables().month_lengths, Gregorian.tables().month_lengths);
 }

@@ -158,6 +158,63 @@ pub struct Bridge {
     pub epoch_label: &'static str,
 }
 
+impl Bridge {
+    /// Declare a bridge to a foreign unit.
+    ///
+    /// # Why this exists
+    ///
+    /// `Bridge` is `#[non_exhaustive]` and had no constructor, so it could be
+    /// built inside this crate and nowhere else. `Profile::bridge` returns one,
+    /// which meant a downstream profile could not *make* a bridge and had to
+    /// borrow a shipped profile's — a second profile could pick a new datum and
+    /// a new frame, and had to convert through this one's second. X3 found it,
+    /// and nearly mistook it for a seal on the whole trait.
+    ///
+    /// # `divisibility` is computed, not taken
+    ///
+    /// It is defined as *the largest `n` such that `5^n` divides `ticks`*, and a
+    /// constructor that accepted it as an argument would accept one that is
+    /// wrong. §2.4's alignment invariants and D-3's exact decimal subdivisions
+    /// both rest on it being right, and a caller has no way to be told it is
+    /// not — so it is derived here and cannot disagree.
+    ///
+    /// `UC1::bridge` keeps its literal rather than calling this, because the
+    /// value is a declared `const` under §3.3 and the derivation is a loop of
+    /// divisions on the hot path. `bridge_divisibility_is_what_uc1_declares`
+    /// pins the two together.
+    pub fn new(name: &'static str, ticks: Ticks, epoch_label: &'static str) -> Bridge {
+        let divisibility = five_adic_valuation(&ticks);
+        Bridge {
+            name,
+            ticks,
+            divisibility,
+            epoch_label,
+        }
+    }
+}
+
+/// The largest `n` such that `5^n` divides `v`, saturating at `u32::MAX`.
+///
+/// Zero has every power of five as a divisor; the answer for it is 0, because a
+/// bridge of zero ticks is not a bridge and the caller is better served by a
+/// useless-looking number than by a loop that does not end.
+fn five_adic_valuation(v: &Ticks) -> u32 {
+    if v.is_zero_ticks() {
+        return 0;
+    }
+    let five = <Ticks as TickInt>::from_u64(5);
+    let mut n = 0u32;
+    let mut cur = v.clone();
+    loop {
+        let (q, r) = cur.quot_rem(&five);
+        if !r.is_zero_ticks() {
+            return n;
+        }
+        cur = q;
+        n += 1;
+    }
+}
+
 /// An immutable, named constant set fixing a datum and a tick (§2.1).
 pub trait Profile: 'static + Copy + Clone + PartialEq + Eq + core::fmt::Debug {
     /// The profile tag carried by every serialised form (Rule P).
