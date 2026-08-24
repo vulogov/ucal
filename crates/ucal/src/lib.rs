@@ -1507,6 +1507,37 @@ pub fn cmd_cal_list() -> CmdResult {
 /// labelled.
 #[cfg(all(feature = "body", feature = "civil"))]
 pub fn cmd_show(input: &str, calendars: &[String]) -> CmdResult {
+    cmd_show_inner(input, calendars, None)
+}
+
+/// F1 — the multi-calendar view, with one calendar coming from §15.1 files.
+///
+/// This is where the loaders stopped being useful. `cal derive --anchor --at`
+/// could already produce a date from a pair of files; what it could not do is
+/// put that calendar **beside** the shipped ones, which is the comparison the
+/// whole exercise is for. A body that does not ship is now a row in the same
+/// table as Earth and Mars.
+///
+/// `cal show` deliberately did *not* grow the same flags. `cal derive` already
+/// prints that view from the same code, and two spellings of one question is
+/// how they come to disagree.
+#[cfg(all(feature = "body", feature = "civil"))]
+pub fn cmd_show_with_file(
+    input: &str,
+    calendars: &[String],
+    body_path: &str,
+    anchor_path: &str,
+) -> CmdResult {
+    let extra = calendar_from_files(body_path, anchor_path)?;
+    cmd_show_inner(input, calendars, Some(extra))
+}
+
+#[cfg(all(feature = "body", feature = "civil"))]
+fn cmd_show_inner(
+    input: &str,
+    calendars: &[String],
+    extra: Option<ucal_body::calendar::BodyCalendar>,
+) -> CmdResult {
     let (t, _) = parse_instant(input)?;
     let mut rows: Vec<(String, Value)> = Vec::new();
     let mut produced = 0usize;
@@ -1568,6 +1599,33 @@ pub fn cmd_show(input: &str, calendars: &[String]) -> CmdResult {
         rows.push((id.clone(), entry));
     }
 
+    // The file-defined calendar, rendered by the same arm the shipped ones use.
+    if let Some(c) = extra {
+        let id = ucal_core::qualified::CalendarIdentity::id(&c).to_string();
+        let r = c.render(&t)?;
+        let f = c.fields(&t)?;
+        produced += 1;
+        rows.push((
+            id,
+            Value::Section(vec![
+                ("rendered".into(), Value::text(r.to_string())),
+                ("kind".into(), Value::text("derived (Rule K), from files")),
+                (
+                    "anchor_revision".into(),
+                    Value::number(f.anchor_revision.to_string()),
+                ),
+                (
+                    "window_ticks".into(),
+                    Value::number(f.window.width().ticks().to_dec_string()),
+                ),
+                (
+                    "source".into(),
+                    Value::text("§15.1 body and anchor files, loaded at run time"),
+                ),
+            ]),
+        ));
+    }
+
     // Every requested calendar failed, so nothing was produced and the process
     // must say so. It exited 0 until 0.9.0 — a script asking for a calendar that
     // does not exist got a success and a table of dashes.
@@ -1600,11 +1658,55 @@ pub fn cmd_show(input: &str, calendars: &[String]) -> CmdResult {
         ))
 }
 
+/// F1 — a calendar built from §15.1 files rather than from the registry.
+///
+/// `cal derive --anchor --at` could produce a date from a body file and an
+/// anchor file, and then that calendar was stranded: `cal show` and `show` knew
+/// only the compiled-in registry, so the one thing the loaders exist for — using
+/// a body this program does not ship — stopped at a single command.
+///
+/// The calendar id is derived from the body's, as `<body>-d`, and the anchor
+/// file must name it. Same check `cal derive` makes, same reason: two files that
+/// each load, pair up, and quietly produce a date for one body using another
+/// body's phase is the borrowing Rule J forbids.
+#[cfg(feature = "body")]
+pub fn calendar_from_files(
+    body_path: &str,
+    anchor_path: &str,
+) -> Result<ucal_body::calendar::BodyCalendar, TimeError> {
+    let body = body_file::load(std::path::Path::new(body_path))?;
+    let anchor = anchor_file::load(std::path::Path::new(anchor_path))?;
+    let id: &'static str = body_file::leak(format!("{}-d", body.id()));
+    if anchor.calendar_id() != id {
+        return Err(TimeError::with_context(
+            Code::E0062,
+            body_file::leak(format!(
+                "the anchor file names calendar `{}`, and this body file derives `{id}`",
+                anchor.calendar_id()
+            )),
+        ));
+    }
+    let satellite = body.satellites().first().map(|s| s.id());
+    ucal_body::calendar::BodyCalendar::build(
+        id,
+        body,
+        anchor,
+        satellite,
+        ucal_body::DriftBound::DEFAULT,
+        32,
+    )
+}
+
 /// `ucal cal show <id> <T>` — one calendar's derivation, in full.
 #[cfg(feature = "body")]
 pub fn cmd_cal_show(id: &str, input: &str) -> CmdResult {
-    let (t, _) = parse_instant(input)?;
     let c = bodycal::by_id(id)?;
+    cal_show_of(&c, id, input)
+}
+
+#[cfg(feature = "body")]
+fn cal_show_of(c: &ucal_body::calendar::BodyCalendar, id: &str, input: &str) -> CmdResult {
+    let (t, _) = parse_instant(input)?;
     let f = c.fields(&t)?;
     let rule = c.leap_rule();
 

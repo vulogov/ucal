@@ -174,6 +174,13 @@ enum Command {
     Show {
         /// A `UC1` text form, a UCID, or a decimal tick count.
         instant: String,
+        /// A body file (§15.1), shown alongside the calendars named by
+        /// `--calendars`. Needs `--anchor`: local fields need a phase (Rule J.3).
+        #[arg(long, value_name = "FILE", requires = "anchor")]
+        body: Option<String>,
+        /// The anchor file matching `--body`.
+        #[arg(long, value_name = "FILE")]
+        anchor: Option<String>,
         /// Comma-separated calendar ids, e.g. `earth-d,mars-d,earth-civil`.
         #[arg(long, default_value = "earth-d,mars-d,earth-civil")]
         calendars: String,
@@ -316,6 +323,11 @@ enum CalCommand {
     /// Every calendar, with its kind.
     List,
     /// One calendar's derivation in full: anchor, intercalation, cycles.
+    ///
+    /// For a calendar defined by §15.1 files rather than compiled in, use
+    /// `ucal cal derive <body> --anchor <anchor> --at <instant>`, which prints
+    /// the same derivation from the same code. A second spelling here would be
+    /// two ways to ask one question.
     Show {
         /// Calendar id, e.g. `earth-d`.
         id: String,
@@ -600,9 +612,16 @@ fn main() {
         Command::Show {
             instant,
             calendars,
+            body,
+            anchor,
         } => {
             let ids: Vec<String> = calendars.split(',').map(|s| s.trim().to_string()).collect();
-            ucal::cmd_show(pick(replacement, instant), &ids)
+            match (body, anchor) {
+                (Some(b), Some(a)) => {
+                    ucal::cmd_show_with_file(pick(replacement, instant), &ids, b, a)
+                }
+                _ => ucal::cmd_show(pick(replacement, instant), &ids),
+            }
         }
         Command::Ladder { named_only } => {
             LocaleId::parse(&cli.locale).and_then(|l| cmd_ladder(l, *named_only))

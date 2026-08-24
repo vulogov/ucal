@@ -578,10 +578,35 @@ ucal show <INSTANT> [--calendars <ID,ID,…>]
 | `calendars.<id>.rendered` | The local label. |
 | `calendars.<id>.kind` | `derived (Rule K)` or `legacy (§8.6)`, on every row. |
 | `calendars.<id>.anchor_revision` | Which anchor revision produced it. |
+| `calendars.<id>.source` | Present only for a calendar loaded from §15.1 files, saying so. |
 | `calendars.<id>.window_ticks` | The uncertainty the anchor contributes, in ticks. A local date is only as sharp as the anchor behind it. |
 | `calendars.<id>.day_is_ambiguous` | Whether the instant falls close enough to a day boundary that the anchor's window straddles it. |
 | `calendars.<id>.error` | Present instead of fields when a calendar cannot render — a missing anchor is `UCAL-E0062`, not a guess. |
 | `calendars.<id>.arbitrary` | For a legacy calendar: which of its parameters are declared by convention rather than derived from a body. |
+
+---
+
+### A calendar from files, beside the shipped ones
+
+```
+ucal show <INSTANT> --calendars earth-d,mars-d \
+  --body Documentation/examples/earth.hjson \
+  --anchor Documentation/examples/earth-anchor.hjson
+```
+
+`--body` and `--anchor` add **one** calendar defined by §15.1 files to the table,
+rendered by the same code path as every other row. Both are required together:
+local fields need a phase, and phase is empirical (Rule J.3), so a body file
+alone cannot produce a date.
+
+This is the comparison the loaders exist for — a body this program does not ship,
+in the same table as the ones it does. `cal derive --anchor --at` could already
+produce that body's date on its own; what it could not do was put it beside
+anything.
+
+**`cal show` deliberately does not take the same flags.** `cal derive <body>
+--anchor <anchor> --at <instant>` prints that view already, from the same code,
+and two spellings of one question is how they come to disagree.
 
 ---
 

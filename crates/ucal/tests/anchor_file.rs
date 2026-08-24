@@ -271,3 +271,55 @@ fn the_documented_examples_load() {
     assert_eq!(a.calendar_id(), "earth-d");
     assert_eq!(a.revision(), 1);
 }
+
+/// F1 — a file-defined calendar sits in the same table as the shipped ones.
+///
+/// This is where the loaders stopped being useful. `cal derive --anchor --at`
+/// could already produce a date from a pair of files; what it could not do was
+/// put that calendar **beside** the compiled-in ones, which is the comparison
+/// the whole exercise is for.
+///
+/// The example pair reproduces `earth-d`, so the two rows must agree — a file
+/// route and a compiled route giving different answers for the same body would
+/// mean one of them is not reading what it claims to.
+#[test]
+fn a_file_defined_calendar_appears_beside_the_shipped_ones() {
+    let (_d, anchor) = tmp("show-with-file", &anchor_text());
+    let doc = ucal::cmd_show_with_file(
+        T,
+        &["earth-d".to_string()],
+        &body_example(),
+        anchor.to_str().expect("utf-8"),
+    )
+    .expect("the pair renders");
+    let json = doc.to_json();
+
+    assert!(json.contains("from files"), "the row is not labelled:\n{json}");
+
+    // Two rows, and the rendered value appears twice because they agree.
+    let rendered = value_after(&json, "\"rendered\"");
+    let occurrences = json.matches(rendered.trim_matches('"')).count();
+    assert!(
+        occurrences >= 2,
+        "the file route and the compiled route disagree about earth-d:\n{json}"
+    );
+}
+
+/// The file calendar is subject to the same refusals as any other.
+///
+/// An anchor naming a different calendar is `UCAL-E0062` here exactly as it is
+/// in `cal derive` — the check is in `calendar_from_files`, which both go
+/// through, rather than in either command.
+#[test]
+fn the_shared_builder_still_refuses_a_mismatched_anchor() {
+    let bad = anchor_text().replace("calendar_id: earth-d", "calendar_id: mars-d");
+    let (_d, p) = tmp("show-wrong-calendar", &bad);
+    let e = ucal::cmd_show_with_file(
+        T,
+        &["earth-d".to_string()],
+        &body_example(),
+        p.to_str().expect("utf-8"),
+    )
+    .expect_err("an anchor for another calendar must be refused");
+    assert_eq!(e.code, Code::E0062);
+}
