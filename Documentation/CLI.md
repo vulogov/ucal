@@ -488,10 +488,22 @@ a file makes far easier than a constant does.
 | `fields` | Only with `--anchor` **and** `--at`: the instant in the derived calendar's local fields, interval-valued and carrying the anchor revision. |
 
 **Every parameter needs Rule C's obligations** — the published value verbatim,
-its unit (`s`, `d` or `yr`), a citation, and the half-width of its validity
+its unit (`s`, `min`, `h`, `d` or `yr`), a citation, and the half-width of its validity
 window in Julian years. A file omitting any of them is refused rather than
 defaulted, because a format that let them be optional would be a second and
 laxer way of declaring a body.
+
+**The units exist so a file can quote its source.** Rule C asks for the published
+value *verbatim*, and the NASA fact sheets this project cites more than any other
+print rotation periods and lengths of day **in hours**. `data::jupiter` converts
+one in a comment — `9.9250 h × 3600 = 35 730 s, exact` — which a file could not
+do until 1.9.0: an author had to convert by hand, which is either a rounding (and
+a rounded parameter is a different calendar) or an exact conversion whose working
+the file no longer shows.
+
+`min` and `h` are exact multiples of the second, so nothing is lost in the unit
+itself. A unit that was not an exact multiple would put a rounding *inside* the
+conversion, which is a different decision and has not been made.
 
 **A parameter may be derived instead of measured.** `derived: synodic` computes
 the solar day as `1 / (1/rotation_period - 1/orbital_period)`, exactly, in ticks:

@@ -76,6 +76,31 @@ pub enum MeasuredUnit {
     SiDay,
     /// 31 557 600 SI seconds, exactly. Not an orbit of any body.
     JulianYear,
+
+    /// 60 SI seconds, exactly.
+    ///
+    /// Added in 1.9.0 with [`MeasuredUnit::Hour`], and for the same reason: Rule
+    /// C asks for the **published value verbatim**, and the sources this project
+    /// cites most publish rotation periods in hours. Without these an author had
+    /// to convert by hand, which is either a rounding — and a rounded parameter
+    /// is a different calendar — or an exact conversion the file no longer shows
+    /// the working for.
+    ///
+    /// **Appended rather than placed in reading order**, like `Code::E0014` and
+    /// for the same reason: the variants carry implicit discriminants, so
+    /// inserting one in the middle changes the value of every later variant and
+    /// breaks a caller who casts. It was written in the middle first and
+    /// `cargo semver-checks` reported `enum_no_repr_variant_discriminant_changed`
+    /// — the same lesson, learned the same way, three releases after it was
+    /// written down.
+    SiMinute,
+    /// 3600 SI seconds, exactly.
+    ///
+    /// The NASA planetary fact sheets print "Length of Day (hrs)" and rotation
+    /// periods in hours for every planet. `data::jupiter` converts them in a
+    /// comment — `9.9250 h x 3600 = 35 730 s, exact` — which is what a file
+    /// could not do.
+    Hour,
 }
 
 impl MeasuredUnit {
@@ -83,6 +108,8 @@ impl MeasuredUnit {
     pub const fn bridge_units(self) -> u64 {
         match self {
             MeasuredUnit::SiSecond => 1,
+            MeasuredUnit::SiMinute => 60,
+            MeasuredUnit::Hour => 3_600,
             MeasuredUnit::SiDay => 86_400,
             MeasuredUnit::JulianYear => 31_557_600,
         }
@@ -92,6 +119,8 @@ impl MeasuredUnit {
     pub const fn symbol(self) -> &'static str {
         match self {
             MeasuredUnit::SiSecond => "s",
+            MeasuredUnit::SiMinute => "min (60 s)",
+            MeasuredUnit::Hour => "h (3600 s)",
             MeasuredUnit::SiDay => "d (86400 s)",
             MeasuredUnit::JulianYear => "yr (Julian, 31557600 s)",
         }

@@ -579,3 +579,88 @@ fn distinct_strings_are_not_conflated() {
     assert_ne!(a.id(), b.id());
     assert!(!std::ptr::eq(a.id().as_ptr(), b.id().as_ptr()));
 }
+
+/// F5 — hours and minutes, so a file can quote its source verbatim.
+///
+/// **The check that matters.** `data::jupiter` states its rotation in seconds
+/// and converts in a comment — `9.9250 h x 3600 = 35 730 s, exact` — because the
+/// fact sheet publishes hours and the format had no way to say so. A file
+/// quoting the fact sheet as printed must derive the same calendar as the
+/// hand-converted body, or the new units are a second and laxer way of stating
+/// a parameter.
+#[test]
+fn a_file_quoting_hours_derives_what_the_shipped_body_does() {
+    let jupiter = r#"
+id: jupiter
+primary: sun
+rotation_period: {
+  value: 9.9250
+  unit: h
+  citation: NASA Planetary Fact Sheets
+  valid_years: 1000
+}
+solar_day: {
+  value: 9.9259
+  unit: h
+  citation: NASA Planetary Fact Sheets
+  valid_years: 1000
+}
+orbital_period: {
+  value: 4332.589
+  unit: d
+  citation: NASA Planetary Fact Sheets
+  valid_years: 10000
+}
+"#;
+    let (_d, p) = tmp("jupiter-hours", jupiter);
+    let from_file = rule_of(&body_file::load(&p).expect("jupiter in hours loads"));
+    let shipped = rule_of(&ucal_body::data::jupiter());
+    assert_eq!(
+        (
+            from_file.chosen.value.numer().to_dec_string(),
+            from_file.chosen.value.denom().to_dec_string()
+        ),
+        (
+            shipped.chosen.value.numer().to_dec_string(),
+            shipped.chosen.value.denom().to_dec_string()
+        ),
+        "hours and the hand conversion to seconds disagree"
+    );
+    assert_eq!(shipped.chosen.value.denom().to_dec_string(), "81");
+}
+
+/// Minutes work too, and the conversion is exact.
+///
+/// 60 and 3600 are exact multiples of the second, which is the condition Z1.2
+/// set for admitting a unit at all: one that was not would put a rounding inside
+/// the conversion, and that is a different decision from this one.
+#[test]
+fn a_minute_is_sixty_seconds_exactly() {
+    let a = GOOD_EUROPA.replace(
+        "SOLAR_DAY",
+        "solar_day: {\n  value: 120\n  unit: min\n  citation: c\n  valid_years: 10000\n}",
+    );
+    let b = GOOD_EUROPA.replace(
+        "SOLAR_DAY",
+        "solar_day: {\n  value: 7200\n  unit: s\n  citation: c\n  valid_years: 10000\n}",
+    );
+    let (_d1, p1) = tmp("minutes", &a);
+    let (_d2, p2) = tmp("seconds", &b);
+    let m = body_file::load(&p1).expect("minutes load");
+    let s = body_file::load(&p2).expect("seconds load");
+    assert_eq!(
+        m.solar_day().value_at_epoch().cmp_exact(s.solar_day().value_at_epoch()),
+        core::cmp::Ordering::Equal,
+        "120 min is not 7200 s"
+    );
+}
+
+/// A unit the format does not accept is still refused, and says what it takes.
+#[test]
+fn an_unknown_unit_is_still_refused() {
+    let bad = GOOD.replace("unit: d", "unit: parsec");
+    let (_d, p) = tmp("bad-unit-f5", &bad);
+    let e = body_file::load(&p).expect_err("parsec is not a duration");
+    assert_eq!(e.code, Code::E0018);
+    assert!(e.to_string().contains("`h`"), "{e}");
+}

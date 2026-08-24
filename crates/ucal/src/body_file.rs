@@ -292,11 +292,25 @@ fn mantissa_of(v: &str) -> Result<(u128, u32)> {
 fn unit_of(u: &str) -> Result<MeasuredUnit> {
     match u {
         "s" => Ok(MeasuredUnit::SiSecond),
+        // F5. Rule C asks for the published value *verbatim*, and the fact
+        // sheets this project cites most publish rotation periods in hours —
+        // `data::jupiter` converts one in a comment, `9.9250 h x 3600 = 35 730
+        // s, exact`, which a file could not do. An author without these had to
+        // convert by hand: either a rounding, and a rounded parameter is a
+        // different calendar, or an exact conversion whose working the file no
+        // longer shows.
+        //
+        // Both are exact multiples of the second, which is the condition Z1.2
+        // set. A unit that was not would put a rounding inside the conversion,
+        // and that is a different decision.
+        "min" => Ok(MeasuredUnit::SiMinute),
+        "h" => Ok(MeasuredUnit::Hour),
         "d" => Ok(MeasuredUnit::SiDay),
         "yr" => Ok(MeasuredUnit::JulianYear),
         _ => Err(TimeError::with_context(
             Code::E0018,
-            "unit must be `s` (SI second), `d` (86 400 s) or `yr` (Julian year)",
+            "unit must be `s` (SI second), `min` (60 s), `h` (3600 s), \
+             `d` (86 400 s) or `yr` (Julian year)",
         )),
     }
 }
