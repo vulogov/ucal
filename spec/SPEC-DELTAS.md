@@ -993,6 +993,33 @@ change class to `CORRECTION` instead: if the file format cannot express Rule C's
 obligations without being harder to write than the Rust it replaces, then bodies
 are code and §15.1 is wrong.
 
+### 1.8.0: the leak is bounded, and this entry does not move
+
+The objection recorded above is specific — *a caller loading in a loop leaks
+without bound* — and 1.8.0 answered that specific sentence. The binary's loaders
+**intern**: one allocation per distinct string rather than one per call, so a
+thousand loads of one file cost what one load costs.
+`crates/ucal/tests/body_file.rs` asserts it by pointer identity.
+
+**The class stays `UNIMPLEMENTED`, and the reason is worth stating precisely.**
+Interning changes the *shape* of the leak, not its existence:
+
+- a caller loading one file repeatedly no longer accumulates — the case that was
+  unbounded in a loop;
+- a caller loading a thousand *different* files still does;
+- and a loaded `Body` still cannot be dropped and its strings reclaimed, because
+  the data model is `&'static str` and that is the actual obstacle.
+
+So the fix removes the sharpest form of the objection and leaves the requirement
+unmet. A library that leaked on its callers' behalf would still be making a
+choice that is not its to make, whatever the bound.
+
+[`A2-the-2.0-diff.md`](../Documentation/Proposals/A2-the-2.0-diff.md) records the
+alternative this suggests: if interning is enough for the *binary*, an arena
+owned by the loader might be enough for the *library*, which would close this
+entry without the `Cow` migration item 2 assumes. That is a design proposal and
+not a decision.
+
 ---
 
 ## D-A21 — the leap *placement* is a convention and must be declared

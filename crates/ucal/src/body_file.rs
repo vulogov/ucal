@@ -13,10 +13,12 @@
 //! release:
 //!
 //! - **Leak.** `Box::leak` turns a `String` into a `&'static str`. It works, and
-//!   it leaks once per load. In a process that loads a file and exits, that is
-//!   bounded by the number of files named on the command line. In a library, a
-//!   caller loading calendars in a loop leaks without bound, and handing that to
-//!   every downstream user is not a trade this crate gets to make for them.
+//!   it leaked once per *call* until 1.8.0; it now leaks once per **distinct
+//!   string**, because [`leak`] interns. A caller loading one file in a loop no
+//!   longer accumulates, which was the sharp form of the objection. A caller
+//!   loading a thousand different files still does, and a loaded `Body` still
+//!   cannot be dropped — so this remains a trade a library does not get to make
+//!   for its callers, and D-A20 does not move.
 //! - **Own the strings.** `Cow<'static, str>` or `String` throughout, which is a
 //!   breaking change to `ucal-core`'s public API and therefore 2.0's.
 //!
@@ -190,12 +192,55 @@ struct BodyFile {
     satellites: Vec<SatelliteFile>,
 }
 
-/// `&'static str` from an owned one, by leaking.
+/// `&'static str` from an owned one, **interned**.
 ///
-/// The bounded leak this module's header describes. Called once per string in a
-/// loaded file, in a process that then exits.
+/// # What this changes, and what it does not
+///
+/// The data model is `&'static str` throughout, so a runtime loader has to
+/// produce one, and the only way to do that from owned data is to leak. That is
+/// [D-A20]'s obstacle and it has not moved: `Body` still holds `&'static str`,
+/// so a loaded body can never be dropped and its strings reclaimed.
+///
+/// What interning changes is the **shape** of the leak. `Box::leak` leaks once
+/// per call, so loading one file twice leaked twice; this leaks once per
+/// *distinct string*, so loading one file a thousand times leaks what loading it
+/// once leaks. The bound moves from *number of loads* to *number of distinct
+/// strings the process has seen*, which for the case that matters — a caller
+/// loading calendars in a loop — is the difference between unbounded and
+/// bounded.
+///
+/// **It is not enough to close D-A20**, and the delta stays `UNIMPLEMENTED` for
+/// the library. A caller loading a thousand *different* files still accumulates,
+/// and a library that leaked on its callers' behalf would still be making a
+/// choice that is not its to make. What this does is remove the case that was
+/// unbounded in the loop, and leave the case that is unbounded in the corpus.
+///
+/// # Cost
+///
+/// One `Mutex<HashSet<&'static str>>`, and a lookup per string. A body file
+/// carries a couple of dozen; the lookup is not on any hot path, because there
+/// is no hot path — this runs once per file named on a command line.
+///
+/// [D-A20]: https://github.com/vulogov/ucal/blob/main/spec/SPEC-DELTAS.md
 pub(crate) fn leak(s: String) -> &'static str {
-    Box::leak(s.into_boxed_str())
+    use std::collections::HashSet;
+    use std::sync::{Mutex, OnceLock};
+
+    static POOL: OnceLock<Mutex<HashSet<&'static str>>> = OnceLock::new();
+    let pool = POOL.get_or_init(|| Mutex::new(HashSet::new()));
+    // A poisoned lock means another thread panicked mid-intern. The pool is a
+    // set of immutable strings, so its contents cannot be torn; taking the inner
+    // value is correct rather than merely convenient.
+    let mut pool = match pool.lock() {
+        Ok(g) => g,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    if let Some(existing) = pool.get(s.as_str()) {
+        return existing;
+    }
+    let leaked: &'static str = Box::leak(s.into_boxed_str());
+    pool.insert(leaked);
+    leaked
 }
 
 /// J2000.0, the epoch every shipped parameter is stated at.
