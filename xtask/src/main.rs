@@ -1004,7 +1004,7 @@ fn run_corpus() -> i32 {
         println!("  UNAPP the mutation edited nothing, so nothing was tested");
         println!("  DIRTY the check was already failing on the unmutated sandbox");
         println!("        (for worked-examples this usually means target/release/ucal is");
-        println!("         a build without `--features tui`; a workspace test run replaces it)");
+        println!("         a build without `--features full`; an --all-targets build replaces it)");
         return 6;
     }
     0
@@ -1180,7 +1180,7 @@ fn run_docs(mode: &str) -> i32 {
                 eprintln!(
                     "  FAIL  worked examples not checked: target/release/ucal is \
                      absent, and in CI a skip is a failure. Build it first: \
-                     `cargo build --release -p ucal --features tui`."
+                     `cargo build --release -p ucal --features full`."
                 );
                 code = 6;
             }

@@ -174,7 +174,7 @@ jobs:
       # survives. `--features tui` because two of the examples are wall-clock
       # frames.
       - name: the binary the documentation is generated from
-        run: cargo build --release --locked -p ucal --features tui
+        run: cargo build --release --locked -p ucal --features full
 
       # §13.5's single source of truth, every citation resolving against spec/,
       # and Documentation/CLI.md covering the command surface.

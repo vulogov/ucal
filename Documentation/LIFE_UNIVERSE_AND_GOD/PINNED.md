@@ -7,11 +7,11 @@ the RFC is evidence about the past.
 
 | | |
 |---|---|
-| commit | `96d673cee03246deb12b00bd52c0ca0317f8a8d2` |
-| short | `96d673c` |
-| branch | `1.5.0` |
-| date | 2026-08-05 |
-| released | 1.4.0 on crates.io (six crates); this tree is 1.5.0, in development |
+| commit | `f9e5b811baeae03e3b0c0249cbec5931bd900c48` |
+| short | `f9e5b81` |
+| branch | `1.8.0` |
+| date | 2026-08-24 |
+| released | 1.7.0 on crates.io (six crates); this tree is 1.8.0, in development |
 
 ## Toolchain
 
@@ -25,12 +25,15 @@ the RFC is evidence about the past.
 
 | | |
 |---|---|
-| tests passing | 518 |
-| suites | 33 |
-| backends | `u512` (bnum) and `bigint` (num-bigint), both green |
-| constants harness | `cargo run -p xtask` — 96/96, two independent routes |
-| lints | clean; every exemption declared and reported by the tool |
-| citations | every `§`, `Rule` and `D-A` resolves against `spec/` (117 distinct) |
+| tests passing | 609 on the default backend; 221 in `ucal` built with `--features full` |
+| suites | 47 |
+| backends | `u512` (bnum) and `bigint` (num-bigint), both green on the same Rule W digest |
+| constants harness | `cargo run -p xtask` — 96/96, two independent routes, and it now refuses to meet its exit criterion below 60 checks |
+| lints | clean across 77 files; every exemption declared and reported by the tool |
+| defect corpus | `cargo run -p xtask -- corpus` — 22 recorded mutations, one per check, no survivors |
+| citations | every `§`, `Rule` and `D-A` resolves against `spec/` (136 distinct, and since 1.7.0 the documentation is scanned too) |
+| spec deltas | 25 recorded, 24 standing and applied to the normative text |
+| MSRV | 1.88, verified on the workspace and on `--features full` |
 | CLI | no invocation panics; every rejection is a §19.5 exit code and a sentence |
 
 ## Typst packages

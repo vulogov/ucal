@@ -165,7 +165,7 @@ fn capture(bin: &Path, args: &[&str]) -> Result<String, String> {
     if err.contains("unrecognized subcommand") || err.contains("unexpected argument") {
         return Err(format!(
             "`ucal {}` was rejected by the binary: it is probably built without \
-             `--features tui`. Run `cargo build --release -p ucal --features tui`.",
+             `--features full`. Run `cargo build --release -p ucal --features full`.",
             args.join(" ")
         ));
     }
@@ -181,7 +181,7 @@ pub fn generate(root: &Path, bin: &Path) -> Result<String, String> {
     let mut out = String::new();
     out.push_str("# Worked examples\n\n");
     out.push_str("**Generated — do not edit.** Every block below is the real output of the command above it, captured by running it. Regenerate with:\n\n");
-    out.push_str("```\ncargo build --release -p ucal --features tui\ncargo run -p xtask -- gen-examples\n```\n\n");
+    out.push_str("```\ncargo build --release -p ucal --features full\ncargo run -p xtask -- gen-examples\n```\n\n");
     out.push_str("`cargo run -p xtask -- check-docs` fails if this file is not what a fresh run produces, so an example cannot describe output the program does not produce. Field-by-field documentation is in [`CLI.md`](CLI.md).\n\n");
     out.push_str("`ucal now` and `ucal tour` are absent on purpose: `now` reads the system clock, so its output differs on every run and could never match a committed file.\n\n");
     out.push_str("Colour is off and the width is 80 columns, so these match a redirected run rather than a terminal.\n\n---\n");
@@ -205,7 +205,7 @@ fn binary(root: &Path) -> Result<std::path::PathBuf, String> {
         Ok(bin)
     } else {
         Err(format!(
-            "{} is missing; run `cargo build --release -p ucal --features tui` first",
+            "{} is missing; run `cargo build --release -p ucal --features full` first",
             bin.display()
         ))
     }
