@@ -218,6 +218,20 @@ enum Command {
     Verify,
     /// The first five minutes: what to type, what it shows, and why.
     Tour,
+    /// Instants at a tier interval, one per line. `seq`, for time.
+    #[cfg(feature = "body")]
+    Seq {
+        /// The first instant, and the first line of output.
+        from: String,
+        /// The last instant. The walk stops at or before it.
+        to: String,
+        /// The interval, as a tier: `T0`, `T1`, `T-3`, or a name like `arc`.
+        #[arg(long, default_value = "T1")]
+        step: String,
+        /// Refuse rather than print more lines than this.
+        #[arg(long, default_value = "1000000")]
+        max: u64,
+    },
     /// A full-screen clock showing universe time. `q` quits.
     #[cfg(feature = "tui")]
     Wallclock {
@@ -504,6 +518,35 @@ fn main() {
         clap_complete::generate(*shell, &mut cmd, name, &mut std::io::stdout());
         return;
     }
+    // Plain lines, not a `Doc`, for the same reason `completions` is: a
+    // generator's output is an input to something else — here `ucal to-civil -`.
+    #[cfg(feature = "body")]
+    if let Command::Seq {
+        from,
+        to,
+        step,
+        max,
+    } = &cli.command
+    {
+        let out = LocaleId::parse(&cli.locale)
+            .and_then(|l| parse_tier_in(l, step))
+            .and_then(|t| ucal::cmd_seq(from, to, t, *max));
+        match out {
+            Ok(lines) => {
+                for l in lines {
+                    println!("{l}");
+                }
+                return;
+            }
+            Err(e) => {
+                // Before the style is resolved, so this one prints plain. A
+                // generator that runs before the rendering machinery cannot
+                // borrow its colours from it.
+                eprintln!("{e}");
+                std::process::exit(exit_code(&e));
+            }
+        }
+    }
     if let Command::Man { command } = &cli.command {
         // roff on stdout, for the same reason as the completions above: a page
         // written by hand is a second description of the CLI, and this one comes
@@ -627,6 +670,14 @@ fn main() {
             LocaleId::parse(&cli.locale).and_then(|l| cmd_ladder(l, *named_only))
         }
         Command::Verify => ucal::cmd_verify(),
+        // Handled by the early return above, like `completions` and `man`: its
+        // output is lines, not a document. A diagnostic rather than
+        // `unreachable!()`, because this crate carries no panicking construct.
+        #[cfg(feature = "body")]
+        Command::Seq { .. } => Err(ucal_core::TimeError::with_context(
+            ucal_core::Code::E0001,
+            "internal: `seq` is handled before dispatch and should not have reached it",
+        )),
         Command::Tour => ucal::cmd_tour(),
         // Only `--theme list` reaches here; every other value ran the clock and
         // returned above.

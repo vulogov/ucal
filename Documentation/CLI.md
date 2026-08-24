@@ -1132,6 +1132,37 @@ are statements *about the display*, not units the clock counts in.
 
 ---
 
+## `ucal seq`
+
+`seq`, for time: instants at a tier interval, one decimal tick count per line.
+
+```
+ucal seq <FROM> <TO> [--step <TIER>] [--max <N>]
+ucal seq <FROM> <TO> --step T1 | ucal to-civil -
+```
+
+| | |
+|---|---|
+| `--step` | the interval, as a tier: `T0`, `T1`, `T-3`, or a name like `arc`. Default `T1`. |
+| `--max` | refuse rather than print more than this many lines. Default 1 000 000. |
+
+**The output is lines, not a document**, which is the one place this program
+breaks its own habit. It does so for the same reason `completions` does: a
+generator's output is an input to something else, and the something else is the
+`-` reader above.
+
+**The count is bounded and the refusal is honest.** A tier interval can be very
+small and a span very large — one tick across one second is 1.8 × 10⁴³ lines —
+so the step count is computed *before* anything is printed, and a walk over the
+cap is refused with the number it would have produced and the three ways out. A
+program that starts printing and never stops is worse than one that says why.
+
+The span is inclusive at both ends, counts forwards only, and a span shorter than
+one step yields the start and nothing else — which is an answer, where an empty
+list would be indistinguishable from a caller's mistake.
+
+---
+
 ## Reading instants from stdin
 
 ```

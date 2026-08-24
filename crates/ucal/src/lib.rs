@@ -2572,6 +2572,67 @@ pub fn cmd_wallclock_themes() -> Doc {
         )
 }
 
+/// F6 — instants at a tier interval, as plain lines.
+///
+/// `seq` for time. The output is one decimal tick count per line and **not** a
+/// `Doc`, which is the one place this program breaks its own habit, for the same
+/// reason `completions` does: a generator's output is an input to something
+/// else. The something else is [`cmd_to_civil`] and its siblings reading `-`,
+/// added in the same release:
+///
+/// ```text
+///   ucal seq <FROM> <TO> --step T1 | ucal to-civil -
+/// ```
+///
+/// # The count is bounded, and refuses rather than hangs
+///
+/// A tier interval can be very small and a span very large: stepping `T-12` —
+/// one tick — across a single second is 1.8 x 10^43 lines. There is no useful
+/// behaviour there, and a program that starts printing and never stops is worse
+/// than one that says why. So the step count is computed **first**, and a run
+/// that would exceed the cap is refused with the number it would have produced.
+#[cfg(feature = "body")]
+pub fn cmd_seq(from: &str, to: &str, step: Tier, max: u64) -> Result<Vec<String>, TimeError> {
+    let (a, _) = parse_instant(from)?;
+    let (b, _) = parse_instant(to)?;
+    if a.ticks() > b.ticks() {
+        return Err(TimeError::with_context(
+            Code::E0018,
+            "the second instant is earlier than the first; `seq` counts forwards",
+        ));
+    }
+    let span = b.ticks().try_sub(a.ticks()).ok_or_else(|| {
+        TimeError::with_context(Code::E0021, "the span between those instants exceeds the domain")
+    })?;
+    let stride = step.ticks();
+    let (count, _) = span.quot_rem(&stride);
+
+    // How many lines this would be, as a number the message can name. A count
+    // that does not fit in a u64 is by definition past the cap.
+    let n: u64 = count.to_dec_string().parse().unwrap_or(u64::MAX);
+    if n >= max {
+        return Err(TimeError::with_context(
+            Code::E0018,
+            body_file::leak(format!(
+                "that is {} steps of {step}, and the limit is {max}. Ask for a coarser \
+                 tier with --step, a shorter span, or raise --max deliberately",
+                if n == u64::MAX { "more than 2^64".to_string() } else { n.to_string() }
+            )),
+        ));
+    }
+
+    let mut out = Vec::with_capacity(n as usize + 1);
+    let mut cur = a.ticks().clone();
+    for _ in 0..=n {
+        out.push(cur.to_dec_string());
+        match cur.try_add(&stride) {
+            Some(next) => cur = next,
+            None => break,
+        }
+    }
+    Ok(out)
+}
+
 /// `ucal tour` — the first five minutes.
 #[allow(clippy::doc_markdown)]
 pub fn cmd_tour() -> CmdResult {
