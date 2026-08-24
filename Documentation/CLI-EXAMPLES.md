@@ -346,6 +346,21 @@ calendars:
                 status  no anchor: complete in units, intercalation and cycles,
                         incomplete in phase. Asking for local fields is
                         UCAL-E0062 (Rule J.3).
+  uranus-d      derived — Rule K                 uranus     —
+                leap_rule  42/85 (convergent 2)
+                status  no anchor: complete in units, intercalation and cycles,
+                        incomplete in phase. Asking for local fields is
+                        UCAL-E0062 (Rule J.3).
+  neptune-d     derived — Rule K                 neptune    —
+                leap_rule  7/179 (convergent 4)
+                status  no anchor: complete in units, intercalation and cycles,
+                        incomplete in phase. Asking for local fields is
+                        UCAL-E0062 (Rule J.3).
+  pluto-d       derived — Rule K                 pluto      —
+                leap_rule  53/149 (convergent 5)
+                status  no anchor: complete in units, intercalation and cycles,
+                        incomplete in phase. Asking for local fields is
+                        UCAL-E0062 (Rule J.3).
   earth-civil   legacy — declared tables (§8.6)  —          —
                 leap_rule  97/400 (NOT a convergent — declared, not derived)
                 arbitrary  4
