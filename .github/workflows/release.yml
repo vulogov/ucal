@@ -96,10 +96,14 @@ jobs:
       # Only the binary. The libraries are on crates.io; a download is for
       # somebody who wants to run the thing.
       - name: build
-        # `--features tui` for `ucal wallclock`. It is not a default feature —
-        # ratatui and crossterm are a large tree and `cargo install ucal` should
-        # stay lean — so the published binaries are where it ships.
-        run: cargo build --release --locked -p ucal --features tui --target ${{ matrix.target }}
+        # `--features full` — every feature this binary can have on one backend,
+        # which is `default` plus `tui`. `tui` is not a default feature (ratatui
+        # and crossterm are a large tree and `cargo install ucal` should stay
+        # lean), so the published binaries are where the wall clock ships.
+        #
+        # `full` and not `tui` since 1.9.0: the two expand to the same set here,
+        # and `full` is the name the documentation and every other workflow use.
+        run: cargo build --release --locked -p ucal --features full --target ${{ matrix.target }}
 
       # A binary that cannot re-derive its own constants is not worth shipping.
       # Every target but one is built on a runner of its own architecture, so
