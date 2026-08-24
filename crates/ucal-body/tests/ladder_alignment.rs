@@ -257,16 +257,77 @@ fn the_moons_day_is_earths_month_by_two_routes() {
 /// That is a fact about the model and not about a rendering, and no amount of
 /// zoom improves it — zooming in far enough to separate `T1` from `T2` shows
 /// two rows and no ladder.
+/// **Three rungs since 1.9.0, and the third arrived by adding a body.**
+///
+/// W4 step 1 found two — `T1` and `T2` — across the twelve calendars that
+/// shipped then, all of them inside Saturn's orbit or on it. F9 added Uranus,
+/// Neptune and Pluto, and a Plutonian year is 248 Earth years against a `T3`
+/// span of 45, so the outer solar system reaches a rung the inner one never
+/// touches.
+///
+/// The finding is not weakened by this; it is measured better. **The whole solar
+/// system's days and years occupy three rungs out of forty-five**, and the two
+/// extra bodies moved it by one. That is still a ladder whose steps are a factor
+/// of 3125 spanning a range its contents do not, which was the point.
 #[test]
-fn every_local_unit_lands_on_one_of_two_rungs() {
+fn every_local_unit_lands_on_one_of_three_rungs() {
     let mut rungs: Vec<String> = table().into_iter().map(|(_, _, p)| label(p.tier)).collect();
     rungs.sort();
     rungs.dedup();
     assert_eq!(
         rungs,
-        vec!["T1 arc".to_string(), "T2 sweep".to_string()],
-        "every local unit of every shipped body should sit on one of two rungs"
+        vec![
+            "T1 arc".to_string(),
+            "T2 sweep".to_string(),
+            "T3 span".to_string()
+        ],
+        "every local unit of every shipped body should sit on one of three rungs"
     );
-    // Forty-five rungs exist. Forty-three of them hold nothing, for every body.
+    // Forty-five rungs exist. Forty-two of them hold nothing, for every body.
     assert_eq!(Tier::all_descending().count(), 45);
+}
+
+/// The distribution, which is not the tidy story it looks like.
+///
+/// It is tempting to summarise the placements as *days on one rung, years on the
+/// next*, and that is wrong. Fifteen days split **eight on `T1`, seven on `T2`**
+/// — Luna, Mercury, Venus, Titan, Ganymede, Callisto and Pluto have days long
+/// enough to reach the sweep — and fifteen years split **twelve on `T2`, three
+/// on `T3`**.
+///
+/// So days and years *overlap* on `T2`, and the ladder does not separate them.
+/// A body's day and another body's year can sit on the same rung, which is what
+/// a grid built from powers of five with no knowledge of either would do.
+///
+/// The neat version was written here first and asserted that Pluto's was the
+/// only day off the arc. Seven others already were, before F9 added anything.
+/// The tidy claim was a property of the sample, and the sample was never looked
+/// at.
+#[test]
+fn days_and_years_overlap_on_one_rung() {
+    let mut days: Vec<String> = Vec::new();
+    let mut years: Vec<String> = Vec::new();
+    for (_, what, p) in table() {
+        match what {
+            "solar day" => days.push(label(p.tier)),
+            "year" => years.push(label(p.tier)),
+            _ => {}
+        }
+    }
+    let uniq = |mut v: Vec<String>| {
+        v.sort();
+        v.dedup();
+        v
+    };
+    assert_eq!(uniq(days.clone()), vec!["T1 arc".to_string(), "T2 sweep".to_string()]);
+    assert_eq!(
+        uniq(years.clone()),
+        vec!["T2 sweep".to_string(), "T3 span".to_string()]
+    );
+
+    // The overlap itself: one rung carries both kinds of unit.
+    assert!(
+        days.contains(&"T2 sweep".to_string()) && years.contains(&"T2 sweep".to_string()),
+        "the sweep should carry some bodies' days and other bodies' years"
+    );
 }

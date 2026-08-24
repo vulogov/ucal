@@ -468,6 +468,66 @@ pub fn luna() -> Body {
 }
 
 /// Every built-in body (§9.7).
+/// Uranus.
+///
+/// **Retrograde**, and the fact sheet says so with a sign — `-17.24 h` — that
+/// [`Measured`](crate::param::Measured) cannot carry. Item 3 of
+/// `ROAD-TO-2.0.md`, unchanged since 1.0. It costs nothing here: the sheet
+/// publishes the **length of day** directly, so the solar day is stated rather
+/// than derived, and the derivation is the only place the sign would matter.
+///
+/// The obliquity carries the fact instead, as it does for Venus: 97.77 degrees
+/// is past a right angle, which is how a retrograde spin is stated when the
+/// rotation itself is a magnitude.
+///
+/// Both periods are quoted **in hours**, as the source prints them (F5).
+pub fn uranus() -> Body {
+    Body::new(
+        "uranus",
+        param(1_724, 2, MeasuredUnit::Hour, NASA_FACT_SHEET, 1_000),
+        param(1_724, 2, MeasuredUnit::Hour, NASA_FACT_SHEET, 1_000),
+        param(306_854, 1, MeasuredUnit::SiDay, NASA_FACT_SHEET, 10_000),
+    )
+    .orbiting("sun")
+    .with_obliquity(AngleParam::degrees(9_777, 2, IAU_WGCCRE).expect("valid angle"))
+}
+
+/// Neptune.
+///
+/// The one of these three whose rotation is prograde, and whose sidereal period
+/// and length of day are published as the same figure to the precision given.
+pub fn neptune() -> Body {
+    Body::new(
+        "neptune",
+        param(1_611, 2, MeasuredUnit::Hour, NASA_FACT_SHEET, 1_000),
+        param(1_611, 2, MeasuredUnit::Hour, NASA_FACT_SHEET, 1_000),
+        param(601_890, 1, MeasuredUnit::SiDay, NASA_FACT_SHEET, 10_000),
+    )
+    .orbiting("sun")
+    .with_obliquity(AngleParam::degrees(2_832, 2, IAU_WGCCRE).expect("valid angle"))
+}
+
+/// Pluto.
+///
+/// Retrograde, like Uranus, and the only body here whose sidereal rotation and
+/// length of day differ in the fourth figure — `153.2928` against `153.2820` —
+/// because its year is short enough relative to its day for the synodic
+/// correction to show at that precision. Both are published, so both are stated.
+///
+/// Not a planet by the IAU's 2006 definition, which changes nothing this program
+/// does: Rule K derives a calendar from periods, and a body's classification is
+/// not one of them.
+pub fn pluto() -> Body {
+    Body::new(
+        "pluto",
+        param(1_532_928, 4, MeasuredUnit::Hour, NASA_FACT_SHEET, 1_000),
+        param(1_532_820, 4, MeasuredUnit::Hour, NASA_FACT_SHEET, 1_000),
+        param(90_560, 0, MeasuredUnit::SiDay, NASA_FACT_SHEET, 10_000),
+    )
+    .orbiting("sun")
+    .with_obliquity(AngleParam::degrees(12_253, 2, IAU_WGCCRE).expect("valid angle"))
+}
+
 pub fn all() -> alloc::vec::Vec<Body> {
     alloc::vec![
         earth(),
@@ -483,6 +543,9 @@ pub fn all() -> alloc::vec::Vec<Body> {
         ganymede(),
         callisto(),
         enceladus(),
+        uranus(),
+        neptune(),
+        pluto(),
     ]
 }
 
@@ -627,6 +690,12 @@ mod tests {
         assert!(by_id("mars").is_some());
         assert!(by_id("titan").is_some());
         assert!(by_id("Earth").is_none());
-        assert!(by_id("pluto").is_none());
+        // `vulcan` and not `pluto`. Pluto was the stand-in for a body this
+        // program does not have until 1.9.0 added it, at which point the test
+        // asserted something false about the catalogue rather than about the
+        // lookup. Vulcan is the intramercurial planet Le Verrier proposed to
+        // explain Mercury's perihelion precession; general relativity explained
+        // it instead, and nobody will be adding Vulcan.
+        assert!(by_id("vulcan").is_none());
     }
 }

@@ -394,6 +394,9 @@ pub fn registered() -> Vec<(&'static str, crate::body::Body, Option<&'static str
         ("ganymede-d", crate::data::ganymede(), None),
         ("callisto-d", crate::data::callisto(), None),
         ("enceladus-d", crate::data::enceladus(), None),
+        ("uranus-d", crate::data::uranus(), None),
+        ("neptune-d", crate::data::neptune(), None),
+        ("pluto-d", crate::data::pluto(), None),
     ]
 }
 
