@@ -530,7 +530,31 @@ fn main() {
         return;
     }
 
-    let result = match &cli.command {
+    // F2. `-` as an instant reads lines from stdin, and the whole dispatch runs
+    // once per line. `over` substitutes the line for whichever argument carried
+    // the `-`; every other argument is the one the caller typed, so a streamed
+    // run and a single run differ in exactly one value.
+    let streaming = streamed(&cli.command);
+    let mut lines: Vec<String> = Vec::new();
+    if streaming {
+        use std::io::BufRead;
+        for line in std::io::stdin().lock().lines() {
+            match line {
+                Ok(l) if !l.trim().is_empty() => lines.push(l.trim().to_string()),
+                Ok(_) => {}
+                Err(_) => {
+                    eprintln!("could not read stdin");
+                    std::process::exit(2);
+                }
+            }
+        }
+    }
+
+    fn pick<'x>(replacement: Option<&'x str>, typed: &'x str) -> &'x str {
+        replacement.unwrap_or(typed)
+    }
+    let dispatch = |replacement: Option<&str>| -> ucal::CmdResult {
+        match &cli.command {
         Command::Datum => cmd_datum(),
         Command::Doctor => cmd_doctor(),
         #[cfg(feature = "cosmo")]
@@ -566,7 +590,7 @@ fn main() {
         #[cfg(all(feature = "body", feature = "civil"))]
         Command::Cal { what } => match what {
             CalCommand::List => ucal::cmd_cal_list(),
-            CalCommand::Show { id, instant } => ucal::cmd_cal_show(id, instant),
+            CalCommand::Show { id, instant } => ucal::cmd_cal_show(id, pick(replacement, instant)),
             CalCommand::Anchor { id } => ucal::cmd_cal_anchor(id),
             CalCommand::Derive { file, anchor, at } => {
                 ucal::cmd_cal_derive_with(file, anchor.as_deref(), at.as_deref())
@@ -578,7 +602,7 @@ fn main() {
             calendars,
         } => {
             let ids: Vec<String> = calendars.split(',').map(|s| s.trim().to_string()).collect();
-            ucal::cmd_show(instant, &ids)
+            ucal::cmd_show(pick(replacement, instant), &ids)
         }
         Command::Ladder { named_only } => {
             LocaleId::parse(&cli.locale).and_then(|l| cmd_ladder(l, *named_only))
@@ -603,9 +627,9 @@ fn main() {
         }
         Command::Explain { instant, claim, why } => {
             if *why {
-                ucal::cmd_explain_why(instant, *claim)
+                ucal::cmd_explain_why(pick(replacement, instant), *claim)
             } else {
-                cmd_explain(instant, *claim)
+                cmd_explain(pick(replacement, instant), *claim)
             }
         }
         Command::Between { from, to, at } => match at {
@@ -635,9 +659,12 @@ fn main() {
             // half-even is still the default for both.
             .and_then(|s| parse_calendar(calendar).map(|c| (s, c)))
             .and_then(|(s, c)| {
-                cmd_to_civil(instant, s, *digits, round.unwrap_or(Rounding::HalfEven), c)
+                cmd_to_civil(pick(replacement, instant), s, *digits, round.unwrap_or(Rounding::HalfEven), c)
             }),
+        }
     };
+
+
 
     // --no-color beats --color, because it is the flag a script sets when it
     // cannot know what the caller's environment has already put in `--color`.
@@ -734,6 +761,39 @@ fn main() {
         .bridge(cli.bridge)
         .width(Render::resolve_width(cli.width, terminal));
 
+    // F2: one document per input line, in whichever form the caller asked for.
+    if streaming {
+        let mut bad = 0;
+        for line in &lines {
+            match dispatch(Some(line)) {
+                Ok(doc) => {
+                    if cli.json {
+                        // JSON Lines: one record, one line, so the stream is a
+                        // filter rather than a concatenation of documents.
+                        println!("{}", compact_json(&doc.to_json_with(&render)));
+                    } else {
+                        print!("{}", doc.render(&render));
+                    }
+                }
+                Err(e) => {
+                    // A bad line is reported and the stream continues: a filter
+                    // that dies on line 3 of 10 000 has thrown away the other
+                    // 9 999 answers. The exit code still says something went
+                    // wrong, so a script cannot mistake a partial run for a
+                    // clean one.
+                    let err_style = error_style(choice);
+                    eprintln!("{}: {}", line, err_style.paint(Role::Error, &e.to_string()));
+                    bad += 1;
+                }
+            }
+        }
+        if bad > 0 {
+            std::process::exit(6);
+        }
+        return;
+    }
+
+    let result = dispatch(None);
     match result {
         Ok(doc) => {
             print!(
@@ -807,5 +867,96 @@ fn terminal_width() -> Option<usize> {
         terminal_size::terminal_size().map(|(terminal_size::Width(w), _)| w as usize)
     } else {
         None
+    }
+}
+
+/// Does this invocation read its instant from stdin?
+///
+/// F2. `-` is the conventional spelling, and the commands that accept it are the
+/// ones taking **exactly one** instant. `between` and `ruler` take two, and a
+/// line-oriented filter has no natural answer for which of the two a line is —
+/// so they do not accept it rather than accepting it and guessing.
+fn streamed(cmd: &Command) -> bool {
+    let one: Option<&String> = match cmd {
+        Command::ToCivil { instant, .. } => Some(instant),
+        Command::Explain { instant, .. } => Some(instant),
+        #[cfg(all(feature = "body", feature = "civil"))]
+        Command::Show { instant, .. } => Some(instant),
+        #[cfg(feature = "body")]
+        Command::Cal { what } => match what {
+            CalCommand::Show { instant, .. } => Some(instant),
+            _ => None,
+        },
+        _ => None,
+    };
+    one.is_some_and(|i| i == "-")
+}
+
+/// One JSON document on one line.
+///
+/// F2. A stream is only a filter if each record is a line, and `to_json_with`
+/// pretty-prints — so this removes the whitespace *between* tokens and touches
+/// nothing inside a string.
+///
+/// Deliberately a post-pass over the one serialiser rather than a second
+/// serialiser. A compact writer beside the pretty one would be two descriptions
+/// of the `ucal-json/1` surface, and `fixtures/json-surface.txt` pins only one
+/// of them — which is exactly how the two would come to disagree.
+fn compact_json(pretty: &str) -> String {
+    let mut out = String::with_capacity(pretty.len());
+    let mut in_string = false;
+    let mut escaped = false;
+    for ch in pretty.chars() {
+        if in_string {
+            out.push(ch);
+            if escaped {
+                escaped = false;
+            } else if ch == '\\' {
+                escaped = true;
+            } else if ch == '"' {
+                in_string = false;
+            }
+            continue;
+        }
+        match ch {
+            '"' => {
+                in_string = true;
+                out.push(ch);
+            }
+            ' ' | '\n' | '\t' | '\r' => {}
+            _ => out.push(ch),
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod stream_tests {
+    use super::compact_json;
+
+    /// Compaction removes layout and preserves content.
+    #[test]
+    fn compaction_touches_nothing_inside_a_string() {
+        let pretty = "{\n  \"a\": \"two words\",\n  \"b\": [\n    1,\n    2\n  ]\n}";
+        assert_eq!(compact_json(pretty), "{\"a\":\"two words\",\"b\":[1,2]}");
+    }
+
+    /// An escaped quote does not end the string early.
+    ///
+    /// The failure this guards against is silent: a citation containing `\"`
+    /// would flip the parser's idea of where the string ends and the rest of the
+    /// document would have its spaces eaten.
+    #[test]
+    fn an_escaped_quote_does_not_end_the_string() {
+        let pretty = "{\"q\": \"a \\\" b\",  \"n\": 1}";
+        assert_eq!(compact_json(pretty), "{\"q\":\"a \\\" b\",\"n\":1}");
+    }
+
+    /// And a trailing backslash inside a string is not treated as an escape of
+    /// the closing quote.
+    #[test]
+    fn a_literal_backslash_is_handled() {
+        let pretty = "{\"p\": \"a\\\\\", \"n\": 2}";
+        assert_eq!(compact_json(pretty), "{\"p\":\"a\\\\\",\"n\":2}");
     }
 }

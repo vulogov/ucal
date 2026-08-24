@@ -1095,6 +1095,34 @@ are statements *about the display*, not units the clock counts in.
 
 ---
 
+## Reading instants from stdin
+
+```
+cat ticks.txt | ucal --json to-civil -
+ucal cal show earth-d - < instants.txt
+```
+
+**`-` in place of an instant reads lines from stdin**, and the whole command runs
+once per line. Every other argument is the one you typed, so a streamed run and a
+single run differ in exactly one value — and a test holds them to agreeing.
+
+| | |
+|---|---|
+| accepted by | the commands taking **exactly one** instant: `to-civil`, `explain`, `show`, `cal show` |
+| not accepted by | `between` and `ruler`, which take two — a line-oriented filter has no answer for which of the two a line is, so `-` is treated as what it is, an unparseable instant |
+| with `--json` | **JSON Lines**: one `ucal-json/1` record per line, so the output is a filter's output |
+| without `--json` | one rendered document per line, which is complete and verbose |
+| blank lines | skipped, not an error — a file ending in a newline is not a mistake |
+| a bad line | reported on stderr, **and the stream continues**; the exit status is still non-zero |
+
+That last row is two decisions, and they pull in opposite directions. A filter
+that dies on line 3 of 10 000 has thrown away 9 997 answers it had already
+computed. A filter that exits 0 after skipping a line lets a script treat a
+partial run as a complete one. So it does both: every good line is answered, and
+the exit code says something was not.
+
+---
+
 ## `ucal doctor`
 
 Profile, backend, ceiling, leap table, features, provenance (§19.3).
