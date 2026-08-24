@@ -235,8 +235,8 @@ cargo run -p xtask -- verify-vectors  # conformance vectors re-derive
 
 ## Status
 
-Released **1.7.0** on crates.io, all six crates. `main` carries the released
-line; `1.8.0` is where development happens.
+Released **1.8.0** on crates.io, all six crates. `main` carries the released
+line.
 
 The API is **stable**: within `1.x` no public item is removed, no signature
 changes, and nothing that compiled stops compiling. What is promised above the

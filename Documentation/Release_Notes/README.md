@@ -12,7 +12,7 @@ knows only what it did.
 
 | version | date | state |
 |---|---|---|
-| [1.8.0](1.8.0.md) | — | **unreleased** — the frozen four, measured |
+| [1.8.0](1.8.0.md) | 2026-08-24 | released — the frozen four, measured |
 | [1.7.0](1.7.0.md) | 2026-08-22 | released — does each check catch what it exists for |
 | [1.6.0](1.6.0.md) | 2026-08-20 | released — the mechanism without a wire |
 | [1.5.0](1.5.0.md) | 2026-08-11 | released — spend what the research found, and build a clock |
