@@ -897,6 +897,13 @@ fn terminal_width() -> Option<usize> {
 /// so they do not accept it rather than accepting it and guessing.
 fn streamed(cmd: &Command) -> bool {
     let one: Option<&String> = match cmd {
+        // Gated for the same reason the variants are. `streamed` named
+        // `Command::ToCivil` unconditionally and the `features` workflow caught
+        // it on `--no-default-features --features u512,std`, where `civil` is
+        // absent and the variant does not exist — the fourth time that workflow
+        // has found a feature-gating miss by building a combination nobody
+        // would type.
+        #[cfg(feature = "civil")]
         Command::ToCivil { instant, .. } => Some(instant),
         Command::Explain { instant, .. } => Some(instant),
         #[cfg(all(feature = "body", feature = "civil"))]
