@@ -249,7 +249,8 @@ repository has used the API.
 [release](https://github.com/vulogov/ucal/releases) — unpack and run, no
 toolchain needed. They are built with `--features tui`, so they include
 `ucal wallclock`. `cargo install ucal` if you have a toolchain, and
-`cargo install ucal --features tui` if you want the clock: `ratatui` and
+`cargo install ucal --features tui` if you want the clock, or `--features full`
+for everything at once: `ratatui` and
 `crossterm` are a large tree and a lean default install matters more.
 
 Release notes: [`Documentation/Release_Notes`](Documentation/Release_Notes).

@@ -73,6 +73,19 @@ cosmo = ["dep:ucal-cosmo"]
 # afternoon, on the same feature, which is a fair measure of how invisible this
 # is without a machine looking.
 tui = ["dep:ratatui", "dep:crossterm", "std", "civil", "body"]
+# Everything this binary can be, on one backend.
+#
+# `--all-features` is the name a tool reaches for and **cannot work here**: it
+# enables `u512` and `bigint` together and the backend guard fires, because Rule
+# B makes the value width a wire-format commitment. Three tools have now wanted
+# something the feature surface could not give them — `cargo semver-checks`
+# needs `--default-features`, the MSRV job spelled out `--features tui`, and
+# 1.6.0's audit wrote around it — so this is the name they were asking for.
+#
+# It deliberately does **not** include `bigint`. A feature meaning "everything"
+# that quietly picked a backend would be a worse answer than no feature at all;
+# this one means everything that can be true at once.
+full = ["u512", "std", "civil", "body", "events", "cosmo", "tui"]
 
 [dev-dependencies]
 ucal-events = { workspace = true }

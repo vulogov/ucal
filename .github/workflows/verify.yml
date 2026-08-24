@@ -140,13 +140,11 @@ jobs:
       # feature that cannot be built at the declared MSRV is a second, unstated
       # MSRV.
       #
-      # `--all-features` and not `--features tui` would be the obvious spelling
-      # and does not work: it enables `u512` and `bigint` together and the
-      # backend guard fires. That is item 1 of ROAD-TO-2.0 turning up in a third
-      # tool, after `cargo semver-checks` needing `--default-features` and the
-      # dependency-graph hazard the proposal is actually about.
-      - name: the tui feature builds at the MSRV too
-        run: cargo build -p ucal --features tui --all-targets
+      # `--features full`, not `--all-features`: the latter enables `u512` and
+      # `bigint` together and the backend guard fires. `full` is the name added
+      # in 1.8.0 for exactly this — everything the binary can be, on one backend.
+      - name: every feature builds at the MSRV
+        run: cargo build -p ucal --features full --all-targets
 
 
   checks:

@@ -60,6 +60,8 @@ jobs:
       - run: cargo build -p ucal --no-default-features --features u512,std,tui
       - run: cargo build -p ucal --no-default-features --features u512,std,civil,tui
       - run: cargo build -p ucal --features tui
+      # The alias three tools wanted. Must be exactly the buildable maximum.
+      - run: cargo build -p ucal --features full
 
   refused:
     name: every unsupported combination fails with a sentence

@@ -248,7 +248,7 @@ exists so that it does not have to.
   built at the declared MSRV is a second, unstated MSRV — a caller who types
   `cargo install ucal --features tui` and is told their toolchain is too old has
   not been given a number they could have checked. The floor is 1.88, `rust-version`
-  says so, and CI builds `--all-features` at it.
+  says so, and CI builds `--features full` at it.
 
   The library crates are unaffected in substance: their floor is still `bnum
   0.14`'s 1.87, and a caller depending on `ucal-core` alone needs no more than
@@ -256,7 +256,7 @@ exists so that it does not have to.
   higher of the two is the honest one to publish.
 
 *Enforced by* a CI job pinned to exactly 1.88 that builds the workspace and all
-targets **and `-p ucal --features tui --all-targets`**, plus a check that the
+targets **and `-p ucal --features full --all-targets`**, plus a check that the
 manifest still declares 1.88. The version pin is a literal rather than read from
 the manifest: a job that follows the manifest would prove nothing about a
 manifest lowered by hand.

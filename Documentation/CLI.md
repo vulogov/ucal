@@ -940,7 +940,11 @@ ucal wallclock --once [--at <INSTANT>] [--height <N>]
 ucal wallclock --theme list
 ```
 
-**Only in a build with the `tui` feature.** `ratatui` and `crossterm` are a
+**Only in a build with the `tui` feature** — or `full`, which is every feature
+this binary can have on one backend. `--all-features` is the name a tool reaches
+for and cannot work here: it enables both integer backends at once and the guard
+in `ucal-core` refuses to compile, because Rule B makes the value width a
+wire-format commitment. `ratatui` and `crossterm` are a
 large tree and [`GE-U4-tier-navigator.md`](Proposals/GE-U4-tier-navigator.md)
 asked in as many words that `cargo install ucal` stay lean, so the feature is not
 in `default`. The published release binaries are built with it; a source install

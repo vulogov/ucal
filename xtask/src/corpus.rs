@@ -166,6 +166,17 @@ pub const MUTATIONS: &[Mutation] = &[
         find: "\"ticks\"",
         replace: "\"ticks_renamed\"",
     },
+    Mutation {
+        // X1 listed this check as hand-verified because it read `workspace_root()`
+        // and could not be pointed at a sandbox. B6 gave it a root parameter, and
+        // this is the mutation it existed to be given: the committed digest no
+        // longer matches what the two integer routes re-derive.
+        check: "verify-vectors",
+        what: "a conformance digest that the two routes do not re-derive",
+        file: "fixtures/SHA256SUMS",
+        find: "1f99cf62",
+        replace: "1f99cf63",
+    },
     // ---- lints -----------------------------------------------------------
     Mutation {
         check: "lint:float-free",
@@ -372,6 +383,9 @@ pub fn run_check(name: &str, root: &Path) -> bool {
         // here so a sandbox without one shows up as a survivor rather than as a
         // silent success — the same distinction V2 drew for CI.
         "worked-examples" => !matches!(crate::examples::check(root), Err(_)),
+        // Exit 0 means the digest matched. The check prints as it goes, which is
+        // noisy inside a corpus run and is the check doing its job.
+        "verify-vectors" => crate::run_verify_vectors_at(root) == 0,
         "schema" => crate::schema::check(root).is_ok(),
         other => panic!("the corpus names a check that does not exist: `{other}`"),
     }
