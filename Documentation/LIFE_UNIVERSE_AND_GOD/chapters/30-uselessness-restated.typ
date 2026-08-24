@@ -107,11 +107,15 @@ only its successes would be making the same claims with none of the standing.
 
 #section("What was actually built")
 
-Six crates. 518 tests on two integer backends. A specification vendored, corrected in
+Six crates. 609 tests on two integer backends. A specification vendored, corrected in
 place, and cited by the source about a thousand times, with a build step that fails if
-a citation resolves to nothing. A tier grid generated from the library so it cannot
-drift. A lint that reports every exemption it honours. A book, marked throughout where
-it stops asserting fact, with a script that checks the marking.
+a citation resolves to nothing — including, since 1.7.0, the citations in this book and
+in every other document here, which had never been checked at all. A tier grid
+generated from the library so it cannot drift. A lint that reports every exemption it
+honours, and refuses to report anything if it read too few files to be believed. A
+corpus of twenty-two recorded defects, one per check, so that every check is known to
+object to the thing it exists for. A book, marked throughout where it stops asserting
+fact, with a script that checks the marking.
 
 None of it is useful.
 

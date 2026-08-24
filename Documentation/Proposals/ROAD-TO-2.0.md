@@ -114,9 +114,9 @@ so that the compiled-in tables stay `const`-constructible and cost nothing —
 §3.3 requires the profile constants to be `const`, and that must not regress to
 buy a loader.
 
-**Cost to a caller:** every construction site changes. `Citation::new` is the
-worst of it, and it is `const fn` today, which `Cow` preserves for the borrowed
-case.
+**Cost to a caller:** *measured in 1.8.0 and not what this said.* `Citation::new`
+keeps its signature and its `const fn`, so no construction site changes at all.
+What a caller loses is `Copy`, on seven types — see the measured diff below.
 
 ### 3. `Measured` cannot express a retrograde rotation — **rides along**
 
@@ -181,6 +181,69 @@ latent, and the cost of waiting is zero until something does.
 That is not a gate. It is the observation that the release can be made whenever
 the work is done, and that nothing is made worse by doing the work in a cycle
 that has room for it.
+
+### That paragraph was a deferral, and it lasted five cycles
+
+Written above and left standing since 1.4.0. It reads like a schedule and
+functions as one only if somebody counts the diff, which nobody did until 1.8.0
+— five releases later. [`A2-the-2.0-diff.md`](A2-the-2.0-diff.md) says the rest
+plainly, and the shape is the one this document already diagnosed one section
+earlier about the contact gate: *"It reads as rigour and functions as deferral."*
+
+The lesson is not that the decision was wrong. It is that **"when the work is
+done" needs somebody to have measured the work**, and this document did not ask
+anyone to.
+
+### The measured diff (1.8.0)
+
+| item | caller-visible cost | internal cost |
+|---|---|---|
+| 1 — withdraw `bigint` | one documented feature disappears | ~25 lines across 6 manifests |
+| 2 — `Cow` data model | **`Copy` lost on 7 types**; construction unchanged | 22 struct literals, 14 compile errors |
+| 3 — `Measured` sign | one constructor argument | 17 sites |
+| 4 — §15.1 in the library | none (additive) | 627 lines moved |
+
+**Item 2 is not the rename this document assumed.** `Citation::new` can keep
+taking `&'static str` and keep being `const fn`, because `Cow::Borrowed` is a
+`const` constructor — so §3.3's const-constructible profile constants survive and
+**all twenty-nine call sites compile unchanged**, verified by doing it. What
+breaks is `Copy`, on seven types, and that lands on callers rather than here.
+
+The paragraph above says the fix's "cost to a caller" is that "every construction
+site changes". That is now known to be false, and the real cost is one this
+document did not name.
+
+**Item 1 has three tools asking for it.** `cargo semver-checks` needs
+`--default-features`, the MSRV job cannot say `--all-features`, and 1.6.0's audit
+wrote around the same wall. 1.8.0 added a `full` feature as the name they were
+reaching for, which relieves the symptom without touching the hazard: two
+libraries on different backends still cannot appear in one dependency graph.
+
+And item 1 must be executed as one change across all six manifests. Withdrawing
+the feature from `ucal-core` alone makes `cargo metadata` fail outright, because
+siblings request `ucal-core/bigint` — found while probing, in A3.
+
+### A path this document does not list
+
+A2 surfaced it: **give the loader an arena or an interner** rather than changing
+the data model. §15.1's obstacle is that a runtime loader must produce
+`&'static str` and therefore leaks; interning bounds the leak by *distinct
+content* instead of by call count. That would address item 4 without item 2, and
+it is additive.
+
+Whether it is enough to move D-A20 from `UNIMPLEMENTED` is a separate question —
+interning does not make a loaded `Body` droppable, so it weakens the objection
+rather than removing it.
+
+### And the tool can be relied on
+
+A2's number depends on `cargo semver-checks` being right about what breaks, and
+V1 Finding 6 established that it is not always.
+[`A3-semver-probes.md`](A3-semver-probes.md) probed the six categories a 2.0 of
+this crate would touch — a removed feature, a removed derive, a changed field
+type, an added argument, and a variant added to each of a `#[non_exhaustive]` and
+a closed enum — against what a real downstream crate does. **Six agreements, no
+second blind spot.**
 
 ## What 2.0 does not do
 

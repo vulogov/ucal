@@ -58,8 +58,13 @@ pub struct Mutation {
     /// One line: the defect this introduces, for the report.
     pub what: &'static str,
     /// Repo-relative path of the file to edit.
+    ///
+    /// `{VERSION}` is replaced with the workspace version, so an entry naming
+    /// this cycle's release notes does not go stale at the next bump.
     pub file: &'static str,
-    /// Exact text to find. Must occur at least once, or the mutation is
+    /// Exact text to find, with `{VERSION}` substituted as in [`Mutation::file`].
+    ///
+    /// Must occur at least once, or the mutation is
     /// **unapplied** and reported as such — a corpus entry that silently edits
     /// nothing would be a check on nothing, which is the defect this file exists
     /// to find in other people's work.
@@ -143,7 +148,7 @@ pub const MUTATIONS: &[Mutation] = &[
     Mutation {
         check: "ci-covers-procedure",
         what: "a verification command the release notes claim and CI does not run",
-        file: "Documentation/Release_Notes/1.7.0.md",
+        file: "Documentation/Release_Notes/{VERSION}.md",
         find: "cargo test --workspace --release",
         replace: "cargo test --workspace --release\ncargo run -p xtask -- invented-check",
     },
@@ -160,6 +165,17 @@ pub const MUTATIONS: &[Mutation] = &[
         file: "fixtures/ucal-json-1.schema.json",
         find: "\"ticks\"",
         replace: "\"ticks_renamed\"",
+    },
+    Mutation {
+        // X1 listed this check as hand-verified because it read `workspace_root()`
+        // and could not be pointed at a sandbox. B6 gave it a root parameter, and
+        // this is the mutation it existed to be given: the committed digest no
+        // longer matches what the two integer routes re-derive.
+        check: "verify-vectors",
+        what: "a conformance digest that the two routes do not re-derive",
+        file: "fixtures/SHA256SUMS",
+        find: "1f99cf62",
+        replace: "1f99cf63",
     },
     // ---- lints -----------------------------------------------------------
     Mutation {
@@ -251,8 +267,8 @@ pub const MUTATIONS: &[Mutation] = &[
         // member manifests at all. See the survivor note in
         // `Documentation/Proposals/X1-defect-corpus.md`.
         file: "Cargo.toml",
-        find: "ucal-core = { version = \"1.7.0\"",
-        replace: "ucal-core = { version = \"1.6.0\"",
+        find: "ucal-core = { version = \"{VERSION}\"",
+        replace: "ucal-core = { version = \"0.0.1\"",
     },
     Mutation {
         // The second path, added when X2 widened this lint to member manifests.
@@ -267,9 +283,23 @@ pub const MUTATIONS: &[Mutation] = &[
         what: "a member manifest that stops inheriting the workspace version",
         file: "crates/ucal-core/Cargo.toml",
         find: "version.workspace = true",
-        replace: "version = \"1.7.0\"",
+        replace: "version = \"{VERSION}\"",
     },
 ];
+
+/// Fill `{VERSION}` in a mutation's paths and patterns.
+///
+/// Three entries name the version — the current release notes, and the two
+/// halves of `version-lockstep`. Hardcoding it meant the corpus went stale at
+/// every bump, which it duly did on the first one after it was written: three
+/// entries reported `UNAPP` on the 1.8.0 branch and tested nothing.
+///
+/// The `UNAPP` verdict caught it, which is the design working. Not needing to be
+/// caught is better than being caught, and a mechanism requiring a hand edit
+/// every release is one that eventually gets edited wrong.
+pub fn subst(s: &str) -> String {
+    s.replace("{VERSION}", env!("CARGO_PKG_VERSION"))
+}
 
 /// Copy the parts of the tree the checks read into a scratch directory.
 ///
@@ -353,6 +383,9 @@ pub fn run_check(name: &str, root: &Path) -> bool {
         // here so a sandbox without one shows up as a survivor rather than as a
         // silent success — the same distinction V2 drew for CI.
         "worked-examples" => !matches!(crate::examples::check(root), Err(_)),
+        // Exit 0 means the digest matched. The check prints as it goes, which is
+        // noisy inside a corpus run and is the check doing its job.
+        "verify-vectors" => crate::run_verify_vectors_at(root) == 0,
         "schema" => crate::schema::check(root).is_ok(),
         other => panic!("the corpus names a check that does not exist: `{other}`"),
     }
@@ -363,12 +396,12 @@ pub fn run(root: &Path, into: &Path) -> Result<Vec<(&'static Mutation, Verdict)>
     sandbox(root, into)?;
     let mut out = Vec::new();
     for m in MUTATIONS {
-        let path = into.join(m.file);
+        let path = into.join(subst(m.file));
         let Ok(original) = std::fs::read_to_string(&path) else {
             out.push((m, Verdict::Unapplied));
             continue;
         };
-        if !original.contains(m.find) {
+        if !original.contains(&subst(m.find)) {
             out.push((m, Verdict::Unapplied));
             continue;
         }
@@ -378,7 +411,11 @@ pub fn run(root: &Path, into: &Path) -> Result<Vec<(&'static Mutation, Verdict)>
             out.push((m, Verdict::SandboxAlreadyFailing));
             continue;
         }
-        std::fs::write(&path, original.replacen(m.find, m.replace, 1)).map_err(|e| e.to_string())?;
+        std::fs::write(
+            &path,
+            original.replacen(&subst(m.find), &subst(m.replace), 1),
+        )
+        .map_err(|e| e.to_string())?;
         let passed = run_check(m.check, into);
         std::fs::write(&path, &original).map_err(|e| e.to_string())?;
         out.push((
@@ -457,11 +494,11 @@ mod tests {
             .expect("workspace root")
             .to_path_buf();
         for m in MUTATIONS {
-            let path = root.join(m.file);
+            let path = root.join(subst(m.file));
             let src = std::fs::read_to_string(&path)
-                .unwrap_or_else(|e| panic!("{} names {}: {e}", m.check, m.file));
+                .unwrap_or_else(|e| panic!("{} names {}: {e}", m.check, subst(m.file)));
             assert!(
-                src.contains(m.find),
+                src.contains(&subst(m.find)),
                 "{}: `{}` does not contain the anchor `{}`",
                 m.check,
                 m.file,

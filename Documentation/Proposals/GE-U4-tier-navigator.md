@@ -143,6 +143,27 @@ is the one person who cannot be either. What was in the author's control was
 making it runnable, and that is now done: the test has no remaining cost except
 the two people, which is the same thing 0.7.0 is waiting on everywhere else.
 
+### Run, in 1.8.0 — the part the author can settle
+
+Built in 1.4.0 and carried as "built and unrun" in six release notes. Run now:
+**forty-five frames, T-12 to T32, exit 0.** So the script works, which was never
+in doubt and was never checked.
+
+What the run settles is small and worth having:
+
+- Every frame renders, including the ones nobody would have looked at. The tick
+  counts grow from one digit to 154 and the last few frames wrap to three lines,
+  which is the *shape filling the screen* the section above hoped for and is
+  visible for the first time.
+- Nothing drifted. The values come from `ucal ladder --json`, so the walk cannot
+  disagree with the table, and running it confirms the pipeline still holds after
+  four releases of changes to that command.
+
+What it does **not** settle is the hypothesis — whether a walk reads better than
+a table. That needs the two readers, and running the script does not conjure
+them. The carried-forward line changes from *"built and unrun"* to *"built, run,
+and waiting on two readers"*, which is a smaller and truer claim.
+
 ## Prior art in this repository
 
 Not consulted for design, listed so a future reader knows what was already

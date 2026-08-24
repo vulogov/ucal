@@ -3,7 +3,7 @@
 **Generated — do not edit.** Every block below is the real output of the command above it, captured by running it. Regenerate with:
 
 ```
-cargo build --release -p ucal --features tui
+cargo build --release -p ucal --features full
 cargo run -p xtask -- gen-examples
 ```
 

@@ -527,3 +527,55 @@ fn example_path() -> std::path::PathBuf {
         .expect("workspace root")
         .join("Documentation/examples/europa.hjson")
 }
+
+/// B1 — the leak is bounded by distinct strings, not by loads.
+///
+/// §15.1's loader must produce `&'static str` from owned data, so it leaks;
+/// [D-A20] records that as the reason the loader is in the binary rather than in
+/// `ucal-body`. The objection is specific: *"a caller loading in a loop leaks
+/// without bound"*.
+///
+/// Interning answers that objection and not the whole of D-A20. This test is the
+/// part that can be asserted: the same string, loaded twice, is the **same
+/// pointer** — so a thousand loads of one file cost what one load costs.
+///
+/// What it cannot assert is that nothing leaks. A thousand *different* files
+/// still accumulate, and that is why the delta stays `UNIMPLEMENTED`.
+///
+/// [D-A20]: https://github.com/vulogov/ucal/blob/main/spec/SPEC-DELTAS.md
+#[test]
+fn loading_the_same_file_twice_interns_rather_than_leaking_twice() {
+    let (_d, p) = tmp("intern", GOOD);
+
+    let first = body_file::load(&p).expect("loads");
+    let second = body_file::load(&p).expect("loads again");
+
+    // Same id, and the same allocation behind it.
+    assert_eq!(first.id(), second.id());
+    assert!(
+        std::ptr::eq(first.id().as_ptr(), second.id().as_ptr()),
+        "the second load allocated a second copy of an identical string"
+    );
+
+    // And the citations, which are the strings a file carries most of.
+    let a = first.rotation_period().citation().source;
+    let b = second.rotation_period().citation().source;
+    assert!(
+        std::ptr::eq(a.as_ptr(), b.as_ptr()),
+        "an identical citation was leaked twice"
+    );
+}
+
+/// Distinct strings still get distinct allocations, so the pool is a pool and
+/// not a single slot.
+#[test]
+fn distinct_strings_are_not_conflated() {
+    let (_d1, p1) = tmp("intern-a", GOOD);
+    let other = GOOD.replace("id: europa", "id: europa-variant");
+    let (_d2, p2) = tmp("intern-b", &other);
+
+    let a = body_file::load(&p1).expect("loads");
+    let b = body_file::load(&p2).expect("loads");
+    assert_ne!(a.id(), b.id());
+    assert!(!std::ptr::eq(a.id().as_ptr(), b.id().as_ptr()));
+}

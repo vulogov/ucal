@@ -55,6 +55,39 @@ pub struct DeclaredLeapRule {
     pub is_convergent: bool,
 }
 
+impl DeclaredLeapRule {
+    /// Declare an intercalation rule.
+    ///
+    /// Added with [`DeclaredTables::new`], and for a reason worth recording: the
+    /// first version of that constructor took a `DeclaredLeapRule` while this
+    /// type was still unconstructible from outside, which made the constructor
+    /// **decorative**. An extension point is only as usable as the least
+    /// constructible type in its signature, and that was found by writing the
+    /// test rather than by reading the code.
+    ///
+    /// `is_convergent` is **declared, not verified**. Whether `p/q` is a
+    /// convergent of the tropical year is a fact about a continued fraction this
+    /// crate does not have — `ucal-body` derives those and §12 forbids the
+    /// dependency. The two shipped rules have theirs checked by the UC-P0
+    /// harness against Appendix I.1; a downstream rule is taken at its word, and
+    /// that is the difference between a shipped calendar and a declared one.
+    ///
+    /// `UCAL-E0018` for a cycle of zero years, which is not a rule.
+    pub fn new(numerator: u32, denominator: u32, is_convergent: bool) -> Result<DeclaredLeapRule> {
+        if denominator == 0 {
+            return Err(TimeError::with_context(
+                Code::E0018,
+                "an intercalation rule needs a cycle: the denominator is years per cycle",
+            ));
+        }
+        Ok(DeclaredLeapRule {
+            numerator,
+            denominator,
+            is_convergent,
+        })
+    }
+}
+
 /// A discontinuity in a legacy calendar's history.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[non_exhaustive]
@@ -67,6 +100,47 @@ pub struct Discontinuity {
     pub first_new: (i64, u8, u8),
     /// How many days the labelling skipped.
     pub days_skipped: u8,
+}
+
+impl Discontinuity {
+    /// Declare a historical discontinuity in a calendar's labelling.
+    ///
+    /// Added for the same reason as [`DeclaredLeapRule::new`]: it appears in
+    /// [`DeclaredTables::new`]'s signature, so without it that constructor could
+    /// not express a calendar that has one — which is most of the interesting
+    /// ones, since a legacy calendar without a reform is a legacy calendar
+    /// nobody argued about.
+    ///
+    /// `UCAL-E0018` for a description that says nothing, or a skip of no days.
+    /// The dates are **not** checked against each other: this crate can tell
+    /// whether they are well-formed labels in some calendar, and cannot tell
+    /// whether *this* calendar's reform actually spanned them, because that is a
+    /// fact about the reform and not about arithmetic.
+    pub fn new(
+        description: &'static str,
+        last_old: (i64, u8, u8),
+        first_new: (i64, u8, u8),
+        days_skipped: u8,
+    ) -> Result<Discontinuity> {
+        if description.trim().is_empty() {
+            return Err(TimeError::with_context(
+                Code::E0018,
+                "a discontinuity is a historical event and needs saying what it was",
+            ));
+        }
+        if days_skipped == 0 {
+            return Err(TimeError::with_context(
+                Code::E0018,
+                "a discontinuity that skips no days is not one",
+            ));
+        }
+        Ok(Discontinuity {
+            description,
+            last_old,
+            first_new,
+            days_skipped,
+        })
+    }
 }
 
 /// The declared table content of a legacy calendar (§8.6).
@@ -83,6 +157,82 @@ pub struct DeclaredTables {
     pub discontinuity: Option<Discontinuity>,
     /// Explicit statements of what in this calendar is arbitrary (§8.6).
     pub arbitrary: &'static [&'static str],
+}
+
+impl DeclaredTables {
+    /// Declare a legacy calendar's tables.
+    ///
+    /// # Why this exists
+    ///
+    /// `DeclaredTables` is `#[non_exhaustive]` and had no constructor, so a
+    /// downstream `LegacyCalendar` could not build one and had to return a
+    /// shipped calendar's. §8.6 keeps legacy calendars "for interoperation";
+    /// until now that admitted no calendar this crate does not already ship,
+    /// which X3 found and recorded.
+    ///
+    /// # Why it returns a `Result`
+    ///
+    /// Three of the fields carry obligations that a struct literal cannot state
+    /// and this constructor can:
+    ///
+    /// - **The months must make a common year.** Twelve lengths summing to 365.
+    ///   A table whose months do not add up is not a calendar, and every
+    ///   `fields`/`instant` round-trip in this module assumes they do.
+    /// - **A week must have days in it.** Zero would make weekday arithmetic
+    ///   divide by zero.
+    /// - **The intercalation must have a cycle.** A denominator of zero is not a
+    ///   rule.
+    /// - **`arbitrary` must not be empty.** This is §8.6's actual requirement
+    ///   and the reason legacy calendars are tolerable at all: they are kept as
+    ///   *declared tables* whose arbitrariness is stated, not derived from
+    ///   anything. A legacy calendar that declares nothing arbitrary is
+    ///   claiming to be derived, and it is not.
+    ///
+    /// `UCAL-E0018` for all four — a value supplied for a field that cannot take
+    /// it (D-A24).
+    pub fn new(
+        month_lengths: [u8; 12],
+        week_length: u8,
+        leap_rule: DeclaredLeapRule,
+        discontinuity: Option<Discontinuity>,
+        arbitrary: &'static [&'static str],
+    ) -> Result<DeclaredTables> {
+        let days: u32 = month_lengths.iter().map(|d| u32::from(*d)).sum();
+        if days != 365 {
+            return Err(TimeError::with_context(
+                Code::E0018,
+                "a common year's months must sum to 365 days; every round-trip in \
+                 this module assumes it",
+            ));
+        }
+        if week_length == 0 {
+            return Err(TimeError::with_context(
+                Code::E0018,
+                "a week with no days in it makes weekday arithmetic divide by zero",
+            ));
+        }
+        if leap_rule.denominator == 0 {
+            return Err(TimeError::with_context(
+                Code::E0018,
+                "an intercalation rule needs a cycle: the denominator is years per cycle",
+            ));
+        }
+        if arbitrary.is_empty() {
+            return Err(TimeError::with_context(
+                Code::E0018,
+                "§8.6 keeps a legacy calendar as declared tables whose arbitrariness \
+                 is stated. One that declares nothing arbitrary is claiming to be \
+                 derived, and it is not",
+            ));
+        }
+        Ok(DeclaredTables {
+            month_lengths,
+            week_length,
+            leap_rule,
+            discontinuity,
+            arbitrary,
+        })
+    }
 }
 
 /// A civil label produced by a legacy calendar.
