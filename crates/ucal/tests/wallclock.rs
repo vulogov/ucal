@@ -229,7 +229,12 @@ fn an_unanchored_calendar_is_refused_as_a_dial() {
     let e = Face::at(instant(), en(), Some("titan-d")).expect_err("titan has no anchor");
     assert_eq!(e.code, ucal_core::Code::E0062);
 
-    let e = Face::at(instant(), en(), Some("pluto-d")).expect_err("no such calendar");
+    // `vulcan-d` and not `pluto-d`. Pluto was the stand-in for a calendar this
+    // program does not have, and 1.9.0 added it — so the test began asserting
+    // something false about the catalogue rather than about the lookup. The same
+    // substitution was needed in `data::tests` in the same commit, which is how
+    // often a body name gets used to mean "absent".
+    let e = Face::at(instant(), en(), Some("vulcan-d")).expect_err("no such calendar");
     assert_eq!(e.code, ucal_core::Code::E0016);
 }
 
