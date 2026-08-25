@@ -548,9 +548,9 @@ means a rounded parameter is a different calendar.
 Europa's rule moves through `47/105`, `2/27`, `5/126`, `5/116` and then `1/24`
 across the first six decimals of its solar day. Six settle it, and that is a
 fact about Europa rather than a rule anyone can apply to a body they have not
-tried. Use `derived:` where the quantity is derivable, and where it is not,
-shorten the value until `ucal cal derive` reports a different rule and then put
-a digit back.
+tried. Use `derived:` where the quantity is derivable, and where it is not, ask
+[`cal validate`](#cal-validate), which moves the last published digit each way
+and reports whether the rule survives.
 
 **Loaded by the binary, not by `ucal-body`.** §15.1 puts the loader in the
 library; [D-A20](../spec/SPEC-DELTAS.md) records that it is not there. Every
@@ -558,6 +558,69 @@ string in the data model is a `&'static str`, so a runtime loader must either
 leak or change a published type, and the second is a breaking change. This one
 leaks, bounded by a process that exits — which is safe in a binary and would not
 be in a library.
+
+### `cal validate`
+
+```
+ucal cal validate <FILE> [--anchor <FILE>]
+```
+
+Check a §15.1 file and report **two** things: whether it loads, and whether a
+calendar follows from it. They are separate questions with separate answers, and
+`cal derive` could only ever give one — it returns `UCAL-E0060` for a body whose
+year is a whole number of its solar days, and an author reading a red exit code
+cannot tell a malformed file from a body that simply has no fractional day to
+distribute. `validate` succeeds in that case and says so in the `intercalation`
+row.
+
+`<FILE>` may be either kind. A body file is tried first; if the file is an
+anchor file the anchor loader is tried before any error is reported, because a
+perfectly valid anchor file fed to the body loader raises `UCAL-E0012`,
+*unknown key*, which is true and unhelpful.
+
+| field | meaning |
+|---|---|
+| `file` | The path given. |
+| `kind` | Which of §15.1's two files this turned out to be. |
+| `checks` | Everything below. |
+| `loads` | Strict HJSON, every key known, every parameter carrying Rule C's obligations. |
+| `id` | The calendar this file derives, and whether one of that id already ships. |
+| `primary` | What the file says this body orbits, or that it names nothing. |
+| `rotation_period`, `solar_day`, `orbital_period` | What the file states for each: a measured figure with its unit, or a `derived:` relation, and the citation either way. |
+| `intercalation` | The leap rule, **or the reason there is none** — which may be a fact about the body rather than a defect in the file. |
+| `cycles` | The grouping satellite, or that there is none, which §15.3 makes an answer rather than a gap. |
+| `precision` | One row per measured parameter feeding the intercalation. See below. |
+| `anchor:names`, `anchor:evaluable` | With `--anchor`: whether the two files are a pair, and whether the phase is definable from what the body file states. |
+
+An anchor file reports `calendar`, `phase`, `revision`, `method`,
+`uncertainty`, `window` and `citation` instead — the same fields
+[`cal anchor`](#cal-anchor) prints for a compiled-in one.
+
+**`precision:` measures the caveat this project has carried since 0.2.0.** Every
+release note says *a rounded parameter is a different calendar*, and until 1.9.0
+that was true and unmeasurable. For each measured parameter feeding the
+intercalation, the last published digit is moved by one in each direction and
+the rule re-derived. `Measured` holds its figure as a mantissa and a decimal
+count rather than as a parsed number, so one unit in the last place is exactly
+`mantissa ± 1` and the probe is exact.
+
+```
+ucal cal validate Documentation/examples/europa.hjson
+```
+
+reports its `orbital_period` probe as **sensitive**: `4332.589 d` gives `1/24`,
+`4332.590 d` gives `5/119`, `4332.588 d` gives `7/169`.
+
+That is a measurement and not a verdict. A figure exact by definition — Earth's
+`86400 s` solar day — has no last digit to be wrong in, and will be reported
+sensitive because moving it by a second does change the calendar. What the check
+tells you is whether *this* figure's precision is what decides *this* calendar;
+whether that matters is a question about the source, which no program can
+answer.
+
+**What is not checked, and cannot be.** Whether the published figures are the
+ones the body actually has. Every check is on internal consistency; a file that
+cites the wrong fact sheet perfectly will pass all of them.
 
 ### `cal anchor`
 

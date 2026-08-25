@@ -2992,3 +2992,367 @@ pub fn cmd_cal_derive_with(path: &str, anchor: Option<&str>, at: Option<&str>) -
          This one leaks, bounded by a process that exits.",
     ))
 }
+
+/// F4 — check a §15.1 file and say what follows from it.
+///
+/// # Why `cal derive` was not already this
+///
+/// The only way to test a file was to run `cal derive` and see whether it
+/// errored, and that conflates two different answers. A file can be perfectly
+/// well-formed and still have `derive` fail — a body whose year is a whole
+/// number of its solar days gets `UCAL-E0060`, which is a fact about the body
+/// and not a defect in the file. An author reading a red exit code cannot tell
+/// which of the two they have.
+///
+/// So this separates them. **Does the file load** is one question, **does a
+/// calendar follow from it** is another, and both are reported whatever the
+/// other says.
+///
+/// # The check nothing else performs
+///
+/// Every release note this project has published carries the same caveat:
+///
+/// > A rounded parameter is a different calendar.
+///
+/// It has been true and unmeasurable. Here it is measured: for each *measured*
+/// parameter feeding the intercalation, the last published digit is moved by one
+/// in each direction and the leap rule re-derived. If the rule survives both, the
+/// file's precision is sufficient for the calendar it declares; if it does not,
+/// the author is shown the rules their neighbours would have derived.
+///
+/// This is the check that would have caught the documented Europa example, which
+/// stated a solar day wrong in the third decimal and derived `202/279` where the
+/// body derives `1/24`.
+#[cfg(feature = "body")]
+pub fn cmd_cal_validate(path: &str, anchor_path: Option<&str>) -> CmdResult {
+    let p = std::path::Path::new(path);
+    // A body file first, because that is what most files are and what the
+    // positional argument is documented to take. An anchor file fed here parses
+    // as neither — `deny_unknown_fields` sees `calendar`, `phase` and
+    // `determination` and rejects the lot — so rather than report a confusing
+    // `UCAL-E0012` about a file that is perfectly valid, try the other loader
+    // and say which kind it actually is.
+    match body_file::load(p) {
+        Ok(body) => validate_body(path, &body, anchor_path),
+        Err(body_err) => match anchor_file::load(p) {
+            Ok(anchor) => validate_anchor(path, &anchor, anchor_path),
+            // Both failed. The body error is the one to report: this argument is
+            // documented as a body file, and the anchor loader's complaint about
+            // a malformed body file would be noise.
+            Err(_) => Err(body_err),
+        },
+    }
+}
+
+/// One `(name, verdict)` row of the report.
+#[cfg(feature = "body")]
+fn check(name: &str, verdict: impl Into<String>) -> (String, Value) {
+    (name.to_string(), Value::text(verdict.into()))
+}
+
+/// The body-file half of [`cmd_cal_validate`].
+#[cfg(feature = "body")]
+fn validate_body(path: &str, body: &ucal_body::Body, anchor_path: Option<&str>) -> CmdResult {
+    let mut checks: Vec<(String, Value)> = Vec::new();
+
+    checks.push(check(
+        "loads",
+        "ok — strict HJSON, every key known (§15.1), and every parameter carries a value, a \
+            unit, an epoch, a validity window and a citation (Rule C)",
+    ));
+
+    let id: String = format!("{}-d", body.id());
+    let collides = ucal_body::calendar::registered()
+        .iter()
+        .any(|(rid, _, _)| *rid == id);
+    checks.push(check(
+        "id",
+        if collides {
+            format!(
+                "`{}` — which derives `{id}`, and a calendar of that id already ships. The \
+                    file is valid; a command naming `{id}` will get the compiled-in one",
+                body.id()
+            )
+        } else {
+            format!("`{}` — which derives the calendar `{id}`", body.id())
+        },
+    ));
+
+    checks.push(check(
+        "primary",
+        match body.primary() {
+            Some(p) => format!("`{p}`"),
+            None => "none — this file names nothing that this body orbits, which is legal and means \
+                the year is stated rather than inherited"
+                .to_string(),
+        },
+    ));
+
+    for (what, param) in [
+        ("rotation_period", body.rotation_period()),
+        ("solar_day", body.solar_day()),
+        ("orbital_period", body.orbital_period()),
+    ] {
+        checks.push(check(
+            what,
+            match param.as_measured() {
+                Some(m) => format!("measured: {} — {}", m.verbatim(), param.citation().source),
+                None => format!(
+                    "derived (Z1.1), so this file states no figure of its own for it — {}",
+                    param.citation().source
+                ),
+            },
+        ));
+    }
+
+    // Does a calendar follow? A separate question from whether the file loads,
+    // and the reason this command exists.
+    let solar = body.solar_day().value_at_epoch();
+    let year = body.orbital_period().value_at_epoch();
+    // The same pre-check `cal derive` makes, and for the same reason: a year
+    // that is a whole number of solar days reaches `derive_leap_rule` as
+    // `UCAL-E0061` — *no convergent meets the drift bound* — advising a wider
+    // bound or a greater depth, neither of which can help. Reporting that here
+    // would be reporting the wrong thing in the command whose whole purpose is
+    // to say which of the two an author has.
+    let whole_year = year.div(solar).map(|r| r.is_integer()).unwrap_or(false);
+    let rule = ucal_body::derive_leap_rule(solar, year, ucal_body::DriftBound::DEFAULT, 32);
+    if whole_year {
+        checks.push(check(
+            "intercalation",
+            "none follows — this body's year is a whole number of its solar days, so there is \
+             no fractional day to distribute and Rule K has nothing to derive. That is a fact \
+             about this body, not a defect in this file",
+        ));
+    } else {
+        match &rule {
+            Ok(r) => checks.push(check(
+                "intercalation",
+                format!(
+                    "{}/{} at convergent {}, {} whole days per year",
+                    r.chosen.value.numer().to_dec_string(),
+                    r.chosen.value.denom().to_dec_string(),
+                    r.depth,
+                    r.whole_days.numer().to_dec_string()
+                ),
+            )),
+            Err(e) => checks.push(check(
+                "intercalation",
+                format!(
+                    "none follows — {}. That is a fact about this body, not a defect in this file",
+                    e.context.unwrap_or("no rule meets the drift bound")
+                ),
+            )),
+        }
+    }
+
+    checks.push(check(
+        "cycles",
+        match body.satellites().first() {
+            Some(sat) => format!(
+                "grouped by `{}`, the first satellite this file lists (D-A5)",
+                sat.id()
+            ),
+            None => "none — this file lists no satellite, so the calendar has no month. §15.3 forbids \
+                a fallback, so that is the answer and not a gap"
+                .to_string(),
+        },
+    ));
+
+    // The precision probe. Nested under one key rather than flattened into
+    // `precision:solar_day` and friends: the parameters probed depend on which
+    // of them the file states as measured, and a field name that varies with
+    // the input is a field name the manual cannot document.
+    if let Ok(baseline) = &rule {
+        let probes: Vec<(String, Value)> = [
+            ("solar_day", body.solar_day()),
+            ("orbital_period", body.orbital_period()),
+        ]
+        .into_iter()
+        .filter_map(|(what, param)| {
+            let m = param.as_measured()?;
+            Some((
+                what.to_string(),
+                Value::text(probe_last_digit(m, what, solar, year, baseline)),
+            ))
+        })
+        .collect();
+        if !probes.is_empty() {
+            checks.push(("precision".to_string(), Value::Section(probes)));
+        }
+    }
+
+    if let Some(a) = anchor_path {
+        let anchor = anchor_file::load(std::path::Path::new(a))?;
+        checks.push(check(
+            "anchor:names",
+            if anchor.calendar_id() == id {
+                format!("`{}`, which is the calendar this body derives", anchor.calendar_id())
+            } else {
+                format!(
+                    "`{}`, and this body derives `{id}` — the two files are not a pair",
+                    anchor.calendar_id()
+                )
+            },
+        ));
+        checks.push(check(
+            "anchor:evaluable",
+            match anchor.check_evaluable(body) {
+                Ok(()) => format!(
+                    "ok — the phase `{}` is definable from the parameters this body file states",
+                    anchor.phase().label()
+                ),
+                Err(e) => format!(
+                    "no — {}",
+                    e.context
+                        .unwrap_or("this phase needs a parameter the body file does not state")
+                ),
+            },
+        ));
+    }
+
+    Ok(Doc::new()
+        .title("ucal cal validate")
+        .field("file", Value::text(path))
+        .field("kind", Value::text("body file (§15.1)"))
+        .field(
+            "checks",
+            Value::Section(checks),
+        )
+        .note(
+            "A file that loads is not a file that is right. Every check above is on \
+                *internal* consistency — that the parameters are present, cited and mutually \
+                coherent. Whether the published figures are the ones this body actually has is a \
+                question about the sources, and nothing in this program can answer it.",
+        ))
+}
+
+/// Move the last published digit by one, each way, and re-derive.
+///
+/// The `Measured` carries its figure as a mantissa and a decimal count rather
+/// than as a parsed number, precisely so that `9.9250` is four decimals and not
+/// three — which makes one unit in the last place exactly `mantissa ± 1` and the
+/// probe exact rather than approximate.
+#[cfg(feature = "body")]
+fn probe_last_digit(
+    m: &ucal_body::param::Measured,
+    what: &str,
+    solar: &Ratio,
+    year: &Ratio,
+    baseline: &ucal_body::LeapRule,
+) -> String {
+    use ucal_body::param::Measured;
+
+    let want = |r: &ucal_body::LeapRule| {
+        format!(
+            "{}/{}",
+            r.chosen.value.numer().to_dec_string(),
+            r.chosen.value.denom().to_dec_string()
+        )
+    };
+    let base = want(baseline);
+
+    let mut neighbours: Vec<String> = Vec::new();
+    for delta in [1i128, -1] {
+        let Some(mantissa) = m.mantissa.checked_add_signed(delta) else {
+            continue;
+        };
+        if mantissa == 0 {
+            continue;
+        }
+        let Ok(t) = Measured::new(mantissa, m.decimals, m.unit, m.citation).ticks() else {
+            continue;
+        };
+        let derived = if what == "solar_day" {
+            ucal_body::derive_leap_rule(&t, year, ucal_body::DriftBound::DEFAULT, 32)
+        } else {
+            ucal_body::derive_leap_rule(solar, &t, ucal_body::DriftBound::DEFAULT, 32)
+        };
+        let got = match &derived {
+            Ok(r) => want(r),
+            Err(_) => "no rule at all".to_string(),
+        };
+        if got != base {
+            neighbours.push(format!(
+                "{} → {got}",
+                Measured::new(mantissa, m.decimals, m.unit, m.citation).verbatim()
+            ));
+        }
+    }
+
+    if neighbours.is_empty() {
+        format!(
+            "stable — one unit in the last published place, either way, still derives {base}. \
+             This figure is stated precisely enough for the calendar it declares"
+        )
+    } else {
+        format!(
+            "sensitive — one unit in the last published place derives a different rule. {} \
+             gives {base}; {}. This is the standing caveat measured, not a verdict: a figure \
+             that is exact by definition has no last digit to be wrong in, and a figure that \
+             was rounded to reach this precision declares a calendar the unrounded one would \
+             not",
+            m.verbatim(),
+            neighbours.join("; ")
+        )
+    }
+}
+
+/// The anchor-file half of [`cmd_cal_validate`].
+#[cfg(feature = "body")]
+fn validate_anchor(
+    path: &str,
+    anchor: &ucal_body::anchor::Anchor,
+    anchor_path: Option<&str>,
+) -> CmdResult {
+    let mut checks: Vec<(String, Value)> = vec![
+        check(
+            "loads",
+            "ok — strict HJSON, and every obligation `Anchor::new` puts on a compiled-in \
+                anchor is met: the phase is a physical event of the body (Rule J.1), the window \
+                contains the anchor's own tick (Rule J.2), and the determination states a \
+                method, a citation and what dominates the uncertainty",
+        ),
+        check("calendar", format!("`{}`", anchor.calendar_id())),
+        check("phase", anchor.phase().label()),
+        check("revision", format!(
+            "{} — anchors version independently of body files, because parameters change with \
+                better measurement and anchors with re-determination",
+            anchor.revision()
+        )),
+        check("method", anchor.method().method),
+        check("uncertainty", anchor.method().uncertainty_note),
+        check(
+            "window",
+            format!(
+                "± {} ticks about the stated instant",
+                anchor.uncertainty().ticks().to_dec_string()
+            ),
+        ),
+        check("citation", anchor.citation().source),
+    ];
+
+    if anchor_path.is_some() {
+        checks.push(check(
+            "--anchor",
+            "ignored — the positional file is itself an anchor, so there is no body file here \
+                for it to be paired against",
+        ));
+    }
+
+    Ok(Doc::new()
+        .title("ucal cal validate")
+        .field("file", Value::text(path))
+        .field("kind", Value::text("anchor file (§15.1)"))
+        .field(
+            "checks",
+            Value::Section(checks),
+        )
+        .note(
+            "An anchor is an observation and cannot be checked against anything but its \
+                source. What is checked here is that it is *shaped* like one — a phase that is \
+                an event of its own body, a window that contains its own estimate, and a \
+                determination that says how it was made. To check it against the body it belongs \
+                to, pass the body file as the positional argument and this file to --anchor.",
+        ))
+}

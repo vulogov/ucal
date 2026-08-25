@@ -365,6 +365,20 @@ enum CalCommand {
         #[arg(long, value_name = "INSTANT")]
         at: Option<String>,
     },
+    /// Check a §15.1 file: does it load, and does a calendar follow from it?
+    ///
+    /// Two questions, because they have different answers. A file can be
+    /// well-formed and still derive nothing — a body whose year is a whole
+    /// number of its solar days has no fractional day to intercalate — and an
+    /// author reading a red exit code from `cal derive` cannot tell which of the
+    /// two they have.
+    Validate {
+        /// Path to a body file, or to an anchor file.
+        file: String,
+        /// An anchor file to check the body file against.
+        #[arg(long, value_name = "FILE")]
+        anchor: Option<String>,
+    },
 }
 
 #[cfg(feature = "civil")]
@@ -648,6 +662,9 @@ fn main() {
             CalCommand::List => ucal::cmd_cal_list(),
             CalCommand::Show { id, instant } => ucal::cmd_cal_show(id, pick(replacement, instant)),
             CalCommand::Anchor { id } => ucal::cmd_cal_anchor(id),
+            CalCommand::Validate { file, anchor } => {
+                ucal::cmd_cal_validate(file, anchor.as_deref())
+            }
             CalCommand::Derive { file, anchor, at } => {
                 ucal::cmd_cal_derive_with(file, anchor.as_deref(), at.as_deref())
             }

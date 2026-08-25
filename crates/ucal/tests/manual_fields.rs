@@ -80,6 +80,16 @@ fn all_commands() -> Vec<(&'static str, Doc)> {
         v.push(("cal show", ucal::cmd_cal_show("earth-d", T).unwrap()));
         v.push(("cal anchor", ucal::cmd_cal_anchor("earth-d").unwrap()));
         v.push(("cal derive", ucal::cmd_cal_derive(concat!(env!("CARGO_MANIFEST_DIR"), "/../../Documentation/examples/europa.hjson")).unwrap()));
+        // Both halves: the anchor rows only appear when a pair is given, and the
+        // manual documents them.
+        v.push(("cal validate", ucal::cmd_cal_validate(
+            concat!(env!("CARGO_MANIFEST_DIR"), "/../../Documentation/examples/earth.hjson"),
+            Some(concat!(env!("CARGO_MANIFEST_DIR"), "/../../Documentation/examples/earth-anchor.hjson")),
+        ).unwrap()));
+        v.push(("cal validate anchor", ucal::cmd_cal_validate(
+            concat!(env!("CARGO_MANIFEST_DIR"), "/../../Documentation/examples/earth-anchor.hjson"),
+            None,
+        ).unwrap()));
         v.push((
             "show",
             ucal::cmd_show(

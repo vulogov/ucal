@@ -664,3 +664,173 @@ fn an_unknown_unit_is_still_refused() {
     assert_eq!(e.code, Code::E0018);
     assert!(e.to_string().contains("`h`"), "{e}");
 }
+
+// ---- F4: `ucal cal validate` -------------------------------------------
+
+/// The finding this command exists for: **the file is fine and the calendar is
+/// not**.
+///
+/// `cal derive` on a body whose year is a whole number of its solar days returns
+/// `UCAL-E0060`, and an author reading a red exit code cannot tell whether their
+/// file is malformed or their body simply has no fractional day to distribute.
+/// `validate` answers both questions separately, and this is the case where the
+/// two answers differ.
+#[test]
+fn validate_separates_a_bad_file_from_a_body_with_no_calendar() {
+    let whole = GOOD_EUROPA
+        .replace(
+            "SOLAR_DAY",
+            "solar_day: {\n  value: 1\n  unit: d\n  citation: c\n  valid_years: 10000\n}",
+        )
+        .replace("value: 4332.589", "value: 4332");
+    let (_d, p) = tmp("validate-whole-days", &whole);
+
+    // `cal derive` refuses outright.
+    assert!(ucal::cmd_cal_derive(p.to_str().expect("utf-8")).is_err());
+
+    // `validate` succeeds, and says both things.
+    let doc = ucal::cmd_cal_validate(p.to_str().expect("utf-8"), None).expect("a report");
+    assert!(
+        verdict(&doc, "loads").starts_with("ok"),
+        "the file did not load: {}",
+        verdict(&doc, "loads")
+    );
+    let why = verdict(&doc, "intercalation");
+    assert!(
+        why.contains("whole number of its solar days"),
+        "the wrong reason: {why}"
+    );
+    assert!(
+        why.contains("not a defect in this file"),
+        "the two answers were not separated: {why}"
+    );
+    // And not the bound-failure advice, which cannot help here.
+    assert!(!why.contains("widen the bound"), "{why}");
+}
+
+/// One check's verdict, read from the report rather than from its rendering.
+///
+/// `to_text` word-wraps, so a `contains` over the rendered page fails on any
+/// phrase long enough to be worth asserting.
+fn probe(doc: &ucal::emit::Doc, parameter: &str) -> String {
+    let Some(ucal::emit::Value::Section(rows)) = doc.get("checks") else {
+        panic!("no checks section");
+    };
+    let Some((_, ucal::emit::Value::Section(probes))) =
+        rows.iter().find(|(k, _)| k == "precision")
+    else {
+        panic!("no precision probes");
+    };
+    probes
+        .iter()
+        .find(|(k, _)| k == parameter)
+        .map(|(_, v)| v.rendered_text())
+        .unwrap_or_else(|| panic!("`{parameter}` was not probed"))
+}
+
+fn verdict(doc: &ucal::emit::Doc, name: &str) -> String {
+    let Some(ucal::emit::Value::Section(rows)) = doc.get("checks") else {
+        panic!("no checks section");
+    };
+    rows.iter()
+        .find(|(k, _)| k == name)
+        .map(|(_, v)| v.rendered_text())
+        .unwrap_or_else(|| panic!("no check named `{name}`"))
+}
+
+/// A malformed file still fails, and with the loader's own diagnosis.
+///
+/// A validator that reported "does not load" and nothing else would be worse
+/// than the error it replaced.
+#[test]
+fn validate_still_fails_on_a_malformed_file() {
+    let bad = GOOD.replace("unit: d", "unit: parsec");
+    let (_d, p) = tmp("validate-bad-unit", &bad);
+    let e = ucal::cmd_cal_validate(p.to_str().expect("utf-8"), None).expect_err("parsec");
+    assert_eq!(e.code, Code::E0018);
+}
+
+/// An anchor file handed to the positional argument is recognised as one.
+///
+/// The body loader is strict, so an anchor file fed to it reports `UCAL-E0012`,
+/// *unknown key* — which is true, unhelpful, and about a file that is perfectly
+/// valid. The second loader is tried before that error is reported.
+#[test]
+fn validate_names_the_kind_of_file_it_was_given() {
+    let doc = ucal::cmd_cal_validate(&anchor_example(), None).expect("an anchor report");
+    let text = doc.to_text();
+    assert!(text.contains("anchor file"), "{text}");
+    assert!(!text.contains("unknown key"), "{text}");
+    assert_eq!(verdict(&doc, "calendar"), "`earth-d` ");
+}
+
+/// The precision probe is a measurement and reports both outcomes.
+///
+/// Every release note this project has published carries *a rounded parameter is
+/// a different calendar*, and until now it was unmeasurable. Europa's orbital
+/// period is the case that proves the probe is not a rubber stamp: one unit in
+/// its last published place moves the rule off `1/24`.
+#[test]
+fn the_precision_probe_finds_a_parameter_its_last_digit_decides() {
+    let doc = ucal::cmd_cal_validate(&body_example(), None).expect("a report");
+    let v = probe(&doc, "orbital_period");
+    assert!(v.starts_with("sensitive"), "{v}");
+    assert!(v.contains("gives 1/24"), "{v}");
+}
+
+/// And it reports *stable* where the figure is precise enough, which is the
+/// half that makes the other half mean something.
+#[test]
+fn the_precision_probe_is_not_only_ever_alarmed() {
+    // Europa's rotation period is not probed — it does not feed the
+    // intercalation — so the stable case needs a body whose two feeding
+    // parameters are stated at different precisions. Mars is one.
+    let mars = r#"
+id: mars
+primary: sun
+rotation_period: {
+  value: 88642.663
+  unit: s
+  citation: c
+  valid_years: 10000
+}
+solar_day: {
+  value: 88775.244
+  unit: s
+  citation: c
+  valid_years: 10000
+}
+orbital_period: {
+  value: 59355036.0
+  unit: s
+  citation: c
+  valid_years: 10000
+}
+"#;
+    let (_d, p) = tmp("validate-stable", mars);
+    let doc = ucal::cmd_cal_validate(p.to_str().expect("utf-8"), None).expect("a report");
+    let v = probe(&doc, "orbital_period");
+    assert!(v.starts_with("stable"), "{v}");
+}
+
+/// A body file and an anchor file that are not a pair are told so.
+#[test]
+fn validate_checks_the_pair() {
+    let doc = ucal::cmd_cal_validate(&body_example(), Some(&anchor_example())).expect("a report");
+    let v = verdict(&doc, "anchor:names");
+    assert!(v.contains("not a pair"), "europa and earth's anchor are not a pair: {v}");
+}
+
+fn body_example() -> String {
+    format!(
+        "{}/../../Documentation/examples/europa.hjson",
+        env!("CARGO_MANIFEST_DIR")
+    )
+}
+
+fn anchor_example() -> String {
+    format!(
+        "{}/../../Documentation/examples/earth-anchor.hjson",
+        env!("CARGO_MANIFEST_DIR")
+    )
+}

@@ -84,6 +84,10 @@ fn examples() -> Vec<Example> {
             why: "One instant in several calendars at once, each labelled derived or legacy.",
         },
         Example {
+            args: &["cal", "validate", "Documentation/examples/europa.hjson"],
+            why: "Two questions with separate answers: does the file load, and does a calendar follow from it? The `precision:` rows measure the caveat this project has carried since 0.2.0 — a rounded parameter is a different calendar — by moving each published figure's last digit and re-deriving.",
+        },
+        Example {
             args: &["events", "show", "recombination"],
             why: "A cited milestone. Events are intervals, and the citation travels with the value.",
         },

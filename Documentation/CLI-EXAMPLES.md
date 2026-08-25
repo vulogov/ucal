@@ -471,6 +471,52 @@ revision (Rule J.5) and the width of the window that revision implies (Rule
 J.2); each legacy one is labelled as declared table data (§8.6).
 ```
 
+## `ucal cal validate Documentation/examples/europa.hjson`
+
+Two questions with separate answers: does the file load, and does a calendar follow from it? The `precision:` rows measure the caveat this project has carried since 0.2.0 — a rounded parameter is a different calendar — by moving each published figure's last digit and re-deriving.
+
+```
+ucal cal validate
+─────────────────
+file  Documentation/examples/europa.hjson
+kind  body file (§15.1)
+checks:
+  loads            ok — strict HJSON, every key known (§15.1), and every
+                   parameter carries a value, a unit, an epoch, a validity
+                   window and a citation (Rule C)
+  id               `europa` — which derives `europa-d`, and a calendar of that
+                   id already ships. The file is valid; a command naming
+                   `europa-d` will get the compiled-in one
+  primary          `jupiter`
+  rotation_period  measured: 3.551181 d (86400 s) — NASA Planetary Fact Sheets
+                   (Williams, D. R.), Jovian satellite fact sheet; the original
+                   document is available in the Internet Archive
+  solar_day        derived (Z1.1), so this file states no figure of its own for
+                   it — derived as 1 / (1/P_rotation - 1/P_orbital_period) from
+                   the two published figures cited in this file; no source
+                   publishes a solar day for a tidally locked moon
+  orbital_period   measured: 4332.589 d (86400 s) — NASA Planetary Fact Sheets
+                   (Williams, D. R.), Jupiter fact sheet; the original document
+                   is available in the Internet Archive
+  intercalation    1/24 at convergent 2, 1219 whole days per year
+  cycles           none — this file lists no satellite, so the calendar has no
+                   month. §15.3 forbids a fallback, so that is the answer and
+                   not a gap
+  precision:
+    orbital_period  sensitive — one unit in the last published place derives a
+                    different rule. 4332.589 d (86400 s) gives 1/24; 4332.590 d
+                    (86400 s) → 5/119; 4332.588 d (86400 s) → 7/169. This is
+                    the standing caveat measured, not a verdict: a figure that
+                    is exact by definition has no last digit to be wrong in,
+                    and a figure that was rounded to reach this precision
+                    declares a calendar the unrounded one would not
+
+A file that loads is not a file that is right. Every check above is on
+*internal* consistency — that the parameters are present, cited and mutually
+coherent. Whether the published figures are the ones this body actually has is
+a question about the sources, and nothing in this program can answer it.
+```
+
 ## `ucal events show recombination`
 
 A cited milestone. Events are intervals, and the citation travels with the value.
