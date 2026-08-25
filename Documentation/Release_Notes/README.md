@@ -103,13 +103,22 @@ one-line version and links to it.
 6. `cargo run -p xtask -- check-links`, which asks the network whether the
    cited URLs still reach the cited documents.
 
-   **Deliberately not in CI**, and deliberately not in the verification block
-   above. Every other check here is offline and deterministic; this one depends
-   on third-party servers, and a check that turns the tree red because somebody
+   **Deliberately not in the verification block above**, and not on `push`.
+   Every other check here is offline and deterministic; this one depends on
+   third-party servers, and a check that turns the tree red because somebody
    else is having a bad morning trains its reader to ignore it. "CI green on
    every push, with no known-failing job" is a 1.0 exit criterion, and the way
    the last false criterion survived a whole release was nobody reading a red
    job.
+
+   **Since 1.9.0 it also runs on a schedule** —
+   [`.github/workflows/links.yml`](../../.github/workflows/links.yml), 07:00 UTC
+   every Monday, plus `workflow_dispatch`. A scheduled job has neither problem:
+   it cannot block a push and it fails on its own account. A failure **opens an
+   issue**, because a job that fails into the Actions tab is a mechanism with
+   nothing attached to it. Running it here at release time is still worth doing
+   — a release should not go out on a week-old answer — but the release is no
+   longer the only time anybody asks.
 
    A `MOVED` result matters as much as a `FAIL`. The citation that prompted
    this check answered **`200 OK`** — `nssdc.gsfc.nasa.gov/planetary/factsheet/`
