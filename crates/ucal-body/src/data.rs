@@ -528,6 +528,12 @@ pub fn pluto() -> Body {
     .with_obliquity(AngleParam::degrees(12_253, 2, IAU_WGCCRE).expect("valid angle"))
 }
 
+/// Every body this crate ships, in the order they were added.
+///
+/// Fifteen. Adding one is a line here and a line in
+/// [`crate::calendar::registered`], and nothing else moves — which is the only
+/// evidence Rule K.5's claim can have, that Earth is an ordinary instance of the
+/// mechanism rather than the case it was built around.
 pub fn all() -> alloc::vec::Vec<Body> {
     alloc::vec![
         earth(),
