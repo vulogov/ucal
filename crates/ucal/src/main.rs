@@ -41,7 +41,8 @@ struct Cli {
     #[arg(long, global = true)]
     sep: Option<char>,
 
-    /// Locale for tier names (Rule N: names are display-only). Shipped: en, ru.
+    /// Locale for tier names, and for the wall clock's chrome (Rule N: names
+    /// are display-only). Shipped: en, ru.
     #[arg(long, global = true, default_value = "en", value_parser = locale_values())]
     locale: String,
 

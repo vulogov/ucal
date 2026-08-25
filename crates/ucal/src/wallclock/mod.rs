@@ -25,9 +25,14 @@
 //!
 //! # Themes
 //!
-//! [`Theme`] is a palette and a layout switch, not a plug-in system. Two ship:
-//! `plain`, which is the default, and `startrek`, which is LCARS. Adding one is
-//! a `const` in [`theme`] and an entry in [`theme::by_name`].
+//! [`Theme`] is a palette and a layout switch, not a plug-in system. Nine ship
+//! across six layouts; `ucal wallclock --theme list` names them. Adding one is a
+//! `const` in [`theme`] and an entry in [`theme::by_name`].
+//!
+//! A theme decides how a face looks and never what language it speaks. The words
+//! live in [`chrome`], resolved from `--locale` — including the Vostok panel's,
+//! which was hardcoded Cyrillic through 1.8.0 and was the one place in this
+//! program where a theme beat a user's flag.
 //!
 //! # Not in the default install
 //!
@@ -45,6 +50,7 @@
 //!
 //! [`GE-U4-tier-navigator.md`]: https://github.com/vulogov/ucal/blob/main/Documentation/Proposals/GE-U4-tier-navigator.md
 
+pub mod chrome;
 pub mod dial;
 pub mod digits;
 pub mod face;

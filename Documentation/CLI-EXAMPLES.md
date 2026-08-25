@@ -884,7 +884,7 @@ A targeting computer: canopy brackets, a reticle round the beat, the flicker rid
 
 ## `ucal wallclock --once --at 8070205189123984864657505252035637180530466139316558837890625 --gagarin --locale ru --height 24`
 
-A Vostok instrument panel: an enamelled plate with bezelled gauges set into it, engraved labels, and a red lamp. Cyrillic chrome; the tier names follow --locale, which is why this example passes one.
+A Vostok instrument panel: an enamelled plate with bezelled gauges set into it, engraved labels, and a red lamp. Everything Cyrillic here comes from --locale ru, including the chrome: through 1.8.0 the plates were hardcoded Russian and this theme was the one place that could override the flag.
 
 ```
  ВРЕМЯ ВСЕЛЕННОЙ · UC1

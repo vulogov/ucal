@@ -53,7 +53,7 @@ Accepted by every command (§19.1).
 |---|---|---|
 | `--profile <TAG>` | `UC-1` | The profile to compute in. Only `UC-1` exists; anything else is exit 5 (Rule P). |
 | `--sep <CHAR>` | `·` | Group separator inside the base-5 text forms. Must not be a digit (§6.3). |
-| `--locale <TAG>` | `en` | Locale for tier names. `en` or `ru`. Affects both display *and* parsing — under `--locale ru`, `--step пролёт` and `--step пр` resolve. |
+| `--locale <TAG>` | `en` | Locale for tier names, and for the wall clock's chrome. `en` or `ru`. Affects both display *and* parsing — under `--locale ru`, `--step пролёт` and `--step пр` resolve. |
 | `--json` | off | Stable, versioned JSON instead of text. Never coloured. |
 | `--color <WHEN>` | `auto` | `auto`, `always` or `never`. `auto` colours only into a terminal. |
 | `--no-color` | off | Alias for `--color never`, and it wins over `--color`. |
@@ -1025,9 +1025,10 @@ wrong before it is drawn; printing nothing would hide it.
 
 - **gagarin** — a Vostok instrument panel. An enamelled plate with bezelled
   gauges set into it, an engraved label under each, and a red lamp. The only
-  light theme by default, because the object was. Its chrome is Cyrillic and its
-  tier names are not: `--locale` decides a name's language and a theme does not
-  get to override it, so the intended pairing is `--gagarin --locale ru`.
+  light theme by default, because the object was. Its Cyrillic comes from
+  `--locale ru`, not from the theme: through 1.8.0 the plates were hardcoded
+  Russian and `--gagarin --locale en` drew them anyway, which made this the one
+  place a theme overrode a user's flag.
 - **armstrong** — an Apollo DSKY. A column of annunciator lamps, `PROG`, `VERB`
   and `NOUN`, and three registers. `V16 N65` is a real pair: monitor, decimal,
   time. The lamps are drawn unlit except `COMP ACTY` — the rest report

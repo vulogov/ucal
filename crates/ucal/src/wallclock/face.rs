@@ -100,6 +100,14 @@ pub struct Face {
     pub hands: Vec<Hand>,
     /// The full `UC1` human form, for the line under the readout.
     pub human: String,
+    /// The words this face prints that are not data, in the caller's language.
+    ///
+    /// F10. `--gagarin --locale en` drew Cyrillic until 1.9.0, which made this
+    /// the one place a theme overrode a user's flag. Instrument legends — the
+    /// DSKY's `VERB` and `NOUN`, a gunsight's `TARGETING` — are *not* here: they
+    /// are the words the object bore, and translating them would invent an
+    /// instrument that never existed.
+    pub chrome: super::chrome::Chrome,
     /// A second dial: a body's own calendar, where one was asked for.
     ///
     /// A wall clock with a second face, and the analogue is exact — the second
@@ -188,6 +196,7 @@ impl Face {
             at: t,
             hands,
             local,
+            chrome: super::chrome::of(locale),
         })
     }
 
@@ -232,7 +241,7 @@ impl Face {
             .split(area);
 
         f.render_widget(
-            Paragraph::new("UCAL — universe calendar")
+            Paragraph::new(self.chrome.program)
                 .style(Style::default().fg(theme.label)),
             rows[0],
         );
@@ -243,7 +252,7 @@ impl Face {
         f.render_widget(
             Paragraph::new(vec![
                 Line::styled(self.human.clone(), Style::default().fg(theme.text)),
-                Line::styled("q to quit", Style::default().fg(theme.label)),
+                Line::styled(self.chrome.quit_hint, Style::default().fg(theme.label)),
             ]),
             rows[3],
         );
@@ -356,7 +365,7 @@ impl Face {
         f.render_widget(
             Paragraph::new(vec![
                 Line::from(Span::styled(
-                    " UNIVERSE CALENDAR · UC1",
+                    format!(" {}", self.chrome.title),
                     Style::default()
                         .bg(theme.primary)
                         .fg(theme.background)
@@ -364,7 +373,7 @@ impl Face {
                 )),
                 Line::from(""),
                 Line::from(Span::styled(
-                    " ABSOLUTE TIME · PLANCK TICKS · BASE FIVE",
+                    format!(" {}", self.chrome.subtitle),
                     Style::default().fg(theme.label),
                 )),
                 Line::from(""),
@@ -390,7 +399,7 @@ impl Face {
                     Style::default().fg(theme.text).add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(
-                    "ONE STOP EVERY 2 MIN 26 S",
+                    self.chrome.arc_pace,
                     Style::default().fg(theme.label),
                 ),
             ])),
@@ -504,7 +513,7 @@ impl Face {
                     ),
                 ]),
                 Line::styled(
-                    " ABSOLUTE TIME · PLANCK TICKS · BASE FIVE",
+                    format!(" {}", self.chrome.subtitle),
                     dim,
                 ),
             ]),
@@ -555,7 +564,7 @@ impl Face {
         f.render_widget(
             Paragraph::new(vec![
                 Line::styled(cross, hot),
-                Line::styled(" T-1 FLICKER ON THE AXIS · 66 000 PER SECOND", dim),
+                Line::styled(format!(" {}", self.chrome.blur_axis), dim),
             ]),
             rows[2],
         );
@@ -590,9 +599,9 @@ impl Face {
     /// a surface — bezelled instruments in a row, each with an engraved plate
     /// under it saying what it measures.
     ///
-    /// The chrome is Cyrillic and the tier names are not: `--locale` decides a
-    /// name's language (Rule N) and a theme does not get to override it. The
-    /// intended pairing is `--gagarin --locale ru`.
+    /// Its Cyrillic comes from `--locale ru` and not from the theme. Through
+    /// 1.8.0 the plates here were hardcoded Russian, which is the one way a
+    /// theme could override a user's flag; see [`super::chrome`].
     // ucal-lint-allow-begin(no-wrapping-arithmetic): u16 terminal geometry only
     fn render_panel(&self, f: &mut Frame, area: Rect, theme: &Theme) {
         let ink = Style::default().fg(theme.text);
@@ -614,8 +623,8 @@ impl Face {
         // The title plate.
         f.render_widget(
             Paragraph::new(vec![
-                Line::styled(" ВРЕМЯ ВСЕЛЕННОЙ · UC1", ink),
-                Line::styled(" АБСОЛЮТНОЕ ВРЕМЯ · ПЛАНКОВСКИЕ ТИКИ · ОСНОВАНИЕ ПЯТЬ", engraved),
+                Line::styled(format!(" {}", self.chrome.title), ink),
+                Line::styled(format!(" {}", self.chrome.subtitle), engraved),
                 Line::styled(" ───────────────────────────────────────────────────", engraved),
             ]),
             rows[0],
@@ -676,7 +685,7 @@ impl Face {
             .beat()
             .map_or_else(|| "T0".to_string(), |h| h.label().to_uppercase());
         main.push(Line::styled(
-            format!("        {beat_label} · ОСНОВНОЙ ОТСЧЁТ"),
+            format!("        {beat_label} · {}", self.chrome.main_plate),
             engraved,
         ));
         f.render_widget(Paragraph::new(main), rows[2]);
@@ -690,7 +699,7 @@ impl Face {
         f.render_widget(
             Paragraph::new(vec![
                 Line::from(vec![Span::styled(format!(" ● {bar}"), lamp)]),
-                Line::styled("   T-1 · 66 000 В СЕКУНДУ · ПОЛОЖЕНИЕ, НЕ ЧИСЛО", engraved),
+                Line::styled(format!("   T-1 · {}", self.chrome.blur_caption), engraved),
             ]),
             rows[3],
         );
@@ -699,8 +708,8 @@ impl Face {
         tail.extend(self.local_lines(theme));
         tail.push(Line::from(""));
         tail.push(Line::from(vec![
-            Span::styled(" ● ГОТОВ", ready),
-            Span::styled("     [Q] ВЫХОД", engraved),
+            Span::styled(format!(" ● {}", self.chrome.ready), ready),
+            Span::styled(format!("     [Q] {}", self.chrome.quit), engraved),
         ]));
         f.render_widget(Paragraph::new(tail), rows[4]);
     }
@@ -768,7 +777,7 @@ impl Face {
                 Line::from(vec![
                     Span::styled("  PROG  ", dim),
                     Span::styled("01", bright),
-                    Span::styled("    UNIVERSE CALENDAR · UC1", dim),
+                    Span::styled(format!("    {}", self.chrome.title), dim),
                 ]),
                 Line::from(vec![
                     Span::styled("  VERB  ", dim),
@@ -808,7 +817,15 @@ impl Face {
         let beat = self.beat().map_or(0, |h| h.position);
         let mut r3 = vec![Line::from(vec![
             Span::styled("  R3   ", dim),
-            Span::styled("T0 BEAT · 21 PER SECOND", dim),
+            Span::styled(
+                format!(
+                    "{} · {}",
+                    self.beat()
+                        .map_or_else(String::new, |h| h.label().to_uppercase()),
+                    self.chrome.beat_rate
+                ),
+                dim,
+            ),
         ])];
         for row in digits::render(&format!("{beat:04}")) {
             r3.push(Line::styled(format!("  {row}"), bright));
@@ -822,7 +839,7 @@ impl Face {
             .collect();
         let mut tail = vec![
             Line::styled(format!("  {bar}"), caution),
-            Line::styled("  T-1 FLICKER · TOO FAST FOR A REGISTER", dim),
+            Line::styled(format!("  {}", self.chrome.blur_register), dim),
             Line::from(""),
             Line::styled(format!("  {}", self.human), green),
         ];
@@ -859,9 +876,9 @@ impl Face {
 
         f.render_widget(
             Paragraph::new(vec![
-                Line::styled(" UCAL — universe calendar, on dials", ink),
+                Line::styled(format!(" {}", self.chrome.program_dials), ink),
                 Line::styled(
-                    " every tier has 3125 stops, because every rung is 5^5 of the one below",
+                    format!(" {}", self.chrome.stops_note),
                     dim,
                 ),
             ]),
@@ -917,7 +934,7 @@ impl Face {
             Paragraph::new(vec![
                 Line::styled(format!(" {bar}"), Style::default().fg(theme.blur)),
                 Line::styled(
-                    " the finest hand has no dial: 66 000 stops a second is not a hand",
+                    format!(" {}", self.chrome.blur_no_dial),
                     dim,
                 ),
             ]),
@@ -927,7 +944,7 @@ impl Face {
         let mut tail = vec![Line::styled(format!(" {}", self.human), ink)];
         tail.extend(self.local_lines(theme));
         tail.push(Line::from(""));
-        tail.push(Line::styled(" q to quit", dim));
+        tail.push(Line::styled(format!(" {}", self.chrome.quit_hint), dim));
         f.render_widget(Paragraph::new(tail), rows[3]);
     }
     // ucal-lint-allow-end(no-wrapping-arithmetic)
@@ -969,7 +986,7 @@ impl Face {
             Paragraph::new(vec![
                 Line::styled(bar, Style::default().fg(theme.blur)),
                 Line::styled(
-                    "T-1 FLICKER · 66 000 PER SECOND · A POSITION, NOT A NUMBER",
+                    self.chrome.blur_line,
                     Style::default().fg(theme.label),
                 ),
             ]),
@@ -1001,28 +1018,31 @@ impl Face {
                     Style::default().fg(theme.label),
                 ),
                 Span::styled(
-                    format!("year {}  day {}", l.year, l.day),
+                    format!(
+                        "{} {}  {} {}",
+                        self.chrome.year, l.year, self.chrome.day, l.day
+                    ),
                     Style::default().fg(theme.text).add_modifier(Modifier::BOLD),
                 ),
                 // No ordinal: "1th local year" was the first draft, and a
                 // suffix table for one label is a rule to get wrong later. The
                 // convention stated plainly needs no agreement about English.
                 Span::styled(
-                    "   counted from the anchor — year 1 began there",
+                    format!("   {}", self.chrome.anchor_note),
                     Style::default().fg(theme.label),
                 ),
             ]),
             Line::from(vec![
                 Span::styled(format!("{bar} "), Style::default().fg(theme.blocks[1 % theme.blocks.len()])),
                 Span::styled(
-                    format!("{}% through the local day", l.through_day),
+                    format!("{}% {}", l.through_day, self.chrome.through_local_day),
                     Style::default().fg(theme.label),
                 ),
             ]),
             Line::styled(
                 format!(
-                    "anchor revision {} — an anchor is an observation and is versioned (Rule J)",
-                    l.revision
+                    "{} {} — {}",
+                    self.chrome.anchor_revision_label, l.revision, self.chrome.anchor_revision
                 ),
                 Style::default().fg(theme.label),
             ),

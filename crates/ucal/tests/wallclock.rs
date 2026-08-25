@@ -424,8 +424,12 @@ fn the_space_programme_faces_draw_their_own_furniture() {
         false,
     )
     .expect("a frame");
-    assert!(gagarin.contains("ВРЕМЯ ВСЕЛЕННОЙ"), "{gagarin}");
-    assert!(gagarin.contains("ГОТОВ"), "{gagarin}");
+    // The furniture, not the language: which language the plates are engraved
+    // in is `--locale`'s business and is asserted in
+    // `a_theme_does_not_override_the_locale`. This face is a *surface*, and what
+    // makes it one is the bezels and the plate under the main instrument.
+    assert!(gagarin.contains("READY"), "no lamp:\n{gagarin}");
+    assert!(gagarin.contains("PRIMARY COUNT"), "no engraved plate:\n{gagarin}");
     assert!(gagarin.contains("┌────────────┐"), "no bezel:\n{gagarin}");
 
     let armstrong = ucal::wallclock::once(
@@ -444,23 +448,59 @@ fn the_space_programme_faces_draw_their_own_furniture() {
     assert!(armstrong.contains("65"), "{armstrong}");
 }
 
-/// The Cyrillic chrome does not become the tier names.
+/// A theme does not override `--locale` — not even the Cyrillic one.
 ///
-/// `--locale` decides a name's language (Rule N) and a theme does not get to
-/// override it. `--gagarin` alone draws Cyrillic chrome around English names,
-/// which looks odd and is correct; `--gagarin --locale ru` is the pairing.
+/// Through 1.8.0 the Vostok panel's chrome was hardcoded Russian while its tier
+/// names followed the flag, so `--gagarin --locale en` drew Cyrillic plates
+/// around English names. That was the one place in the program where a theme
+/// beat a user's flag, and F10 closed it: under `--locale en` the whole face is
+/// English, and under `--locale ru` the whole face is Russian.
 #[test]
 fn a_theme_does_not_override_the_locale() {
     let gagarin = theme::by_name("gagarin").expect("a theme");
     let f_en = Face::at(instant(), en(), None).expect("a face");
     let out = ucal::wallclock::once(&f_en, gagarin, 96, 28, false).expect("a frame");
-    assert!(out.contains("ВРЕМЯ ВСЕЛЕННОЙ"), "chrome should be Cyrillic");
+    assert!(out.contains("UNIVERSE CALENDAR"), "chrome should be English:\n{out}");
     assert!(out.contains("T0 BEAT"), "names should follow --locale:\n{out}");
+    assert!(
+        !out.contains("ВРЕМЯ ВСЕЛЕННОЙ"),
+        "the 1.8.0 behaviour, and the bug:\n{out}"
+    );
 
     let ru = LocaleId::parse("ru").expect("ru ships");
     let f_ru = Face::at(instant(), ru, None).expect("a face");
     let out_ru = ucal::wallclock::once(&f_ru, gagarin, 96, 28, false).expect("a frame");
+    assert!(out_ru.contains("ВРЕМЯ ВСЕЛЕННОЙ"), "{out_ru}");
     assert!(out_ru.contains("ДУГА"), "{out_ru}");
+}
+
+/// Every face, in both locales, prints chrome in the language that was asked
+/// for.
+///
+/// The Vostok panel is the one that was *reported*, because Cyrillic under
+/// `--locale en` is visibly a flag being ignored. English chrome under
+/// `--locale ru` is the same bug and looks like a translation nobody finished,
+/// so it went unnoticed on the other six faces. This test is over all of them.
+#[test]
+fn every_face_follows_the_locale() {
+    let ru = LocaleId::parse("ru").expect("ru ships");
+    for t in theme::ALL {
+        let f_en = Face::at(instant(), en(), None).expect("a face");
+        let out_en = ucal::wallclock::once(&f_en, t, 100, 30, false).expect("a frame");
+        assert!(
+            !out_en.chars().any(|c| ('\u{400}'..='\u{4ff}').contains(&c)),
+            "{}: Cyrillic under --locale en:\n{out_en}",
+            t.key
+        );
+
+        let f_ru = Face::at(instant(), ru, None).expect("a face");
+        let out_ru = ucal::wallclock::once(&f_ru, t, 100, 30, false).expect("a frame");
+        assert!(
+            out_ru.chars().any(|c| ('\u{400}'..='\u{4ff}').contains(&c)),
+            "{}: nothing Russian under --locale ru:\n{out_ru}",
+            t.key
+        );
+    }
 }
 
 /// The targeting face draws its instrument furniture.
