@@ -605,3 +605,176 @@ fn the_orbit_face_has_hands_and_no_block_digits() {
         assert!(out.contains(&h.position.to_string()), "{out}");
     }
 }
+
+// ---- F3: several dials, a chosen hero, and an odometer ------------------
+
+use ucal::wallclock::Dials;
+
+fn dials() -> Dials {
+    Dials::new(en()).expect("defaults")
+}
+
+/// An airport wall: both dials are drawn, in the order asked for.
+///
+/// Only two of the fifteen calendars can be a dial at all — a dial shows local
+/// fields, local fields need a phase, and phase is empirical (Rule J.3) — so
+/// this is the whole wall that can be built today, and that is a fact about
+/// anchors rather than about the flag.
+#[test]
+fn several_dials_are_all_drawn() {
+    let d = dials().with_clock_local(&["earth-d".to_string(), "mars-d".to_string()]);
+    let f = Face::of(instant(), &d).expect("a face");
+    assert_eq!(f.dials.len(), 2, "{:?}", f.dials);
+    let out = drawn_face(&f, "plain", 100, 32);
+    let earth = out.find("EARTH-D").expect("no earth dial");
+    let mars = out.find("MARS-D").expect("no mars dial");
+    assert!(earth < mars, "the dials came out in the wrong order:\n{out}");
+}
+
+/// A dial that cannot exist is a message and an exit code, not a blank panel —
+/// and adding a second dial did not lose that.
+#[test]
+fn an_unanchored_dial_is_still_refused() {
+    let d = dials().with_clock_local(&["earth-d".to_string(), "titan-d".to_string()]);
+    assert!(
+        Face::of(instant(), &d).is_err(),
+        "titan-d has no anchor and was accepted as a dial"
+    );
+}
+
+/// `--tier` promotes a hand to the big readout.
+#[test]
+fn the_hero_tier_can_be_chosen() {
+    let t2 = Tier::new(2).expect("a tier");
+    let d = dials().with_hero(t2);
+    let f = Face::of(instant(), &d).expect("a face");
+    let beat = f.beat().expect("a hero");
+    assert_eq!(beat.tier.index(), 2);
+
+    // And the readout actually shows it: T2's position, not T0's.
+    let plain = Face::of(instant(), &dials()).expect("a face");
+    let t0 = plain.beat().expect("a hero").position;
+    assert_ne!(beat.position, t0, "T2 and T0 happened to coincide");
+}
+
+/// Z2's kill criterion for `--tier`, answered in the display.
+///
+/// "Every choice but `T0` produces a screen where nothing moves, which is a
+/// stopped clock with extra steps." `T1` moves every 2 min 26 s and is still a
+/// clock; `T2` is 5.3 days and `T3` is 45 years, and those are calendar
+/// displays. Refusing them would refuse the flag's stated purpose, so the face
+/// says which it is — a hand that changes every 45 years is pixel-identical to a
+/// clock that has stopped.
+#[test]
+fn a_slow_hero_says_it_is_a_calendar_and_not_a_clock() {
+    for (k, expected) in [(0i8, false), (1, false), (2, true), (3, true)] {
+        let d = dials().with_hero(Tier::new(k).expect("a tier"));
+        let f = Face::of(instant(), &d).expect("a face");
+        let out = drawn_face(&f, "plain", 100, 32);
+        assert_eq!(
+            out.contains("does not move while you watch"),
+            expected,
+            "T{k} said the wrong thing about itself:\n{out}"
+        );
+    }
+}
+
+/// The odometer counts up from an origin, on the same ladder the hands are on.
+#[test]
+#[cfg(feature = "events")]
+fn the_odometer_counts_from_an_origin() {
+    let (origin, label) = ucal::wallclock_origin("bridge-epoch").expect("an exact origin");
+    let d = dials().with_since(origin, label);
+    let f = Face::of(instant(), &d).expect("a face");
+    let o = f.since.as_ref().expect("an odometer");
+    assert!(!o.counting_down, "the bridge epoch is in the past");
+    assert_eq!(o.drums.len(), 5, "five rungs, like the face");
+
+    let out = drawn_face(&f, "plain", 100, 32);
+    assert!(out.contains("SINCE"), "{out}");
+    assert!(out.contains("bridge-epoch"), "{out}");
+}
+
+/// An origin in the future counts towards it rather than reporting a negative.
+///
+/// Absolute time is unsigned (Rule B) and `Ticks` cannot hold a negative, so the
+/// direction is a word beside a magnitude — which is what `SignedWindow` already
+/// does, for the same reason.
+#[test]
+fn an_origin_in_the_future_counts_down() {
+    let later: String = {
+        let mut s = T.to_string();
+        s.push('0'); // ten times further out, and comfortably later
+        s
+    };
+    let (origin, label) = ucal::wallclock_origin(&later).expect("an instant");
+    let d = dials().with_since(origin, label);
+    let f = Face::of(instant(), &d).expect("a face");
+    assert!(f.since.as_ref().expect("an odometer").counting_down);
+    let out = drawn_face(&f, "plain", 100, 32);
+    assert!(out.contains("UNTIL"), "{out}");
+}
+
+/// **Z2's kill criterion for `--since`, and the reason it is a feature.**
+///
+/// > Stop if: the window of the chosen origin exceeds the resolution of the
+/// > display [...] Then it should refuse and say why, rather than render a
+/// > number whose last twelve digits are decoration.
+///
+/// Checked both ways over the whole catalogue: every event with a window wider
+/// than `T-1` is refused, and every event with one no wider is accepted. A check
+/// that only ever refused would pass with the accept path broken.
+#[test]
+#[cfg(feature = "events")]
+fn a_wide_window_is_refused_and_an_exact_one_is_not() {
+    let finest = Tier::new(-1).expect("a tier");
+    let mut refused = 0;
+    let mut accepted = 0;
+    for e in ucal_events::all() {
+        let got = ucal::wallclock_origin(e.id);
+        if e.uncertainty().ticks() > &finest.ticks() {
+            let err = got.expect_err("a window wider than the finest hand was accepted");
+            assert_eq!(err.code, ucal_core::Code::E0023, "{}: {err}", e.id);
+            refused += 1;
+        } else {
+            got.unwrap_or_else(|e| panic!("an exact origin was refused: {e}"));
+            accepted += 1;
+        }
+    }
+    assert!(refused > 0, "no event in the catalogue was refused");
+    assert!(
+        accepted > 0,
+        "no event in the catalogue was accepted, so the accept path is untested"
+    );
+}
+
+/// The odometer's leading drum does not wrap.
+///
+/// Every other rung is a position out of 3125 and reads mod 3125, like the
+/// face's hands. Without an unwrapped leading drum this reading could not tell
+/// 2 000 years from 142 000: one `T3` span is 45 years and 3125 of them is
+/// 141 000.
+#[test]
+#[cfg(feature = "events")]
+fn the_leading_drum_carries_the_whole_count() {
+    let (origin, label) = ucal::wallclock_origin("bridge-epoch").expect("an origin");
+    let near = Face::of(instant(), &dials().with_since(origin, label)).expect("a face");
+    let a = near.since.as_ref().expect("an odometer").drums[0].position;
+
+    // The same origin, read 3125 T3 spans later. A wrapping drum reads the same.
+    let far = {
+        let bump = Tier::new(3)
+            .expect("a tier")
+            .ticks()
+            .try_mul(&<Ticks as TickInt>::from_u64(3125))
+            .expect("in range");
+        let t = Instant::<UC1>::from_ticks(
+            instant().ticks().try_add(&bump).expect("in range"),
+        )
+        .expect("inside the domain");
+        let (origin, label) = ucal::wallclock_origin("bridge-epoch").expect("an origin");
+        Face::of(t, &dials().with_since(origin, label)).expect("a face")
+    };
+    let b = far.since.as_ref().expect("an odometer").drums[0].position;
+    assert_eq!(b, a + 3125, "the leading drum wrapped: {a} then {b}");
+}

@@ -1035,7 +1035,8 @@ wrong five would be useful.
 A full-screen clock showing universe time. `q`, `Esc` or `Ctrl-C` quits.
 
 ```
-ucal wallclock [--theme <KEY>] [--startrek|--gagarin|--armstrong] [--clock-local <ID>]
+ucal wallclock [--theme <KEY>] [--startrek|--gagarin|--armstrong]
+ucal wallclock [--clock-local <ID>]... [--tier <T>] [--since <ORIGIN>]
 ucal wallclock --once [--at <INSTANT>] [--height <N>]
 ucal wallclock --theme list
 ```
@@ -1159,7 +1160,7 @@ an escape sequence in a committed file is a diff nobody can read.
 
 `--at` without `--once` is refused: a live clock's instant is now.
 
-### A second dial: `--clock-local <ID>`
+### More dials: `--clock-local <ID>`
 
 A wall clock's second face has always shown another *place*, and so does this
 one. `--clock-local mars-d` puts Mars beside the universal readout: local year,
@@ -1169,6 +1170,16 @@ revision produced it.
 ```
 ucal wallclock --startrek --clock-local mars-d
 ```
+
+**Repeatable** — an airport wall:
+
+```
+ucal wallclock --clock-local earth-d --clock-local mars-d
+```
+
+Today that is the whole wall that can be built. Only an anchored calendar can be
+a dial, and two of the fifteen have an anchor; the limit is a fact about anchors
+rather than about this flag.
 
 **`--clock-local` and not `--locale`.** `--locale` is this program's *language*
 flag — Rule N makes a tier's name locale-scoped and display-only — and it now
@@ -1187,6 +1198,61 @@ have no anchor — the ordinary case, for the reason
 [`D5-titan-anchor.md`](Proposals/D5-titan-anchor.md) records. Asking for one of
 them is `UCAL-E0062`, reported **before** the clock takes over the terminal, so
 the failure is a message rather than a full-screen panel with nothing in it.
+
+### Choosing the hero: `--tier <T>`
+
+The big readout is `T0` because that is the tier that moves at a rate a person
+watches — about 21 stops a second. `--tier` promotes another, which is what makes
+the face usable as a *calendar* display rather than a *clock* display:
+
+```
+ucal wallclock --tier T2
+```
+
+Z2 named the risk in as many words — *"every choice but `T0` produces a screen
+where nothing moves, which is a stopped clock with extra steps"* — and the answer
+is to say so rather than to refuse. `T1` changes every 2 min 26 s and is still a
+clock. `T2` is 5.3 days and `T3` is 45 years, so at those the face prints **a
+calendar display: this hand does not move while you watch**. Refusing them would
+refuse the flag's stated purpose; a hand that changes every 45 years is
+pixel-identical to a clock that has stopped, so it is labelled.
+
+### An odometer: `--since <ORIGIN>`
+
+Elapsed time from a stated origin, read on the same ladder the hands are on — a
+tier is a duration, so an elapsed count divides by one exactly as an instant's
+does. `<ORIGIN>` is an instant, or an event id from `ucal events list`:
+
+```
+ucal wallclock --since bridge-epoch
+```
+
+The **leading drum does not wrap**. Every other rung is a position out of 3125
+and reads mod 3125, exactly as the face's hands do; the coarsest carries the
+whole count, which is what the leading drum of an odometer has always done.
+Without it the reading could not tell 2 000 years from 142 000 — one `T3` span is
+45 years and 3125 of them is 141 000.
+
+An origin in the future **counts towards it** and is labelled `UNTIL` rather than
+`SINCE`. Absolute time is unsigned (Rule B) and a tick count cannot be negative,
+so the direction is a word beside a magnitude — the same shape `SignedWindow`
+takes, for the same reason.
+
+**An event with a wide window is refused**, which is this flag's kill criterion
+and the interesting part of it:
+
+```
+$ ucal wallclock --since holocene
+UCAL-E0023: comparison indeterminate at stated precision (this event's window is
+wider than the finest hand on the face ...)
+```
+
+`holocene` is uncertain by about two centuries. An odometer ticking 66 000 times
+a second against that figure would be theatre, and
+[`ucal events show`](#ucal-events) already prints the elapsed span with its
+window beside it, which is the honest way to present it. `bridge-epoch` is exact
+by definition — year 0 of the proleptic Gregorian calendar, a declaration and not
+a measurement — and is the origin for which "time since" is a real reading.
 
 **No Earth unit appears on the face as a unit** (Rule A.5), and a test asserts
 it. A clock is where that temptation lives: every clock a reader has ever seen

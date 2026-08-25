@@ -90,6 +90,153 @@ impl Local {
     }
 }
 
+impl Odometer {
+    /// The span between two instants, read on the tier ladder.
+    ///
+    /// The drums are the *elapsed span* placed on the same rungs the hands are.
+    /// A tier is a duration — `5^(60+5k)` Planck ticks — so an elapsed count
+    /// divides by it exactly as an instant's does, and the odometer nests the
+    /// way the face does. That is the whole reason the second function of a wall
+    /// clock is drawable at all here: the ladder measures durations, and an
+    /// instant is only a duration from the origin.
+    ///
+    /// An origin in the future counts towards it rather than reporting a
+    /// negative: absolute time is unsigned by Rule B, `Ticks` cannot hold a
+    /// negative, and a magnitude with a direction beside it is what
+    /// [`ucal_core::SignedWindow`] already does for the same reason.
+    pub fn between(
+        origin: &Instant<UC1>,
+        now: &Instant<UC1>,
+        label: String,
+        locale: LocaleId,
+    ) -> Result<Odometer, TimeError> {
+        let counting_down = origin.ticks() > now.ticks();
+        let (hi, lo) = if counting_down {
+            (origin.ticks(), now.ticks())
+        } else {
+            (now.ticks(), origin.ticks())
+        };
+        // Ordered first, so the subtraction cannot underflow. Rule O forbids
+        // wrapping and saturating arithmetic on durations; this is the third
+        // option, which is to make the operation unable to fail.
+        let span = hi
+            .try_sub(lo)
+            .ok_or_else(|| TimeError::new(ucal_core::Code::E0021))?;
+
+        let mut drums = Vec::new();
+        for (i, k) in FACE_TIERS.into_iter().enumerate() {
+            let tier = Tier::new(k)?;
+            let (q, _) = span.quot_rem(&tier.ticks());
+            // The leading drum carries the whole count; every other one is a
+            // position out of 3125. `u32::MAX` T3 spans is 190 billion years, so
+            // a count that does not fit is a span longer than the universe and
+            // saturating there is not a duration being clamped.
+            let counted = if i == 0 {
+                q.to_dec_string()
+            } else {
+                let (_, r) = q.quot_rem(&<Ticks as TickInt>::from_u64(3125));
+                r.to_dec_string()
+            };
+            let position = counted.parse::<u32>().unwrap_or(u32::MAX);
+            drums.push(Hand {
+                tier,
+                name: match ucal_core::tier::name_of(tier) {
+                    Some(_) => ucal_core::locale::display(locale, tier),
+                    None => String::new(),
+                },
+                position,
+            });
+        }
+
+        Ok(Odometer {
+            origin: label,
+            drums,
+            counting_down,
+        })
+    }
+}
+
+/// What a face is asked to show, beyond the instant itself.
+///
+/// # Why this exists rather than three more arguments
+///
+/// [`Face::at`] took a locale and one calendar id. F3 adds a repeatable dial, a
+/// choice of hero tier and an odometer origin, and a five-argument constructor
+/// where four of them are optional is a constructor nobody can read at the call
+/// site. It is also how [`Face::at`] and [`super::run`] keep the exact
+/// signatures they shipped with in 1.5.0: both remain, delegating here.
+///
+/// `#[non_exhaustive]`, so it is built through [`Dials::new`] and the `with_`
+/// methods rather than as a literal.
+#[derive(Clone, Debug)]
+#[non_exhaustive]
+pub struct Dials {
+    /// The language the tier names and the chrome are drawn in (Rule N).
+    pub locale: LocaleId,
+    /// Bodies' own calendars, each shown as a further dial — an airport wall.
+    pub clock_local: Vec<String>,
+    /// The tier promoted to the big readout. `T0` unless asked otherwise.
+    pub hero: Tier,
+    /// An origin to count from, shown as an odometer.
+    pub since: Option<Instant<UC1>>,
+    /// What the origin was asked for as, for the label.
+    pub since_label: Option<String>,
+}
+
+impl Dials {
+    /// The defaults: this language, no second dial, `T0` as the hero, no
+    /// odometer.
+    pub fn new(locale: LocaleId) -> Result<Dials, TimeError> {
+        Ok(Dials {
+            locale,
+            clock_local: Vec::new(),
+            hero: Tier::new(0)?,
+            since: None,
+            since_label: None,
+        })
+    }
+
+    /// Show these calendars as dials, in the order given.
+    pub fn with_clock_local(mut self, ids: &[String]) -> Dials {
+        self.clock_local = ids.to_vec();
+        self
+    }
+
+    /// Promote a tier to the big readout.
+    pub fn with_hero(mut self, hero: Tier) -> Dials {
+        self.hero = hero;
+        self
+    }
+
+    /// Count from an origin.
+    pub fn with_since(mut self, origin: Instant<UC1>, label: impl Into<String>) -> Dials {
+        self.since = Some(origin);
+        self.since_label = Some(label.into());
+        self
+    }
+}
+
+/// The second function of a wall clock: elapsed time from a stated origin.
+///
+/// The drums are the elapsed *span* read on the same ladder the hands are, which
+/// is what makes this an odometer rather than a subtraction printed twice.
+#[derive(Clone, PartialEq, Eq, Debug)]
+#[non_exhaustive]
+pub struct Odometer {
+    /// The origin, as the caller asked for it.
+    pub origin: String,
+    /// The span's own drums, coarsest first.
+    ///
+    /// The coarsest does **not** wrap. Every other rung is a position out of
+    /// 3125 and reads mod 3125, exactly as the face's hands do; the top one
+    /// carries the whole count, which is what the leading drum of an odometer
+    /// has always done. Without that this reading could not tell 2 000 years
+    /// from 142 000 — one `T3` span is 45 years and 3125 of them is 141 000.
+    pub drums: Vec<Hand>,
+    /// True when the origin is in the future, so this counts towards it.
+    pub counting_down: bool,
+}
+
 /// A reading of the clock.
 #[derive(Clone, Debug)]
 #[non_exhaustive]
@@ -114,7 +261,27 @@ pub struct Face {
     /// face on a real one shows another *place*, and so does this. What it shows
     /// is local fields, which need a phase, so only an anchored calendar can
     /// appear here (Rule J.3).
+    ///
+    /// **The first of [`Face::dials`]**, kept because it is what 1.5.0 published
+    /// and this cycle admits no breaking change. Everything reads `dials`;
+    /// nothing reads this. It goes in 2.0, and `ROAD-TO-2.0.md` says so.
     pub local: Option<Local>,
+    /// Every dial asked for, in the order asked for (F3).
+    ///
+    /// `--clock-local` repeats, so the wall can carry several places at once.
+    /// Only calendars with an anchor can appear at all (Rule J.3), which today
+    /// is two of fifteen — so the wall is a wall of two until a third anchor is
+    /// established, and that is a fact about anchors rather than about this.
+    pub dials: Vec<Local>,
+    /// The tier in the big readout.
+    ///
+    /// `T0` by default, because it is the tier that moves at a rate a person
+    /// watches. `--tier` promotes another, which turns the face from a clock
+    /// display into a calendar display; the face says which, because a hero that
+    /// changes every 45 years looks identical to a stopped clock.
+    pub hero: Tier,
+    /// The odometer, where an origin was given.
+    pub since: Option<Odometer>,
 }
 
 /// The second dial.
@@ -156,6 +323,11 @@ impl Face {
         Face::at(super::now_instant()?, locale, clock_local)
     }
 
+    /// Read the system clock, with everything [`Dials`] can ask for.
+    pub fn now(dials: &Dials) -> Result<Face, TimeError> {
+        Face::of(super::now_instant()?, dials)
+    }
+
     /// Read a given instant, which is what the tests use.
     /// `locale` names the language the tiers are drawn in; `clock_local` names
     /// a place, and is a calendar id.
@@ -164,6 +336,16 @@ impl Face {
         locale: LocaleId,
         clock_local: Option<&str>,
     ) -> Result<Face, TimeError> {
+        let mut dials = Dials::new(locale)?;
+        if let Some(id) = clock_local {
+            dials = dials.with_clock_local(&[id.to_string()]);
+        }
+        Face::of(t, &dials)
+    }
+
+    /// Read a given instant with everything [`Dials`] can ask for.
+    pub fn of(t: Instant<UC1>, dials: &Dials) -> Result<Face, TimeError> {
+        let locale = dials.locale;
         let ticks = t.ticks();
         let mut hands = Vec::new();
         for k in FACE_TIERS {
@@ -187,22 +369,46 @@ impl Face {
                 position,
             });
         }
-        let local = match clock_local {
-            None => None,
-            Some(id) => Some(Local::read(id, &t)?),
+        // Read every dial before anything is drawn. A calendar id that does not
+        // exist, or one that exists and has no anchor, is a message and an exit
+        // code — not a wall with a blank panel on it and no way to see why.
+        let mut ds = Vec::new();
+        for id in &dials.clock_local {
+            ds.push(Local::read(id, &t)?);
+        }
+
+        let since = match (&dials.since, &dials.since_label) {
+            (Some(origin), label) => Some(Odometer::between(
+                origin,
+                &t,
+                label.clone().unwrap_or_else(|| "the stated origin".to_string()),
+                locale,
+            )?),
+            _ => None,
         };
+
         Ok(Face {
             human: crate::render_at(&t, Tier::new(0)?),
             at: t,
             hands,
-            local,
+            local: ds.first().cloned(),
+            dials: ds,
+            hero: dials.hero,
+            since,
             chrome: super::chrome::of(locale),
         })
     }
 
-    /// The hand a reader watches: `T0`, the beat, at about 21 per second.
+    /// The hand in the big readout: `T0` unless `--tier` promoted another.
+    ///
+    /// Named `beat` because `T0` *is* the beat and was the only possibility
+    /// through 1.8.0. What it means is *the hero*, and every face asks for it by
+    /// this name.
     pub fn beat(&self) -> Option<&Hand> {
-        self.hands.iter().find(|h| h.tier.index() == 0)
+        self.hands
+            .iter()
+            .find(|h| h.tier.index() == self.hero.index())
+            .or_else(|| self.hands.iter().find(|h| h.tier.index() == 0))
     }
 
     /// The hand below it, which is a blur and is drawn as one.
@@ -1002,9 +1208,76 @@ impl Face {
     /// only quantity here that moves at a rate worth drawing — one local day is
     /// a day of that body and not of this one.
     fn local_lines(&self, theme: &Theme) -> Vec<Line<'static>> {
-        let Some(l) = &self.local else {
+        let mut out = Vec::new();
+        // Z2's kill criterion for `--tier`, answered rather than enforced: "every
+        // choice but T0 produces a screen where nothing moves, which is a stopped
+        // clock with extra steps." T1 moves every 2 min 26 s and is still a
+        // clock; T2 is 5.3 days and T3 is 45 years, and those are calendar
+        // displays. Refusing them would refuse the flag's stated purpose — to
+        // make the face usable as a calendar — so the face says which it is,
+        // because a hero that changes every 45 years is pixel-identical to a
+        // clock that has stopped.
+        if self.hero.index() >= 2 {
+            out.push(Line::from(""));
+            out.push(Line::styled(
+                self.chrome.hero_is_slow,
+                Style::default().fg(theme.label),
+            ));
+        }
+        for l in &self.dials {
+            out.extend(self.one_dial(l, theme));
+        }
+        out.extend(self.since_lines(theme));
+        out
+    }
+
+    /// The odometer, where an origin was given (F3).
+    ///
+    /// One line, under the dials: it is the second function of a wall clock and
+    /// not the first, and a clock that gave equal weight to *when it is* and
+    /// *how long since* would be two instruments in one pane.
+    fn since_lines(&self, theme: &Theme) -> Vec<Line<'static>> {
+        let Some(o) = &self.since else {
             return Vec::new();
         };
+        let drums: String = o
+            .drums
+            .iter()
+            .enumerate()
+            .map(|(i, d)| {
+                if i == 0 {
+                    format!("{} {}", d.label().to_uppercase(), d.position)
+                } else {
+                    format!("{} {:04}", d.label().to_uppercase(), d.position)
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("  ");
+        vec![
+            Line::from(""),
+            Line::from(vec![
+                Span::styled(
+                    format!(
+                        "{:<14}",
+                        if o.counting_down {
+                            self.chrome.until
+                        } else {
+                            self.chrome.since
+                        }
+                    ),
+                    Style::default().fg(theme.label),
+                ),
+                Span::styled(
+                    o.origin.clone(),
+                    Style::default().fg(theme.text).add_modifier(Modifier::BOLD),
+                ),
+            ]),
+            Line::styled(format!("{drums}"), Style::default().fg(theme.text)),
+        ]
+    }
+
+    /// One dial's block.
+    fn one_dial(&self, l: &Local, theme: &Theme) -> Vec<Line<'static>> {
         let width = 40usize;
         let filled = l.through_day as usize * width / 100;
         let bar: String = core::iter::repeat_n('▓', filled)

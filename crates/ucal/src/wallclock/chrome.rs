@@ -89,6 +89,12 @@ pub struct Chrome {
     pub anchor_note: &'static str,
     /// The second calendar's progress bar, after its percentage.
     pub through_local_day: &'static str,
+    /// The odometer's label, counting up from an origin.
+    pub since: &'static str,
+    /// The odometer's label, counting towards an origin in the future.
+    pub until: &'static str,
+    /// What the big readout is, when it is not the tier that moves.
+    pub hero_is_slow: &'static str,
     /// The label of a second calendar's anchor revision.
     pub anchor_revision_label: &'static str,
     /// That an anchor is an observation, printed after its revision.
@@ -116,6 +122,9 @@ const EN: Chrome = Chrome {
     day: "day",
     anchor_note: "counted from the anchor — year 1 began there",
     through_local_day: "through the local day",
+    since: "SINCE",
+    until: "UNTIL",
+    hero_is_slow: "a calendar display: this hand does not move while you watch",
     anchor_revision_label: "anchor revision",
     anchor_revision: "an anchor is an observation and is versioned (Rule J)",
 };
@@ -141,6 +150,9 @@ const RU: Chrome = Chrome {
     day: "сутки",
     anchor_note: "отсчёт от опорной точки — там начался год 1",
     through_local_day: "местных суток пройдено",
+    since: "ПРОШЛО ОТ",
+    until: "ОСТАЛОСЬ ДО",
+    hero_is_slow: "календарь, а не часы: эта стрелка не движется, пока вы смотрите",
     anchor_revision_label: "версия опорной точки",
     anchor_revision: "это наблюдение, а наблюдения версионируются (правило J)",
 };
@@ -185,6 +197,9 @@ mod tests {
             ("day", c.day),
             ("anchor_note", c.anchor_note),
             ("through_local_day", c.through_local_day),
+            ("since", c.since),
+            ("until", c.until),
+            ("hero_is_slow", c.hero_is_slow),
             ("anchor_revision_label", c.anchor_revision_label),
             ("anchor_revision", c.anchor_revision),
         ]

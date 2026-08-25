@@ -248,7 +248,13 @@ enum Command {
         /// Shorthand for `--theme armstrong`, an Apollo DSKY.
         #[arg(long, conflicts_with_all = ["startrek", "gagarin"])]
         armstrong: bool,
-        /// A body's own calendar, shown as a second dial: `earth-d`, `mars-d`.
+        /// A body's own calendar, shown as a further dial: `earth-d`, `mars-d`.
+        ///
+        /// **Repeatable.** `--clock-local earth-d --clock-local mars-d` is an
+        /// airport wall. Only an anchored calendar can be a dial at all (Rule
+        /// J.3), which today is two of fifteen — so the wall is a wall of two
+        /// until a third anchor is established, and that is a fact about anchors
+        /// rather than about this flag.
         ///
         /// `--clock-local` and not `--locale`, which is already this program's
         /// *language* flag (Rule N). The two are different vocabularies and one
@@ -256,7 +262,24 @@ enum Command {
         /// `--locale ru` translates the tier names on the face, and
         /// `--clock-local mars-d` puts Mars beside them.
         #[arg(long = "clock-local", value_name = "ID")]
-        clock_local: Option<String>,
+        clock_local: Vec<String>,
+        /// The tier in the big readout: `T0`, `T2`, or a name like `sweep`.
+        ///
+        /// `T0` by default, because it is the tier that moves at a rate a person
+        /// watches. Promoting a slower one turns the face from a clock display
+        /// into a calendar display, and the face says so — a hand that changes
+        /// every 45 years is pixel-identical to a clock that has stopped.
+        #[arg(long, value_name = "T")]
+        tier: Option<String>,
+        /// An origin to count from, shown as an odometer: an instant, or an
+        /// event id from `ucal events list`.
+        ///
+        /// An event is refused when its window is wider than the finest tier on
+        /// the face. A reading that ticks 66 000 times a second against a
+        /// citation uncertain by two centuries is theatre, and `ucal events show`
+        /// already prints that number honestly, which is statically.
+        #[arg(long, value_name = "ORIGIN")]
+        since: Option<String>,
         /// Draw one frame to stdout and exit, instead of taking over the screen.
         #[arg(long)]
         once: bool,
@@ -779,6 +802,8 @@ fn main() {
         gagarin,
         armstrong,
         clock_local,
+        tier,
+        since,
         once,
         at,
         height,
@@ -799,11 +824,19 @@ fn main() {
             // second width nobody would keep in step with the first.
             let cols = Render::resolve_width(cli.width, terminal) as u16;
             let result = LocaleId::parse(&cli.locale).and_then(|l| {
+                let mut dials =
+                    ucal::wallclock::Dials::new(l)?.with_clock_local(clock_local);
+                if let Some(t) = tier {
+                    dials = dials.with_hero(ucal::parse_tier(t)?);
+                }
+                if let Some(origin) = since {
+                    let (t, label) = ucal::wallclock_origin(origin)?;
+                    dials = dials.with_since(t, label);
+                }
                 if *once {
-                    ucal::wallclock::run_once(
+                    ucal::wallclock::run_once_with(
                         key,
-                        l,
-                        clock_local.as_deref(),
+                        &dials,
                         at.as_deref(),
                         cols,
                         *height,
@@ -823,7 +856,7 @@ fn main() {
                          a live clock's instant is now",
                     ))
                 } else {
-                    ucal::wallclock::run(key, l, clock_local.as_deref())
+                    ucal::wallclock::run_with(key, &dials)
                 }
             });
             if let Err(e) = result {

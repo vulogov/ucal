@@ -2993,6 +2993,62 @@ pub fn cmd_cal_derive_with(path: &str, anchor: Option<&str>, at: Option<&str>) -
     ))
 }
 
+/// F3 — resolve `ucal wallclock --since <ORIGIN>` to an instant and a label.
+///
+/// An instant is taken as given. **An event id is looked up and may be
+/// refused**, which is Z2's kill criterion for this feature and the only
+/// interesting part of it:
+///
+/// > **Stop if:** the window of the chosen origin exceeds the resolution of the
+/// > display [...] Then it should refuse and say why, rather than render a
+/// > number whose last twelve digits are decoration — the same judgement
+/// > `UCAL-E0023` already makes for comparisons.
+///
+/// The face's finest hand is `T-1`, so that is the resolution. An event whose
+/// window is wider is refused: `holocene` is uncertain by about two centuries,
+/// and an odometer ticking 66 000 times a second against it would be theatre.
+/// `ucal events show` already prints that number the honest way, which is
+/// statically and with its window beside it.
+///
+/// `bridge-epoch` is the exception the proposal predicted — exact by definition,
+/// zero window, and the one origin for which "time since" is a real reading.
+#[cfg(feature = "tui")]
+pub fn wallclock_origin(origin: &str) -> Result<(Instant<UC1>, String), TimeError> {
+    // An instant first: the argument is documented as one, and an id that
+    // happens to parse as a tick count does not exist.
+    if let Ok((t, _)) = parse_instant(origin) {
+        return Ok((t, origin.to_string()));
+    }
+
+    #[cfg(not(feature = "events"))]
+    {
+        Err(TimeError::with_context(
+            Code::E0018,
+            "--since takes an instant. Event ids need this binary built with the \
+             `events` feature",
+        ))
+    }
+    #[cfg(feature = "events")]
+    {
+        let e = events::by_id(origin)?;
+        let finest = Tier::new(-1)?;
+        if e.uncertainty().ticks() > &finest.ticks() {
+            return Err(TimeError::with_context(
+                Code::E0023,
+                "this event's window is wider than the finest hand on the face, so an \
+                 odometer counting from it would tick 66 000 times a second against a \
+                 figure uncertain by very much more. `ucal events show <id>` prints the \
+                 elapsed span with its window beside it, which is the honest way to \
+                 present it. `bridge-epoch` is exact by definition and is accepted here",
+            ));
+        }
+        Ok((
+            Instant::from_ticks(e.window.lo().ticks().clone())?,
+            format!("{} ({})", e.label, e.id),
+        ))
+    }
+}
+
 /// F4 — check a §15.1 file and say what follows from it.
 ///
 /// # Why `cal derive` was not already this

@@ -53,7 +53,7 @@ today, by looking at the code.
 
 ---
 
-## The four
+## The four, and one that arrived later
 
 ### 1. The backends are mutually exclusive — **2.0**
 
@@ -153,6 +153,30 @@ will still not do — let a **reachable** condition arrive as a panic in any cra
 **This item is closed, not deferred.** It is listed so that a reader comparing
 this document to the carried-forward lists can see it was decided rather than
 dropped.
+
+### 5. `wallclock::Face::local` and two constructors survive only for 1.x — **rides along**
+
+Added by 1.9.0, and recorded here the day it was created rather than found
+later.
+
+F3 made `--clock-local` repeatable, so a face carries a *list* of dials. The
+list is `Face::dials`; `Face::local` remains beside it, holding the first, and
+nothing in the program reads it. `Face::at` and `wallclock::run` likewise remain
+as one-line delegations to `Face::of` and `run_with`, which take a [`Dials`]
+instead of an ever-growing argument list.
+
+All three are dead weight kept because 1.9.0's scope admits no breaking change —
+and because `cargo semver-checks` would not have caught the breakage if it had
+been made. `wallclock` sits behind the non-default `tui` feature, so the tool's
+`--default-features` run never sees the type at all. That is not a licence: V1
+Finding 6 and X3 exist because this project does not hide in the tool's blind
+spots, and a change the tool cannot see is exactly the kind that has to be
+declared by hand.
+
+**Cost to remove: three deletions and their call sites.** It rides along with
+whatever else 2.0 does.
+
+[`Dials`]: https://docs.rs/ucal/latest/ucal/wallclock/struct.Dials.html
 
 ---
 
