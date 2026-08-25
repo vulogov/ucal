@@ -60,7 +60,11 @@ permissions:
   issues: write
 
 env:
-  CARGO_TERM_COLOR: always
+  # `never`, where every other workflow here says `always`. This log is pasted
+  # into an issue body, and the first rehearsal produced one that opened with
+  # forty lines of escape-coded `Downloading` — which is what a rehearsal is
+  # for. Colour is for a terminal; an issue is not one.
+  CARGO_TERM_COLOR: never
 
 jobs:
   links:
@@ -71,11 +75,17 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
+      # Built separately so the log the issue carries is the *check's* output
+      # and not cargo's. The same first rehearsal buried the verdict under the
+      # dependency download that preceded it.
+      - name: build xtask
+        run: cargo build -p xtask --quiet
+
       - name: check-links
         id: check
         run: |
           set -o pipefail
-          cargo run -p xtask -- check-links 2>&1 | tee links.log
+          ./target/debug/xtask check-links 2>&1 | tee links.log
           if [ "${{ inputs.rehearse }}" = "true" ]; then
             echo "  REHEARSAL: failing on purpose to exercise the issue path." \
               | tee -a links.log
