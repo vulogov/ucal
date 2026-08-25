@@ -169,10 +169,42 @@ one-line version and links to it.
 
    Pushing the tag triggers `.github/workflows/release.yml`, which builds `ucal`
    for five targets, runs `ucal verify` on each artefact before packaging it,
-   and attaches them to the release with a `SHA256SUMS.txt`. That checksum file
-   is **not** signed and says so in the release body — it is produced by the job
-   that produced the files.
+   and attaches them to the release with a `SHA256SUMS.txt`.
 
    If a runner outage eats the run, re-dispatch it with the tag rather than
    moving the tag.
-10. Open the next file.
+
+10. `cargo run -p xtask -- sign-release X.Y.Z`, once that workflow has finished.
+
+    **This step needs you, and cannot be given to CI.** The minisign secret key
+    is on one laptop with an offline backup and must never enter this repository
+    or a runner; a signature CI could produce would attest to a GitHub secret,
+    which is a different and weaker claim wearing the same shape.
+
+    The command downloads the checksum file the workflow attached, signs it with
+    a trusted comment naming the tag, **verifies the signature against
+    `fixtures/ucal.pub` before uploading anything**, and attaches it. It refuses
+    a checksum file naming no files, and refuses to re-sign one that already has
+    a signature.
+
+    Through 1.8.0 this step did not exist, and nine release notes carried the
+    same sentence about it. C1 closed the half of that sentence which was about
+    this repository; the half about the world — *the key has no authority behind
+    it that is not the author* — is not closable from here.
+
+11. `cargo run -p xtask -- verify-release X.Y.Z`.
+
+    Three comparisons, none of which existed before 1.9.0: the published
+    `.crate` files against a checkout of the tag, the release binaries against
+    `SHA256SUMS.txt`, and that file against its signature.
+
+    It checks the tag out into a temporary worktree rather than trusting the
+    working tree — the first run of it was made from a 1.9.0 tree against
+    published 1.8.0 crates and reported five failures, every one of them cargo
+    correctly refusing to resolve `^1.9.0` against an index that does not have
+    it yet.
+
+    A comparison that could not be performed is reported as `--` and exits 5,
+    not 0. A check that could not run has not passed.
+
+12. Open the next file.
