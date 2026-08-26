@@ -77,6 +77,31 @@ pub fn parse_instant(s: &str) -> Result<(Instant<UC1>, Precision), TimeError> {
             .ok_or(TimeError::with_context(Code::E0001, "tick count out of range"))?;
         return Ok((Instant::<UC1>::from_ticks(t)?, Precision::Tick));
     }
+    // G10 — an event id gets its own answer too. The catalogue's ids are
+    // lowercase words and cannot be confused with any accepted form, and
+    // `ucal between recombination now` reported *malformed timestamp* about a
+    // name this program knows perfectly well.
+    //
+    // It is a refusal and not a conversion, because **an event is an interval**.
+    // `recombination` is a window hundreds of thousands of years wide; silently
+    // taking one end of it would be the substitution Rule U refuses, and taking
+    // the midpoint would be a rendering choice presented as a measurement.
+    // `ucal wallclock --since` accepts an event id and applies a width check
+    // before it does — that is the one place the conversion is honest, and the
+    // message says so.
+    #[cfg(feature = "events")]
+    if events::by_id(s).is_ok() {
+        return Err(TimeError::with_context(
+            Code::E0023,
+            body_file::leak(format!(
+                "`{s}` is an event, and an event is an interval rather than an instant. \
+                 `ucal events show {s}` prints its window and what it was published as. \
+                 `ucal wallclock --since {s}` will count from it if the window is \
+                 narrower than the finest hand on the face, which is the one place \
+                 collapsing it to a point is honest"
+            )),
+        ));
+    }
     // G3 — `-` gets its own answer. F2 added stdin and left this message
     // listing three accepted forms out of four, so the diagnostic a caller hits
     // *while getting the syntax wrong* was missing a quarter of the syntax. A
@@ -357,22 +382,20 @@ pub fn cmd_doctor() -> CmdResult {
     } else {
         "u512 (bnum, stack, const-constructible; Instant is Copy)"
     };
-    let features: Vec<&str> = {
-        let mut f = Vec::new();
-        if cfg!(feature = "u512") {
-            f.push("u512");
-        }
-        if cfg!(feature = "bigint") {
-            f.push("bigint");
-        }
-        if cfg!(feature = "std") {
-            f.push("std");
-        }
-        if cfg!(feature = "civil") {
-            f.push("civil");
-        }
-        f
-    };
+    // G12 — every optional feature this binary can have, not the four somebody
+    // stopped at. `doctor` exists to say what is in the build, and it reported
+    // `u512, std, civil` for a binary built with `--features full`: `body`,
+    // `events`, `cosmo` and `tui` were compiled in and unlisted, so four of the
+    // seven commands a reader could run were invisible to the command whose job
+    // is to enumerate them.
+    //
+    // Held to the full list by a test, since the failure mode is a feature added
+    // and this function not revisited — which is exactly what happened.
+    let features: Vec<&str> = ALL_FEATURES
+        .iter()
+        .filter(|(_, on)| *on)
+        .map(|(name, _)| *name)
+        .collect();
 
     let provenance_present = UC1::datum_provenance().is_ok();
     let domain_max = <Ticks as TickInt>::domain_max();
@@ -2772,6 +2795,22 @@ pub fn cmd_seq_by(
     }
     Ok(out)
 }
+
+/// Every optional feature this binary can be built with, and whether it is.
+///
+/// One list, so `doctor` and the test that holds it complete cannot disagree.
+/// The mutually exclusive backends are both here: exactly one is ever on, and
+/// `ucal-core`'s `compile_error!` guarantees it.
+pub const ALL_FEATURES: &[(&str, bool)] = &[
+    ("u512", cfg!(feature = "u512")),
+    ("bigint", cfg!(feature = "bigint")),
+    ("std", cfg!(feature = "std")),
+    ("civil", cfg!(feature = "civil")),
+    ("body", cfg!(feature = "body")),
+    ("events", cfg!(feature = "events")),
+    ("cosmo", cfg!(feature = "cosmo")),
+    ("tui", cfg!(feature = "tui")),
+];
 
 /// `ucal tour` — the first five minutes.
 #[allow(clippy::doc_markdown)]

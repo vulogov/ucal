@@ -1430,6 +1430,25 @@ list would be indistinguishable from a caller's mistake.
 
 ---
 
+### `seq` and `ruler` are not two spellings of one question
+
+They both walk instants at an interval, which is a fair thing to be suspicious
+of — this project refused a second spelling of `cal derive` in this same cycle.
+Measured, they differ in what they produce rather than in how it looks:
+
+| | `seq` | `ruler` |
+|---|---|---|
+| emits | plain lines, exact tick counts | a document with a `marks` table |
+| each mark | the tick count itself | **rendered at the step's tier**, so truncated to that resolution |
+| too many steps | refused, with the count | truncated at 64 marks, with the count |
+| `--step` | a tier **or a calendar's own unit** | a tier only |
+
+The second row is the structural difference and it settles the question: a
+ruler's marks are rendered *at* the tier they step by, which is what makes it a
+ruler and is meaningless for a body's solar day. The third row follows from the
+first — a stream that silently stopped at 64 would be piped somewhere and not
+noticed, while a document that says it truncated has told its reader everything.
+
 ### Stepping by a body's own unit
 
 `--step` takes a tier — `T1`, `arc`, `5^e` — **or a calendar's own unit**:
@@ -1537,6 +1556,13 @@ ucal doctor
 | `leap_seconds.network` | `never` — the table is bundled and offline (§8.4). |
 | `spec.rfc` | Which specification this build implements. |
 | `spec.deltas[]` | Every recorded correction to the RFC, with its class: amendment, correction or editorial. |
+
+**`features[]` names every optional feature this crate has**, and did not until
+1.9.0: it listed four and the crate had eight, so a binary built with
+`--features full` reported `u512, std, civil` while `body`, `events`, `cosmo`
+and `tui` were compiled in and unlisted. A test now checks the list against the
+manifest, because the failure mode is a feature added and this command not
+revisited — which is what happened.
 
 ---
 

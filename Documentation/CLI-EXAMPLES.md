@@ -904,6 +904,10 @@ features:
   u512
   std
   civil
+  body
+  events
+  cosmo
+  tui
 datum_provenance:
   present  true
   note     present; absence would be UCAL-E0013 (Rule Q.4)
