@@ -134,6 +134,12 @@ handler is the backstop for the libraries beneath it.
 
 The current instant, from the system clock. Performs no network access (§8.4).
 
+**`precision` is the tier the reading was rendered to, not how well the instant
+is known.** `--precision` is documented as *tier to render to*, and the same
+field name means something else in `ucal explain`, where `tick (exact)` is a real
+statement about digits the caller typed. The `clock` section beside it says what
+a reading can actually fill; see [`ucal doctor --clock`](#the-clock-this-program-reads---clock).
+
 ```
 ucal now [--precision <TIER>] [--form human|digit5|named]
 ```
@@ -1556,6 +1562,50 @@ ucal doctor
 | `leap_seconds.network` | `never` — the table is bundled and offline (§8.4). |
 | `spec.rfc` | Which specification this build implements. |
 | `spec.deltas[]` | Every recorded correction to the RFC, with its class: amendment, correction or editorial. |
+| `clock.granularity` | How finely this program can place a reading: **1 ns**, structural, the same on every machine. |
+| `clock.granularity_ticks` | That nanosecond as an exact tick count. |
+| `clock.finest_tier` | The finest rung a nanosecond can fill — **`T-2`**. |
+| `clock.rendering_floor` | Where `ucal now` renders by default, and how many rungs below the clock that is. |
+| `clock.accuracy` | That accuracy is **not measurable here**, and why. |
+| `clock.in_a_difference` | Which error terms cancel between two readings and which do not. |
+
+### The clock this program reads: `--clock`
+
+```
+ucal doctor --clock
+```
+
+`doctor` reports what the clock can do **structurally** — the same on every
+machine, no sampling, which is why it is in the ordinary output that a committed
+example is compared against. `--clock` adds what the clocks on *this* machine
+actually do, which is a measurement and varies by machine and by run.
+
+**Three different numbers, and the distinction is the whole point.**
+
+- **Granularity** is structural: readings are converted through nine decimal
+  places, so one nanosecond is the finest an instant can be placed by this code,
+  whatever the hardware does. A nanosecond fills `T-2` and no lower.
+- **Resolution** is what this machine's clock actually moves in. On the machine
+  these notes were written on: `SystemTime` steps in **1000 ns** and the
+  monotonic clock in **41 ns**.
+- **Accuracy** is the distance from the truth, and this program does not measure
+  it. §8.4 makes operation offline, so there is no reference — and a rate error
+  estimated from a short baseline reports quantisation as drift.
+
+**`ucal now` renders to `T-12`, which is one Planck tick.** That is ten rungs
+below what a nanosecond can fill and eleven below what a microsecond can. A rung
+is `5^5`, so the bottom of a `now` reading is the conversion's arithmetic and not
+the instrument's. The tiers are a coordinate system; being able to *address* a
+position was never a claim that anything can be *observed* there — the same
+posture the datum takes by being stipulated rather than measured.
+
+For scale: the shortest interval anyone has measured is of order `10⁻¹⁹` s, which
+lands between `T-5` and `T-6`. `T-12` is about `10²⁴` times finer than that.
+
+**Interpolating between wall ticks with the monotonic clock is real and buys
+almost nothing.** `--clock` reports it: 1000 ns to 41 ns is a factor of 24, and a
+rung is 3125, so it is **0.008 of a rung** and the finest fillable tier does not
+move.
 
 **`features[]` names every optional feature this crate has**, and did not until
 1.9.0: it listed four and the crate had eight, so a binary built with

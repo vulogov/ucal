@@ -24,6 +24,7 @@ pub mod wallclock;
 #[cfg(feature = "body")]
 pub mod body_file;
 pub mod emit;
+pub mod clock;
 pub mod style;
 pub mod table;
 
@@ -383,6 +384,22 @@ pub fn cmd_datum() -> CmdResult {
 /// `ucal doctor` — profile, backend, domain ceiling, leap table, features,
 /// provenance presence (§19.3).
 pub fn cmd_doctor() -> CmdResult {
+    cmd_doctor_inner(None)
+}
+
+/// `ucal doctor --clock` — the same report, plus what the clocks on this
+/// machine actually do.
+///
+/// Separate because the measurement is **sampled**, so it varies by machine and
+/// by run, and `doctor`'s ordinary output is compared against a committed
+/// example byte for byte. A diagnostic that could not be reproduced would fail
+/// `check-docs` on every machine but the one that generated it.
+#[cfg(feature = "std")]
+pub fn cmd_doctor_measuring() -> CmdResult {
+    cmd_doctor_inner(Some(clock::measured()?))
+}
+
+fn cmd_doctor_inner(measured: Option<Vec<(String, Value)>>) -> CmdResult {
     let backend = if cfg!(feature = "bigint") {
         "bigint (num-bigint, heap; Instant is not Copy)"
     } else {
@@ -414,6 +431,9 @@ pub fn cmd_doctor() -> CmdResult {
         .field("domain_max_ticks", Value::number(domain_max.to_dec_string()))
         .field("domain_bits", Value::number(ucal_core::DOMAIN_BITS.to_string()))
         .field("features", Value::list(features))
+        // The one quantity this program measures itself, with the same
+        // accounting every other measured quantity in it carries.
+        .field("clock", Value::Section(clock::facts()?))
         .field(
             "datum_provenance",
             Value::Section(vec![
@@ -473,6 +493,10 @@ pub fn cmd_doctor() -> CmdResult {
             ),
         ]),
     );
+
+    if let Some(m) = measured {
+        doc = doc.field("clock_measured", Value::Section(m));
+    }
 
     Ok(doc.note("No network access is performed by any command (§8.4)."))
 }
@@ -1305,6 +1329,13 @@ pub fn cmd_now(precision: Tier, form: Form) -> CmdResult {
     if let Ok(r) = codec::render(&t, &fmt) {
         doc = doc.field("rendered", Value::form(r));
     }
+    // `precision` keeps its name and its value: it is a path in `ucal-json/1`
+    // and removing or repurposing one is a breaking change. What it has never
+    // meant is *how precisely this instant is known* — `--precision` is
+    // documented as "tier to render to" — and the same field name carries the
+    // other meaning in `ucal explain`, where `tick (exact)` is a real statement
+    // about a value the caller typed. So the reading it invites is answered
+    // beside it rather than left to be inferred.
     Ok(doc
         .field("precision", Value::text(precision.to_string()))
         .field(
@@ -1317,6 +1348,15 @@ pub fn cmd_now(precision: Tier, form: Form) -> CmdResult {
                 ),
                 ("network".into(), Value::text("none (§8.4)")),
             ]),
+        )
+        .field("clock", Value::Section(clock::facts()?))
+        .note(
+            "**`precision` is the tier this was rendered to, not how well the instant \
+             is known.** The two are far apart: `clock.finest_tier` is what a reading \
+             of the system clock can fill, and the default rendering is ten rungs \
+             below it — a rung being 5^5, those digits come from the conversion and \
+             not from the instrument. `ucal doctor --clock` measures what this \
+             machine's clocks actually do.",
         ))
 }
 

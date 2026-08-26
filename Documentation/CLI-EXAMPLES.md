@@ -908,6 +908,21 @@ features:
   events
   cosmo
   tui
+clock:
+  granularity        1 ns — this program reads the clock to nine decimal places
+  granularity_ticks  18548584399861000000000000000000000
+  finest_tier        T-2 — the finest rung a nanosecond can fill
+  rendering_floor    T-12 — where `ucal now` renders by default, 10 rungs below
+                     what the clock can fill. A rung is 5^5, so those digits
+                     are the conversion's and not the instrument's
+  accuracy           not measurable here. §8.4 makes operation offline, so
+                     there is no reference to compare against, and a rate error
+                     estimated from a short baseline reports quantisation as
+                     drift. This is resolution
+  in_a_difference    a constant offset cancels between two readings and a rate
+                     error does not; quantisation bounds each reading and so
+                     bounds their difference twice over. The frame term `ucal
+                     datum` declares cancels too
 datum_provenance:
   present  true
   note     present; absence would be UCAL-E0013 (Rule Q.4)

@@ -10,7 +10,8 @@ use clap_complete::Shell;
 use ucal::style::{parse_group_sep, resolve_for_output, ColorChoice, Render, Role, Style};
 use ucal_core::Rounding;
 use ucal::{
-    cmd_datum, cmd_doctor, cmd_explain, cmd_ladder, exit_code, parse_rounding, parse_tier_in,
+    cmd_datum, cmd_doctor, cmd_doctor_measuring, cmd_explain, cmd_ladder, exit_code,
+    parse_rounding, parse_tier_in,
 };
 use ucal_core::LocaleId;
 use ucal_core::codec::Form;
@@ -307,7 +308,16 @@ enum Command {
         command: Option<String>,
     },
     /// Profile, backend, domain ceiling, leap table, features, provenance.
-    Doctor,
+    Doctor {
+        /// Also sample the clocks on this machine.
+        ///
+        /// Off by default because the result is a *measurement*: it varies by
+        /// machine and by run, and the rest of this report does not. What it
+        /// measures is **resolution**, never accuracy — §8.4 makes operation
+        /// offline, so there is no reference to compare against.
+        #[arg(long)]
+        clock: bool,
+    },
 }
 
 #[cfg(feature = "cosmo")]
@@ -721,7 +731,13 @@ fn main() {
     let dispatch = |replacement: Option<&str>| -> ucal::CmdResult {
         match &cli.command {
         Command::Datum => cmd_datum(),
-        Command::Doctor => cmd_doctor(),
+        Command::Doctor { clock } => {
+            if *clock {
+                cmd_doctor_measuring()
+            } else {
+                cmd_doctor()
+            }
+        }
         #[cfg(feature = "cosmo")]
         Command::Cosmo { what } => match what {
             CosmoCommand::Age {

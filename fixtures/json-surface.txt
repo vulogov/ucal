@@ -237,6 +237,13 @@ datum.rounding.residual_ticks	string
 datum.rounding.to	string
 datum.tick_zero	string
 doctor.backend	string
+doctor.clock	object
+doctor.clock.accuracy	string
+doctor.clock.finest_tier	string
+doctor.clock.granularity	string
+doctor.clock.granularity_ticks	string
+doctor.clock.in_a_difference	string
+doctor.clock.rendering_floor	string
 doctor.datum_provenance	object
 doctor.datum_provenance.note	string
 doctor.datum_provenance.present	bool
@@ -341,6 +348,13 @@ ladder.tiers.*.exponent	string
 ladder.tiers.*.name	string
 ladder.tiers.*.seconds (bridge)	string (--bridge)
 ladder.tiers.*.ticks	string
+now.clock	object
+now.clock.accuracy	string
+now.clock.finest_tier	string
+now.clock.granularity	string
+now.clock.granularity_ticks	string
+now.clock.in_a_difference	string
+now.clock.rendering_floor	string
 now.human	string
 now.precision	string
 now.rendered	string
