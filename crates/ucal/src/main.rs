@@ -396,8 +396,16 @@ enum CalCommand {
     /// author reading a red exit code from `cal derive` cannot tell which of the
     /// two they have.
     Validate {
-        /// Path to a body file, or to an anchor file.
-        file: String,
+        /// A body file, an anchor file, or a shipped calendar id like `mars-d`.
+        ///
+        /// A path wins over an id: a caller who names a file that exists means
+        /// that file.
+        #[arg(required_unless_present = "all")]
+        file: Option<String>,
+        /// Every shipped calendar at once: which published figure decides which
+        /// leap rule, and which figures more than one calendar rests on.
+        #[arg(long, conflicts_with = "anchor")]
+        all: bool,
         /// An anchor file to check the body file against.
         #[arg(long, value_name = "FILE")]
         anchor: Option<String>,
@@ -685,8 +693,20 @@ fn main() {
             CalCommand::List => ucal::cmd_cal_list(),
             CalCommand::Show { id, instant } => ucal::cmd_cal_show(id, pick(replacement, instant)),
             CalCommand::Anchor { id } => ucal::cmd_cal_anchor(id),
-            CalCommand::Validate { file, anchor } => {
-                ucal::cmd_cal_validate(file, anchor.as_deref())
+            CalCommand::Validate { file, all, anchor } => {
+                if *all {
+                    ucal::cmd_cal_validate_all()
+                } else {
+                    match file {
+                        Some(f) => ucal::cmd_cal_validate(f, anchor.as_deref()),
+                        // Unreachable: clap's `required_unless_present` has
+                        // already refused. Said rather than unwrapped.
+                        None => Err(ucal_core::TimeError::with_context(
+                            ucal_core::Code::E0018,
+                            "cal validate needs a file, a calendar id, or --all",
+                        )),
+                    }
+                }
             }
             CalCommand::Derive { file, anchor, at } => {
                 ucal::cmd_cal_derive_with(file, anchor.as_deref(), at.as_deref())

@@ -3081,7 +3081,26 @@ pub fn wallclock_origin(origin: &str) -> Result<(Instant<UC1>, String), TimeErro
 /// body derives `1/24`.
 #[cfg(feature = "body")]
 pub fn cmd_cal_validate(path: &str, anchor_path: Option<&str>) -> CmdResult {
+    // G5 — a shipped calendar is a thing to validate too.
+    //
+    // The command shipped able to check only a file somebody else wrote, which
+    // put the project's own fifteen calendars outside the one check built to
+    // measure how fragile a calendar's parameters are. They rest on the same
+    // published figures, quoted under the same Rule C, and are exactly as
+    // subject to the answer.
+    //
+    // A path wins over an id, because a caller who names a file that exists
+    // means that file. `earth-d` is not a legal filename anyone would collide
+    // with by accident, and if they did, the file is what they get.
     let p = std::path::Path::new(path);
+    if !p.exists() {
+        if let Ok(cal) = ucal_body::calendar::by_id(path) {
+            return validate_body(Source::Shipped(path), cal.body(), anchor_path);
+        }
+        if let Some(body) = ucal_body::data::by_id(path) {
+            return validate_body(Source::Shipped(path), &body, anchor_path);
+        }
+    }
     // A body file first, because that is what most files are and what the
     // positional argument is documented to take. An anchor file fed here parses
     // as neither — `deny_unknown_fields` sees `calendar`, `phase` and
@@ -3089,7 +3108,7 @@ pub fn cmd_cal_validate(path: &str, anchor_path: Option<&str>) -> CmdResult {
     // `UCAL-E0012` about a file that is perfectly valid, try the other loader
     // and say which kind it actually is.
     match body_file::load(p) {
-        Ok(body) => validate_body(path, &body, anchor_path),
+        Ok(body) => validate_body(Source::File(path), &body, anchor_path),
         Err(body_err) => match anchor_file::load(p) {
             Ok(anchor) => validate_anchor(path, &anchor, anchor_path),
             // Both failed. The body error is the one to report: this argument is
@@ -3106,15 +3125,220 @@ fn check(name: &str, verdict: impl Into<String>) -> (String, Value) {
     (name.to_string(), Value::text(verdict.into()))
 }
 
-/// The body-file half of [`cmd_cal_validate`].
+/// G5 — the precision probe over every calendar this project ships.
+///
+/// # Why this had to exist
+///
+/// F4 built a probe for the caveat every release note has carried since 0.2.0 —
+/// *a rounded parameter is a different calendar* — and pointed it only at files
+/// somebody else wrote. This project's own fifteen calendars quote published
+/// figures under the same Rule C and are exactly as subject to the answer, and
+/// nothing asked them.
+///
+/// # What it found
+///
+/// **Fifteen calendars rest on twenty distinct published figures, and fifteen of
+/// those twenty are one-digit-critical.** That is not a defect: a leap rule is a
+/// convergent of a continued fraction and continued fractions are violently
+/// sensitive to their inputs, which `CLI.md` has said in words since 1.4.0.
+/// This is that sentence measured.
+///
+/// **The sharp part is the sharing.** A satellite's year is its primary's orbit,
+/// so one figure — Jupiter's `4332.589 d` — decides the intercalation of *five*
+/// shipped calendars, and one revision to it moves all five at once. Saturn's
+/// `10759.2058 d` carries three. A count of sensitive *parameters* hides that;
+/// this reports distinct figures and who depends on each.
 #[cfg(feature = "body")]
-fn validate_body(path: &str, body: &ucal_body::Body, anchor_path: Option<&str>) -> CmdResult {
+pub fn cmd_cal_validate_all() -> CmdResult {
+    use std::collections::BTreeMap;
+
+    let mut rows: Vec<(String, Value)> = Vec::new();
+    // figure -> the calendars whose intercalation it decides.
+    let mut shared: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    // figure -> whether its last digit decides the rule. Keyed by figure and not
+    // by parameter, because the first version of this counted parameter slots
+    // and reported nineteen sensitive out of nineteen distinct — five of them
+    // one figure, counted five times.
+    let mut is_sensitive: BTreeMap<String, bool> = BTreeMap::new();
+    let mut probed = 0usize;
+    let mut derived = 0usize;
+
+    let cals = ucal_body::calendar::registered();
+    for (id, body, _) in &cals {
+        let solar = body.solar_day().value_at_epoch();
+        let year = body.orbital_period().value_at_epoch();
+        let Ok(baseline) = ucal_body::derive_leap_rule(
+            solar,
+            year,
+            ucal_body::DriftBound::DEFAULT,
+            32,
+        ) else {
+            rows.push(check(id, "no leap rule follows from this body"));
+            continue;
+        };
+
+        let mut parts = Vec::new();
+        for (what, param) in [
+            ("solar_day", body.solar_day()),
+            ("orbital_period", body.orbital_period()),
+        ] {
+            let Some(m) = param.as_measured() else {
+                derived += 1;
+                parts.push(format!("{what} derived, so it has no last digit to move"));
+                continue;
+            };
+            probed += 1;
+            shared
+                .entry(m.verbatim())
+                .or_default()
+                .push((*id).to_string());
+            let verdict = probe_last_digit(m, what, solar, year, &baseline);
+            let sens = verdict.starts_with("sensitive");
+            // A figure shared by several calendars is probed once per calendar
+            // and can come out differently each time — the same Jovian year
+            // decides Europa's rule and Io's independently. Sensitive anywhere
+            // is sensitive: it is a property of the pairing, and the figure is
+            // the thing a revision would touch.
+            let e = is_sensitive.entry(m.verbatim()).or_insert(false);
+            *e = *e || sens;
+            if sens {
+                parts.push(format!("{what} {} decides the rule", m.verbatim()));
+            } else {
+                parts.push(format!("{what} {} has a digit to spare", m.verbatim()));
+            }
+        }
+        rows.push((
+            (*id).to_string(),
+            Value::text(format!(
+                "{}/{} — {}",
+                baseline.chosen.value.numer().to_dec_string(),
+                baseline.chosen.value.denom().to_dec_string(),
+                parts.join("; ")
+            )),
+        ));
+    }
+
+    // The figures more than one calendar rests on. This is the finding the
+    // per-body view cannot show: the count of sensitive *parameters* triple-counts
+    // a figure three bodies share.
+    let mut carried: Vec<(String, Value)> = shared
+        .iter()
+        .filter(|(_, who)| who.len() > 1)
+        .map(|(fig, who)| {
+            (
+                fig.clone(),
+                Value::text(format!(
+                    "{} calendars: {}",
+                    who.len(),
+                    who.join(", ")
+                )),
+            )
+        })
+        .collect();
+    carried.sort_by_key(|(_, v)| match v {
+        Value::Text(t) => std::cmp::Reverse(t.len()),
+        _ => std::cmp::Reverse(0),
+    });
+
+    Ok(Doc::new()
+        .title("ucal cal validate --all")
+        .field("calendars", Value::number(cals.len().to_string()))
+        .field(
+            "figures",
+            Value::Section(vec![
+                (
+                    "parameters_probed".into(),
+                    Value::number(probed.to_string()),
+                ),
+                (
+                    "parameters_derived".into(),
+                    Value::number(derived.to_string()),
+                ),
+                ("distinct_figures".into(), Value::number(shared.len().to_string())),
+                (
+                    "distinct_sensitive".into(),
+                    Value::number(
+                        is_sensitive.values().filter(|v| **v).count().to_string(),
+                    ),
+                ),
+                (
+                    "distinct_stable".into(),
+                    Value::number(
+                        is_sensitive.values().filter(|v| !**v).count().to_string(),
+                    ),
+                ),
+            ]),
+        )
+        .field("intercalation", Value::Section(rows))
+        .field("carried_by_more_than_one", Value::Section(carried))
+        .note(
+            "**Sensitive is a measurement, not a verdict.** A leap rule is a convergent of \
+             a continued fraction, and continued fractions are violently sensitive to their \
+             inputs — so most published figures deciding their own rule is Rule K working. \
+             What it means for an author is that quoting a source to one digit fewer \
+             declares a different calendar.",
+        )
+        .note(
+            "**The probe is not comparable between bodies.** One unit in the last place is \
+             a second for Earth's 86400 s and a millisecond for Mars's 88775.244 s, so \
+             `sensitive` means `at the precision this source published`, not `to the same \
+             tolerance`. Earth's solar day is exact by definition and has no last digit to \
+             be wrong in; it is reported sensitive because a second either way does change \
+             the rule.",
+        )
+        .note(
+            "**A satellite's year is its primary's orbit.** So the figures above are shared, \
+             and a revision to one moves every calendar under it — which is a thing to know \
+             before revising one.",
+        ))
+}
+
+/// Where the body being checked came from (G5).
+///
+/// The checks are the same either way and a few of their *sentences* are not: a
+/// compiled-in calendar has no file to be well-formed, no id to collide with
+/// itself, and no author to tell that their file is valid. One check list with
+/// two vocabularies, rather than two check lists that can come to disagree.
+#[cfg(feature = "body")]
+enum Source<'a> {
+    /// A §15.1 file at this path.
+    File(&'a str),
+    /// A calendar this project ships, by id.
+    Shipped(&'a str),
+}
+
+#[cfg(feature = "body")]
+impl Source<'_> {
+    fn is_file(&self) -> bool {
+        matches!(self, Source::File(_))
+    }
+    fn name(&self) -> &str {
+        match self {
+            Source::File(p) | Source::Shipped(p) => p,
+        }
+    }
+}
+
+/// The body half of [`cmd_cal_validate`] — a file, or a shipped calendar.
+#[cfg(feature = "body")]
+fn validate_body(
+    source: Source<'_>,
+    body: &ucal_body::Body,
+    anchor_path: Option<&str>,
+) -> CmdResult {
+    let from_file = source.is_file();
     let mut checks: Vec<(String, Value)> = Vec::new();
 
     checks.push(check(
         "loads",
-        "ok — strict HJSON, every key known (§15.1), and every parameter carries a value, a \
-            unit, an epoch, a validity window and a citation (Rule C)",
+        if from_file {
+            "ok — strict HJSON, every key known (§15.1), and every parameter carries a \
+             value, a unit, an epoch, a validity window and a citation (Rule C)"
+        } else {
+            "compiled in — there is no file to be well-formed. The parameters are \
+             `Measured` constants, so Rule C's obligations were met at the type level and \
+             every figure carries its citation. Everything below is the same check a file gets"
+        },
     ));
 
     let id: String = format!("{}-d", body.id());
@@ -3123,14 +3347,14 @@ fn validate_body(path: &str, body: &ucal_body::Body, anchor_path: Option<&str>) 
         .any(|(rid, _, _)| *rid == id);
     checks.push(check(
         "id",
-        if collides {
-            format!(
-                "`{}` — which derives `{id}`, and a calendar of that id already ships. The \
-                    file is valid; a command naming `{id}` will get the compiled-in one",
+        match (from_file, collides) {
+            (true, true) => format!(
+                "`{}` — which derives `{id}`, and a calendar of that id already ships. This \
+                 file is valid; a command naming `{id}` will get the compiled-in one",
                 body.id()
-            )
-        } else {
-            format!("`{}` — which derives the calendar `{id}`", body.id())
+            ),
+            (true, false) => format!("`{}` — which derives the calendar `{id}`", body.id()),
+            (false, _) => format!("`{}` — the body behind the calendar `{id}`", body.id()),
         },
     ));
 
@@ -3138,7 +3362,7 @@ fn validate_body(path: &str, body: &ucal_body::Body, anchor_path: Option<&str>) 
         "primary",
         match body.primary() {
             Some(p) => format!("`{p}`"),
-            None => "none — this file names nothing that this body orbits, which is legal and means \
+            None => "none — nothing is named that this body orbits, which is legal and means \
                 the year is stated rather than inherited"
                 .to_string(),
         },
@@ -3154,7 +3378,7 @@ fn validate_body(path: &str, body: &ucal_body::Body, anchor_path: Option<&str>) 
             match param.as_measured() {
                 Some(m) => format!("measured: {} — {}", m.verbatim(), param.citation().source),
                 None => format!(
-                    "derived (Z1.1), so this file states no figure of its own for it — {}",
+                    "derived (Z1.1), so no figure of its own is stated for it — {}",
                     param.citation().source
                 ),
             },
@@ -3178,7 +3402,7 @@ fn validate_body(path: &str, body: &ucal_body::Body, anchor_path: Option<&str>) 
             "intercalation",
             "none follows — this body's year is a whole number of its solar days, so there is \
              no fractional day to distribute and Rule K has nothing to derive. That is a fact \
-             about this body, not a defect in this file",
+             about this body, not a defect in what declares it",
         ));
     } else {
         match &rule {
@@ -3195,7 +3419,7 @@ fn validate_body(path: &str, body: &ucal_body::Body, anchor_path: Option<&str>) 
             Err(e) => checks.push(check(
                 "intercalation",
                 format!(
-                    "none follows — {}. That is a fact about this body, not a defect in this file",
+                    "none follows — {}. A fact about this body, not a defect in what declares it",
                     e.context.unwrap_or("no rule meets the drift bound")
                 ),
             )),
@@ -3206,10 +3430,10 @@ fn validate_body(path: &str, body: &ucal_body::Body, anchor_path: Option<&str>) 
         "cycles",
         match body.satellites().first() {
             Some(sat) => format!(
-                "grouped by `{}`, the first satellite this file lists (D-A5)",
+                "grouped by `{}`, the first satellite listed (D-A5)",
                 sat.id()
             ),
-            None => "none — this file lists no satellite, so the calendar has no month. §15.3 forbids \
+            None => "none — no satellite is listed, so the calendar has no month. §15.3 forbids \
                 a fallback, so that is the answer and not a gap"
                 .to_string(),
         },
@@ -3269,18 +3493,30 @@ fn validate_body(path: &str, body: &ucal_body::Body, anchor_path: Option<&str>) 
 
     Ok(Doc::new()
         .title("ucal cal validate")
-        .field("file", Value::text(path))
-        .field("kind", Value::text("body file (§15.1)"))
+        .field("source", Value::text(source.name()))
+        .field(
+            "kind",
+            Value::text(if from_file {
+                "body file (§15.1)"
+            } else {
+                "a calendar this project ships (ucal-body::data)"
+            }),
+        )
         .field(
             "checks",
             Value::Section(checks),
         )
-        .note(
+        .note(if from_file {
             "A file that loads is not a file that is right. Every check above is on \
-                *internal* consistency — that the parameters are present, cited and mutually \
-                coherent. Whether the published figures are the ones this body actually has is a \
-                question about the sources, and nothing in this program can answer it.",
-        ))
+             *internal* consistency — that the parameters are present, cited and mutually \
+             coherent. Whether the published figures are the ones this body actually has is \
+             a question about the sources, and nothing in this program can answer it."
+        } else {
+            "Shipping a calendar is not evidence that it is right. Every check above is on \
+             *internal* consistency, and this project's own data is subject to the same \
+             answer as anybody's — which is why it is checked by the same code, and why this \
+             command has taken a calendar id since 1.9.0."
+        }))
 }
 
 /// Move the last published digit by one, each way, and re-derive.

@@ -84,6 +84,10 @@ fn examples() -> Vec<Example> {
             why: "One instant in several calendars at once, each labelled derived or legacy.",
         },
         Example {
+            args: &["cal", "validate", "--all"],
+            why: "The precision probe over every calendar this project ships. Fifteen calendars rest on nineteen distinct published figures and fourteen of those decide their leap rule outright — which is Rule K working, not a defect. The sharp part is the sharing: a satellite's year is its primary's orbit, so Jupiter's 4332.589 d decides five leap rules at once.",
+        },
+        Example {
             args: &["cal", "validate", "Documentation/examples/europa.hjson"],
             why: "Two questions with separate answers: does the file load, and does a calendar follow from it? The `precision:` rows measure the caveat this project has carried since 0.2.0 — a rounded parameter is a different calendar — by moving each published figure's last digit and re-deriving.",
         },

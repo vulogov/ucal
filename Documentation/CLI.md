@@ -562,7 +562,8 @@ be in a library.
 ### `cal validate`
 
 ```
-ucal cal validate <FILE> [--anchor <FILE>]
+ucal cal validate <FILE|CALENDAR> [--anchor <FILE>]
+ucal cal validate --all
 ```
 
 Check a §15.1 file and report **two** things: whether it loads, and whether a
@@ -577,6 +578,17 @@ row.
 anchor file the anchor loader is tried before any error is reported, because a
 perfectly valid anchor file fed to the body loader raises `UCAL-E0012`,
 *unknown key*, which is true and unhelpful.
+
+**It also takes a shipped calendar id** — `ucal cal validate mars-d`. The
+argument is a path if a file of that name exists and an id otherwise, because a
+caller who names a file that exists means that file. The checks are the same
+code; only the `loads` row differs, since a compiled-in calendar has no file to
+be well-formed and its parameters were checked by `Measured`'s constructors
+instead of a deserialiser.
+
+This project's own fifteen calendars quote published figures under the same
+Rule C as anybody's and are exactly as subject to the answer. Through 1.9.0's
+first half they were outside the one check built to ask.
 
 | field | meaning |
 |---|---|
@@ -617,6 +629,46 @@ sensitive because moving it by a second does change the calendar. What the check
 tells you is whether *this* figure's precision is what decides *this* calendar;
 whether that matters is a question about the source, which no program can
 answer.
+
+### The whole shipped set: `--all`
+
+```
+ucal cal validate --all
+```
+
+The probe over every calendar this project ships, and a measurement of the
+caveat carried since 0.2.0.
+
+| | |
+|---|---|
+| calendars | **15** |
+| intercalation parameters | 30 — a solar day and an orbital period each |
+| of those, `derived:` | 6, the tidally locked moons, which publish no solar day and so have no last digit |
+| **distinct published figures** | **19** |
+| **whose last digit decides the leap rule** | **14** |
+
+**That is not a defect.** A leap rule is a convergent of a continued fraction
+and continued fractions are violently sensitive to their inputs — the paragraph
+above says so and has since 1.4.0. What `--all` adds is the number.
+
+**The sharp finding is the sharing.** A satellite's year is its primary's orbit,
+so one figure decides several calendars at once:
+
+- Jupiter's year, 4332.589 d, is the orbital period of **five** calendars —
+  `jupiter-d`, `io-d`, `europa-d`, `ganymede-d` and `callisto-d` — and its last
+  digit decides all five leap rules.
+- Saturn's year, 10759.2058 d, carries two: `titan-d` and `enceladus-d`.
+
+A revision to Jupiter's published orbital period moves five leap rules
+simultaneously, and a count of sensitive *parameters* hides that entirely —
+which is why the survey reports distinct figures and who rests on each.
+
+**The probe is not comparable between bodies.** One unit in the last place is a
+whole second for Earth's `86400 s` and a millisecond for Mars's `88775.244 s`,
+so `sensitive` means *at the precision this source published*, not *to the same
+tolerance*. Earth's solar day is exact by definition and has no last digit to be
+wrong in; it is reported sensitive because a second either way genuinely does
+change the rule.
 
 **What is not checked, and cannot be.** Whether the published figures are the
 ones the body actually has. Every check is on internal consistency; a file that

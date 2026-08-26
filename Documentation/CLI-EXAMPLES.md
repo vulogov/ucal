@@ -471,6 +471,74 @@ revision (Rule J.5) and the width of the window that revision implies (Rule
 J.2); each legacy one is labelled as declared table data (§8.6).
 ```
 
+## `ucal cal validate --all`
+
+The precision probe over every calendar this project ships. Fifteen calendars rest on nineteen distinct published figures and fourteen of those decide their leap rule outright — which is Rule K working, not a defect. The sharp part is the sharing: a satellite's year is its primary's orbit, so Jupiter's 4332.589 d decides five leap rules at once.
+
+```
+ucal cal validate --all
+───────────────────────
+calendars  15
+figures:
+  parameters_probed   24
+  parameters_derived  6
+  distinct_figures    19
+  distinct_sensitive  14
+  distinct_stable     5
+intercalation:
+  earth-d      31/128 — solar_day 86400 s decides the rule; orbital_period
+               31556925.216 s has a digit to spare
+  mars-d       45/76 — solar_day 88775.244 s has a digit to spare;
+               orbital_period 686.9726 d (86400 s) decides the rule
+  titan-d      88/117 — solar_day derived, so it has no last digit to move;
+               orbital_period 10759.2058 d (86400 s) decides the rule
+  luna-d       31/84 — solar_day 29.53 d (86400 s) decides the rule;
+               orbital_period 365.256 d (86400 s) decides the rule
+  mercury-d    1/2 — solar_day 15201360 s has a digit to spare; orbital_period
+               87.969 d (86400 s) has a digit to spare
+  venus-d      135/146 — solar_day 10087200 s has a digit to spare;
+               orbital_period 224.701 d (86400 s) decides the rule
+  jupiter-d    68/81 — solar_day 35733.24 s decides the rule; orbital_period
+               4332.589 d (86400 s) decides the rule
+  io-d         58/59 — solar_day derived, so it has no last digit to move;
+               orbital_period 4332.589 d (86400 s) decides the rule
+  europa-d     1/24 — solar_day derived, so it has no last digit to move;
+               orbital_period 4332.589 d (86400 s) decides the rule
+  ganymede-d   149/261 — solar_day derived, so it has no last digit to move;
+               orbital_period 4332.589 d (86400 s) decides the rule
+  callisto-d   17/28 — solar_day derived, so it has no last digit to move;
+               orbital_period 4332.589 d (86400 s) decides the rule
+  enceladus-d  28/151 — solar_day derived, so it has no last digit to move;
+               orbital_period 10759.2058 d (86400 s) decides the rule
+  uranus-d     42/85 — solar_day 17.24 h (3600 s) decides the rule;
+               orbital_period 30685.4 d (86400 s) decides the rule
+  neptune-d    7/179 — solar_day 16.11 h (3600 s) decides the rule;
+               orbital_period 60189.0 d (86400 s) decides the rule
+  pluto-d      53/149 — solar_day 153.2820 h (3600 s) decides the rule;
+               orbital_period 90560 d (86400 s) decides the rule
+carried_by_more_than_one:
+  4332.589 d (86400 s)    5 calendars: jupiter-d, io-d, europa-d, ganymede-d,
+                          callisto-d
+  10759.2058 d (86400 s)  2 calendars: titan-d, enceladus-d
+
+**Sensitive is a measurement, not a verdict.** A leap rule is a convergent of a
+continued fraction, and continued fractions are violently sensitive to their
+inputs — so most published figures deciding their own rule is Rule K working.
+What it means for an author is that quoting a source to one digit fewer
+declares a different calendar.
+
+**The probe is not comparable between bodies.** One unit in the last place is a
+second for Earth's 86400 s and a millisecond for Mars's 88775.244 s, so
+`sensitive` means `at the precision this source published`, not `to the same
+tolerance`. Earth's solar day is exact by definition and has no last digit to
+be wrong in; it is reported sensitive because a second either way does change
+the rule.
+
+**A satellite's year is its primary's orbit.** So the figures above are shared,
+and a revision to one moves every calendar under it — which is a thing to know
+before revising one.
+```
+
 ## `ucal cal validate Documentation/examples/europa.hjson`
 
 Two questions with separate answers: does the file load, and does a calendar follow from it? The `precision:` rows measure the caveat this project has carried since 0.2.0 — a rounded parameter is a different calendar — by moving each published figure's last digit and re-deriving.
@@ -478,30 +546,29 @@ Two questions with separate answers: does the file load, and does a calendar fol
 ```
 ucal cal validate
 ─────────────────
-file  Documentation/examples/europa.hjson
-kind  body file (§15.1)
+source  Documentation/examples/europa.hjson
+kind    body file (§15.1)
 checks:
   loads            ok — strict HJSON, every key known (§15.1), and every
                    parameter carries a value, a unit, an epoch, a validity
                    window and a citation (Rule C)
   id               `europa` — which derives `europa-d`, and a calendar of that
-                   id already ships. The file is valid; a command naming
+                   id already ships. This file is valid; a command naming
                    `europa-d` will get the compiled-in one
   primary          `jupiter`
   rotation_period  measured: 3.551181 d (86400 s) — NASA Planetary Fact Sheets
                    (Williams, D. R.), Jovian satellite fact sheet; the original
                    document is available in the Internet Archive
-  solar_day        derived (Z1.1), so this file states no figure of its own for
-                   it — derived as 1 / (1/P_rotation - 1/P_orbital_period) from
-                   the two published figures cited in this file; no source
+  solar_day        derived (Z1.1), so no figure of its own is stated for it —
+                   derived as 1 / (1/P_rotation - 1/P_orbital_period) from the
+                   two published figures cited in this file; no source
                    publishes a solar day for a tidally locked moon
   orbital_period   measured: 4332.589 d (86400 s) — NASA Planetary Fact Sheets
                    (Williams, D. R.), Jupiter fact sheet; the original document
                    is available in the Internet Archive
   intercalation    1/24 at convergent 2, 1219 whole days per year
-  cycles           none — this file lists no satellite, so the calendar has no
-                   month. §15.3 forbids a fallback, so that is the answer and
-                   not a gap
+  cycles           none — no satellite is listed, so the calendar has no month.
+                   §15.3 forbids a fallback, so that is the answer and not a gap
   precision:
     orbital_period  sensitive — one unit in the last published place derives a
                     different rule. 4332.589 d (86400 s) gives 1/24; 4332.590 d

@@ -701,7 +701,7 @@ fn validate_separates_a_bad_file_from_a_body_with_no_calendar() {
         "the wrong reason: {why}"
     );
     assert!(
-        why.contains("not a defect in this file"),
+        why.contains("not a defect in what declares it"),
         "the two answers were not separated: {why}"
     );
     // And not the bound-failure advice, which cannot help here.
@@ -833,4 +833,101 @@ fn anchor_example() -> String {
         "{}/../../Documentation/examples/earth-anchor.hjson",
         env!("CARGO_MANIFEST_DIR")
     )
+}
+
+// ---- G5: the probe, turned on this project's own data -------------------
+
+/// `cal validate` takes a shipped calendar id, not only a file.
+///
+/// F4 built the probe and pointed it only at files somebody else wrote, which
+/// left this project's own fifteen calendars outside the one check built to
+/// measure how fragile a calendar's parameters are.
+#[test]
+fn validate_takes_a_shipped_calendar_id() {
+    let doc = ucal::cmd_cal_validate("earth-d", None).expect("a report");
+    assert_eq!(verdict(&doc, "loads").split(' ').next(), Some("compiled"));
+    assert!(verdict(&doc, "intercalation").starts_with("31/128"), "{doc:?}");
+    // And the probe runs on it, which is the point.
+    assert!(probe(&doc, "solar_day").starts_with("sensitive"));
+    assert!(probe(&doc, "orbital_period").starts_with("stable"));
+}
+
+/// A path wins over an id.
+///
+/// Both are accepted in one argument, so the tie has to be broken somewhere and
+/// stated. A caller who names a file that exists means that file.
+#[test]
+fn a_file_that_exists_wins_over_a_calendar_id() {
+    let (_d, p) = tmp("earth-d-shadow", &GOOD);
+    let named = p.to_str().expect("utf-8");
+    let doc = ucal::cmd_cal_validate(named, None).expect("a report");
+    assert!(
+        verdict(&doc, "loads").starts_with("ok"),
+        "the file was not read: {}",
+        verdict(&doc, "loads")
+    );
+}
+
+/// **The G5 measurement, asserted so a data change cannot move it silently.**
+///
+/// Fifteen calendars rest on nineteen distinct published figures, and fourteen
+/// of those decide their calendar's leap rule outright. That is not a defect: a
+/// leap rule is a convergent of a continued fraction and continued fractions are
+/// violently sensitive to their inputs, which `CLI.md` has said in words since
+/// 1.4.0. This is that sentence measured.
+///
+/// The numbers are asserted rather than merely printed for the same reason W4's
+/// were: a finding nobody can notice changing is a finding that will change.
+#[test]
+fn the_shipped_data_has_the_measured_fragility() {
+    let doc = ucal::cmd_cal_validate_all().expect("a survey");
+    let n = |k: &str| -> usize {
+        let Some(ucal::emit::Value::Section(rows)) = doc.get("figures") else {
+            panic!("no figures section");
+        };
+        rows.iter()
+            .find(|(name, _)| name == k)
+            .map(|(_, v)| v.rendered_text().trim().parse::<usize>().expect("a number"))
+            .unwrap_or_else(|| panic!("no `{k}`"))
+    };
+
+    // Fifteen calendars, two intercalation parameters each.
+    assert_eq!(n("parameters_probed") + n("parameters_derived"), 30);
+    // Six solar days are `derived:` — the tidally locked moons, which have no
+    // published figure to have a last digit.
+    assert_eq!(n("parameters_derived"), 6);
+    // The parts must sum to the whole, which is the arithmetic the first
+    // version of this got wrong: it counted parameter slots and reported
+    // nineteen sensitive out of nineteen distinct figures.
+    assert_eq!(
+        n("distinct_sensitive") + n("distinct_stable"),
+        n("distinct_figures"),
+        "the sensitive and stable counts do not partition the distinct figures"
+    );
+    assert_eq!(n("distinct_figures"), 19);
+    assert_eq!(n("distinct_sensitive"), 14);
+}
+
+/// **One published figure decides five calendars.**
+///
+/// A satellite's year is its primary's orbit, so Jupiter's `4332.589 d` is the
+/// orbital period of `jupiter-d`, `io-d`, `europa-d`, `ganymede-d` and
+/// `callisto-d` alike — and its last digit decides all five leap rules. A count
+/// of sensitive *parameters* hides that completely; it is the reason this survey
+/// reports distinct figures and who rests on each.
+#[test]
+fn one_figure_carries_five_calendars() {
+    let doc = ucal::cmd_cal_validate_all().expect("a survey");
+    let Some(ucal::emit::Value::Section(rows)) = doc.get("carried_by_more_than_one") else {
+        panic!("no shared-figure section");
+    };
+    let jovian = rows
+        .iter()
+        .find(|(fig, _)| fig.starts_with("4332.589"))
+        .map(|(_, v)| v.rendered_text())
+        .expect("Jupiter's year is not reported as shared");
+    for who in ["jupiter-d", "io-d", "europa-d", "ganymede-d", "callisto-d"] {
+        assert!(jovian.contains(who), "{who} is missing: {jovian}");
+    }
+    assert!(jovian.contains('5'), "{jovian}");
 }
