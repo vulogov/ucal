@@ -1150,5 +1150,5 @@ q to quit
 A rejection: an Appendix E code, an exit status, and — since 1.2.0 — what a good input would have looked like.
 
 ```
-UCAL-E0001: malformed timestamp (expected a decimal tick count like 8070205189123984864657505252035637180530466139316558837890625, a UC1 text form like `UC1 0031·0687·...`, or a 52-character UCID. `ucal now` prints one of each; `ucal tour` shows what to do with them)
+UCAL-E0001: malformed timestamp (expected a decimal tick count like 8070205189123984864657505252035637180530466139316558837890625, a UC1 text form like `UC1 0031·0687·...`, a 52-character UCID, or `-` to read instants from stdin on the commands that take a single one. `ucal now` prints one of each; `ucal tour` shows what to do with them)
 ```
