@@ -1393,6 +1393,16 @@ list would be indistinguishable from a caller's mistake.
 
 ---
 
+**Which global flags reach it.** `--tick-sep` does, and groups the digits —
+which will break `| ucal to-civil -`, loudly, at the parser on the other end.
+Before 1.9.0 it was accepted here and silently did nothing.
+
+`--decimals` and `--round` do not, and cannot: they govern how a *rational* is
+rendered and `seq` emits exact integers, so there is nothing for them to act on.
+`--json` does not either — the output is lines rather than a document, for the
+same reason `completions`' is, because a generator's output is an input to
+something else.
+
 ## Reading instants from stdin
 
 ```

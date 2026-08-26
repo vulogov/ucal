@@ -574,13 +574,32 @@ fn main() {
         max,
     } = &cli.command
     {
-        let out = LocaleId::parse(&cli.locale)
-            .and_then(|l| parse_tier_in(l, step))
-            .and_then(|t| ucal::cmd_seq(from, to, t, *max));
+        // G2 — `--tick-sep` reaches here too. It is a global flag and every
+        // other command honours it; `seq` ran before the flag was even parsed,
+        // so passing it did nothing and said nothing, which is worse than
+        // refusing it. A caller who asks for separators in a stream they meant
+        // to pipe into `ucal to-civil -` gets a loud failure from the parser at
+        // the other end rather than a silent one here.
+        let out = cli
+            .tick_sep
+            .as_deref()
+            .map(parse_group_sep)
+            .transpose()
+            .and_then(|sep| {
+                LocaleId::parse(&cli.locale)
+                    .and_then(|l| parse_tier_in(l, step))
+                    .and_then(|t| ucal::cmd_seq(from, to, t, *max))
+                    .map(|lines| (sep, lines))
+            });
         match out {
-            Ok(lines) => {
+            Ok((sep, lines)) => {
+                // `PLAIN`, because this runs before the style is resolved and
+                // a generator cannot borrow colours from machinery that has not
+                // started. Grouping is not colour: it is what the caller asked
+                // for in as many words.
+                let render = Render::PLAIN.group(sep);
                 for l in lines {
-                    println!("{l}");
+                    println!("{}", ucal::style::group_decimal(&render, &l));
                 }
                 return;
             }

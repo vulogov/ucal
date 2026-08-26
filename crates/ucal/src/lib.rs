@@ -77,9 +77,24 @@ pub fn parse_instant(s: &str) -> Result<(Instant<UC1>, Precision), TimeError> {
             .ok_or(TimeError::with_context(Code::E0001, "tick count out of range"))?;
         return Ok((Instant::<UC1>::from_ticks(t)?, Precision::Tick));
     }
+    // G3 — `-` gets its own answer. F2 added stdin and left this message
+    // listing three accepted forms out of four, so the diagnostic a caller hits
+    // *while getting the syntax wrong* was missing a quarter of the syntax. A
+    // bare `-` here means the caller tried to stream into a command that does
+    // not read stdin, and saying "malformed timestamp" about it is true and
+    // useless.
+    if s == "-" {
+        return Err(TimeError::with_context(
+            Code::E0001,
+            "`-` reads instants from stdin, and this command does not take it. The \
+             commands that do are the ones taking exactly one instant: `to-civil`, \
+             `explain`, `show` and `cal show`. With `--json` they emit JSON Lines, one \
+             record per input line",
+        ));
+    }
     Err(TimeError::with_context(
         Code::E0001,
-        "expected a decimal tick count like 8070205189123984864657505252035637180530466139316558837890625, a UC1 text form like `UC1 0031\u{00b7}0687\u{00b7}...`, or a 52-character UCID. `ucal now` prints one of each; `ucal tour` shows what to do with them",
+        "expected a decimal tick count like 8070205189123984864657505252035637180530466139316558837890625, a UC1 text form like `UC1 0031\u{00b7}0687\u{00b7}...`, a 52-character UCID, or `-` to read instants from stdin on the commands that take a single one. `ucal now` prints one of each; `ucal tour` shows what to do with them",
     ))
 }
 

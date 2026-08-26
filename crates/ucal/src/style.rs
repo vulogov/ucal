@@ -437,7 +437,10 @@ pub fn parse_group_sep(s: &str) -> Result<char, ucal_core::TimeError> {
     if c.is_ascii_digit() {
         return Err(ucal_core::TimeError::with_context(
             ucal_core::Code::E0018,
-            "the group separator must not be a digit (§6.3); try `--sep _` or `--sep :`",
+            // Named for neither flag: one function serves `--sep` and
+            // `--tick-sep`, and naming `--sep` sent a caller who had typed
+            // `--tick-sep` to look at the wrong option.
+            "the group separator must not be a digit (§6.3); try `_` or `:`",
         ));
     }
     Ok(c)

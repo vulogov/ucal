@@ -156,3 +156,35 @@ fn two_instant_commands_do_not_pretend_to_stream() {
     };
     assert_ne!(code, 0, "`between -` should be a rejection, not a stream");
 }
+
+/// G3 — `-` on a command that does not read stdin says so.
+///
+/// F2 added stdin and left `UCAL-E0001` listing three accepted forms out of
+/// four, so a caller who tried to stream into `between` was told "malformed
+/// timestamp" about an argument that is not malformed at all. The message a
+/// caller hits *while getting the syntax wrong* was missing a quarter of the
+/// syntax.
+#[test]
+fn a_dash_on_a_non_streaming_command_explains_itself() {
+    let e = ucal::parse_instant("-").expect_err("`-` is not an instant");
+    let msg = e.to_string();
+    assert!(msg.contains("reads instants from stdin"), "{msg}");
+    // And it names the commands that do take it, rather than leaving the reader
+    // to find out by trying them.
+    for c in ["to-civil", "explain", "show", "cal show"] {
+        assert!(msg.contains(c), "`{c}` is not named: {msg}");
+    }
+}
+
+/// And the general message now mentions `-` too.
+#[test]
+fn the_malformed_timestamp_message_knows_about_stdin() {
+    let e = ucal::parse_instant("not-an-instant").expect_err("malformed");
+    let msg = e.to_string();
+    assert!(msg.contains("tick count"), "{msg}");
+    assert!(msg.contains("UCID"), "{msg}");
+    assert!(
+        msg.contains("stdin"),
+        "the four accepted forms are three in this message: {msg}"
+    );
+}
