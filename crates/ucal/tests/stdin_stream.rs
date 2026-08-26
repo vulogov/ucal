@@ -144,17 +144,17 @@ fn value_of(json: &str, field: &str) -> String {
     rest.split('"').next().unwrap_or("").to_string()
 }
 
-/// Only the commands taking exactly one instant accept `-`.
+/// A command with no instant at all still refuses `-`.
 ///
-/// `between` takes two, and a line-oriented filter has no answer for which of
-/// the two a line is — so it treats `-` as what it is, an unparseable instant,
-/// rather than guessing.
+/// F2 scoped streaming to commands taking exactly one instant; G7 widened it to
+/// the two-instant commands, one side at a time. `datum` takes none, so `-` is
+/// not an argument it has anywhere to put.
 #[test]
-fn two_instant_commands_do_not_pretend_to_stream() {
-    let Some((_, code)) = run(&["between", "-", T], "") else {
+fn a_command_with_no_instant_does_not_stream() {
+    let Some((_, code)) = run(&["cal", "anchor", "-"], "") else {
         return;
     };
-    assert_ne!(code, 0, "`between -` should be a rejection, not a stream");
+    assert_ne!(code, 0, "`cal anchor -` should be a rejection, not a stream");
 }
 
 /// G3 — `-` on a command that does not read stdin says so.
@@ -187,4 +187,60 @@ fn the_malformed_timestamp_message_knows_about_stdin() {
         msg.contains("stdin"),
         "the four accepted forms are three in this message: {msg}"
     );
+}
+
+/// G7 — a command taking *two* instants streams one side and holds the other.
+///
+/// F2's rule was "exactly one instant", which left `between` and `ruler` out —
+/// and *how long ago was each of these?* is the question a stream of timestamps
+/// is usually asked. The stream replaces the `-`; the other side is whatever was
+/// typed.
+#[test]
+fn between_streams_one_side_and_holds_the_other() {
+    let Some((out, code)) = run(&["--no-color", "between", "-", T], "0\n1000\n") else {
+        return;
+    };
+    assert_eq!(code, 0, "{out}");
+    // Two records, one per input line.
+    assert_eq!(out.matches("ucal between").count(), 2, "{out}");
+
+    // Read the fields rather than matching the rendered columns: a literal
+    // carrying the layout's padding is what `no-indent-in-literal` exists to
+    // catch, and a test that asserts on column widths breaks when they move.
+    let field = |name: &str| -> Vec<String> {
+        out.lines()
+            .filter_map(|l| l.split_once(char::is_whitespace))
+            .filter(|(k, _)| *k == name)
+            .map(|(_, v)| v.trim().to_string())
+            .collect()
+    };
+    // The streamed side takes each line, in order.
+    assert_eq!(field("from"), vec!["0".to_string(), "1000".to_string()], "{out}");
+    // The held side is identical in both records.
+    assert_eq!(field("to"), vec![T.to_string(); 2], "{out}");
+}
+
+/// **`-` on both sides is refused rather than guessed at.**
+///
+/// Two readings are available — a walk over pairs drawn from one stream, or the
+/// same line used twice — and neither is obviously right, so neither is chosen.
+#[test]
+fn a_dash_on_both_sides_is_refused() {
+    let Some((out, code)) = run(&["--no-color", "between", "-", "-"], "0\n") else {
+        return;
+    };
+    assert_ne!(code, 0, "both sides were accepted:\n{out}");
+}
+
+/// And `ruler` too, which takes its instants as options rather than positionals.
+#[test]
+fn ruler_streams_one_side() {
+    let Some((out, code)) = run(
+        &["--no-color", "ruler", "--from", "-", "--to", T, "--step", "T5"],
+        "0\n",
+    ) else {
+        return;
+    };
+    assert_eq!(code, 0, "{out}");
+    assert!(out.contains("ucal ruler"), "{out}");
 }

@@ -1367,7 +1367,7 @@ are statements *about the display*, not units the clock counts in.
 `seq`, for time: instants at a tier interval, one decimal tick count per line.
 
 ```
-ucal seq <FROM> <TO> [--step <TIER>] [--max <N>]
+ucal seq <FROM> <TO> [--step <TIER|CALENDAR>] [--max <N>]
 ucal seq <FROM> <TO> --step T1 | ucal to-civil -
 ```
 
@@ -1393,6 +1393,39 @@ list would be indistinguishable from a caller's mistake.
 
 ---
 
+### Stepping by a body's own unit
+
+`--step` takes a tier — `T1`, `arc`, `5^e` — **or a calendar's own unit**:
+
+```
+ucal seq A B --step mars-d          # one Martian solar day
+ucal seq A B --step mars-d-year     # one Martian year
+ucal seq A B --step mars            # the body, same as mars-d
+```
+
+`ucal seq A B --step mars-d | ucal show - --calendars mars-d` walks consecutive
+Martian days, each at the same fraction through the day — which is what an exact
+stride means and a truncated one could not do.
+
+A tier is tried first, so no existing spelling changes meaning, and a name that
+is neither reports the tier error because a mistyped tier is the likelier
+mistake. A name that *is* a calendar but cannot be a stride reports its own
+reason instead.
+
+**A stride must be a whole number of ticks, and a derived solar day usually is
+not.** Six shipped calendars compute their solar day from two published figures
+and the result is a rational; `--step europa-d` is `UCAL-E0043` rather than a
+truncation, because truncating would make every step short by a little and the
+walk wrong by the accumulated remainder. Tiers cannot have that problem —
+`5^(60+5k)` is an integer by construction, which is why `--step` took one to
+begin with.
+
+**A local unit is not a tier** and this does not pretend otherwise (Rule A.5).
+It counts in the unit named, and every message says which one.
+
+An unanchored calendar is still a stride: thirteen of the fifteen have no anchor,
+and a stride is a *duration*, which needs no phase.
+
 **Which global flags reach it.** `--tick-sep` does, and groups the digits —
 which will break `| ucal to-civil -`, loudly, at the parser on the other end.
 Before 1.9.0 it was accepted here and silently did nothing.
@@ -1417,13 +1450,26 @@ single run differ in exactly one value — and a test holds them to agreeing.
 | | |
 |---|---|
 | accepted by | the commands taking **exactly one** instant: `to-civil`, `explain`, `show`, `cal show` |
-| not accepted by | `between` and `ruler`, which take two — a line-oriented filter has no answer for which of the two a line is, so `-` is treated as what it is, an unparseable instant |
+| and by | `between` and `ruler`, which take two — `-` replaces **one** side and the other is held fixed |
+| not accepted by | commands with no instant at all, which have nowhere to put it |
+| `-` on both sides | refused. Two readings are available — a walk over pairs drawn from one stream, or the same line used twice — and neither is obviously right, so neither is guessed at |
 | with `--json` | **JSON Lines**: one `ucal-json/1` record per line, so the output is a filter's output |
 | without `--json` | one rendered document per line, which is complete and verbose |
 | blank lines | skipped, not an error — a file ending in a newline is not a mistake |
 | a bad line | reported on stderr, **and the stream continues**; the exit status is still non-zero |
 
-That last row is two decisions, and they pull in opposite directions. A filter
+**One side streamed, the other held** is the shape a stream of timestamps is
+usually asked about — *how long ago was each of these?*
+
+```
+cat ticks.txt | ucal between - "$(ucal --json now | sed -n 's/.*"ticks": "\([0-9]*\)".*/\1/p')"
+```
+
+Through 1.9.0's first half `between` refused `-` outright, on the reasoning that
+a filter has no answer for which of two instants a line is. It does when only one
+of them is `-`.
+
+The bad-line row is two decisions, and they pull in opposite directions. A filter
 that dies on line 3 of 10 000 has thrown away 9 997 answers it had already
 computed. A filter that exits 0 after skipping a line lets a script treat a
 partial run as a complete one. So it does both: every good line is answered, and

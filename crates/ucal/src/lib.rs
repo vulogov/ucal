@@ -2608,6 +2608,125 @@ pub fn cmd_wallclock_themes() -> Doc {
 /// that would exceed the cap is refused with the number it would have produced.
 #[cfg(feature = "body")]
 pub fn cmd_seq(from: &str, to: &str, step: Tier, max: u64) -> Result<Vec<String>, TimeError> {
+    cmd_seq_by(from, to, &Stride::tier(step), max)
+}
+
+/// What `seq` counts in (G6).
+///
+/// A tier, or **a body's own solar day or year**. F6 shipped `seq` stepping by
+/// tiers only, which left it unable to express the one walk this project is
+/// actually for — *give me every sunrise on Mars between these two instants*.
+/// F1 and F9 had just made that body's day nameable and `seq` could not reach
+/// it.
+///
+/// The stride is exact in both cases. A tier is `5^(60+5k)` ticks by
+/// construction; a body's day is a `Measured` converted to ticks by Rule Y.2,
+/// which rejects rather than rounds. Neither is a float and neither is
+/// approximated here.
+#[cfg(feature = "body")]
+#[derive(Clone, Debug)]
+pub struct Stride {
+    /// The interval, in ticks.
+    ticks: Ticks,
+    /// How to name it in a message.
+    label: String,
+}
+
+#[cfg(feature = "body")]
+impl Stride {
+    /// The interval, in ticks.
+    pub fn ticks(&self) -> &Ticks {
+        &self.ticks
+    }
+
+    /// How this stride names itself in a message.
+    pub fn label(&self) -> &str {
+        &self.label
+    }
+
+    /// A tier of the ladder.
+    pub fn tier(t: Tier) -> Stride {
+        Stride {
+            ticks: t.ticks(),
+            label: t.to_string(),
+        }
+    }
+
+    /// A calendar's own solar day, or its year.
+    ///
+    /// **A local unit is not a tier and this does not pretend otherwise.** Rule
+    /// A.5 refuses to substitute one body's units for another's; what this does
+    /// is count in the unit the caller named, and say which one it was.
+    ///
+    /// The parameter is read at its epoch rather than at the walk's start.
+    /// [`H1`] Finding 2 records that this project evaluates one parameter at an
+    /// instant and freezes two others, and adding a third convention here would
+    /// deepen the inconsistency it names — so this takes the frozen one, which
+    /// is what `derive_leap_rule` and `derive_cycles` already use.
+    ///
+    /// [`H1`]: https://github.com/vulogov/ucal/blob/main/Documentation/Proposals/H1-when-does-a-calendar-hold.md
+    pub fn calendar(spec: &str) -> Result<Stride, TimeError> {
+        let (id, want_year) = match spec.strip_suffix("-year") {
+            Some(rest) => (rest, true),
+            None => (spec, false),
+        };
+        // `registered()` and not `calendar::by_id`: the latter builds a
+        // calendar, which needs an anchor, and thirteen of the fifteen have
+        // none. Stepping by a body's day does not need a phase — it is a
+        // duration, not a date — so refusing `europa-d` here for want of an
+        // anchor would refuse it for a reason that does not apply.
+        let body = ucal_body::calendar::registered()
+            .into_iter()
+            .find(|(cid, _, _)| *cid == id)
+            .map(|(_, b, _)| b)
+            .or_else(|| ucal_body::data::by_id(id))
+            .ok_or(TimeError::with_context(
+                Code::E0016,
+                "no such calendar or body; `ucal cal list` names every one, and \
+                 `<id>-year` steps by that body's year instead of its day",
+            ))?;
+        let param = if want_year {
+            body.orbital_period()
+        } else {
+            body.solar_day()
+        };
+        // A stride must be a whole number of ticks. A solar day is a rational
+        // and is almost never one, so the remainder is the honest place to stop:
+        // truncating it would make every step short by a little and the walk
+        // wrong by a lot.
+        let v = param.value_at_epoch();
+        if !v.is_integer() {
+            return Err(TimeError::with_context(
+                Code::E0043,
+                body_file::leak(format!(
+                    "`{spec}` is {} ticks, which is not a whole number of them, and a \
+                     stride must be. Truncating would make every step short and the walk \
+                     wrong by the accumulated remainder; §6.3's tiers are exact by \
+                     construction, which is why --step takes one",
+                    v.to_ratio_string()
+                )),
+            ));
+        }
+        Ok(Stride {
+            ticks: v.floor(),
+            label: format!(
+                "one {} of `{}`",
+                if want_year { "year" } else { "solar day" },
+                body.id()
+            ),
+        })
+    }
+}
+
+/// `seq`, counting in whatever [`Stride`] was asked for.
+#[cfg(feature = "body")]
+pub fn cmd_seq_by(
+    from: &str,
+    to: &str,
+    step: &Stride,
+    max: u64,
+) -> Result<Vec<String>, TimeError> {
+    let step_label = &step.label;
     let (a, _) = parse_instant(from)?;
     let (b, _) = parse_instant(to)?;
     if a.ticks() > b.ticks() {
@@ -2619,7 +2738,13 @@ pub fn cmd_seq(from: &str, to: &str, step: Tier, max: u64) -> Result<Vec<String>
     let span = b.ticks().try_sub(a.ticks()).ok_or_else(|| {
         TimeError::with_context(Code::E0021, "the span between those instants exceeds the domain")
     })?;
-    let stride = step.ticks();
+    let stride = step.ticks.clone();
+    if stride.is_zero_ticks() {
+        return Err(TimeError::with_context(
+            Code::E0018,
+            "a stride of zero would never reach the end",
+        ));
+    }
     let (count, _) = span.quot_rem(&stride);
 
     // How many lines this would be, as a number the message can name. A count
@@ -2629,8 +2754,8 @@ pub fn cmd_seq(from: &str, to: &str, step: Tier, max: u64) -> Result<Vec<String>
         return Err(TimeError::with_context(
             Code::E0018,
             body_file::leak(format!(
-                "that is {} steps of {step}, and the limit is {max}. Ask for a coarser \
-                 tier with --step, a shorter span, or raise --max deliberately",
+                "that is {} steps of {step_label}, and the limit is {max}. Ask for a \
+                 coarser --step, a shorter span, or raise --max deliberately",
                 if n == u64::MAX { "more than 2^64".to_string() } else { n.to_string() }
             )),
         ));

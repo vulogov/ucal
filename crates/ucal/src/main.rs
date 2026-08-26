@@ -226,7 +226,13 @@ enum Command {
         from: String,
         /// The last instant. The walk stops at or before it.
         to: String,
-        /// The interval, as a tier: `T0`, `T1`, `T-3`, or a name like `arc`.
+        /// The interval: a tier like `T1` or a name like `arc`, **or a
+        /// calendar's own unit** — `mars-d` for one Martian solar day,
+        /// `mars-d-year` for one Martian year.
+        ///
+        /// A local unit is not a tier and this does not pretend otherwise
+        /// (Rule A.5). It counts in the unit named and the refusal message says
+        /// which one it was.
         #[arg(long, default_value = "T1")]
         step: String,
         /// Refuse rather than print more lines than this.
@@ -586,10 +592,28 @@ fn main() {
             .map(parse_group_sep)
             .transpose()
             .and_then(|sep| {
-                LocaleId::parse(&cli.locale)
+                // A tier first, because that is what `--step` has always taken
+                // and what its default is. A calendar id is tried only when the
+                // tier parser refuses, so no existing spelling changes meaning.
+                let stride = match LocaleId::parse(&cli.locale)
                     .and_then(|l| parse_tier_in(l, step))
-                    .and_then(|t| ucal::cmd_seq(from, to, t, *max))
-                    .map(|lines| (sep, lines))
+                {
+                    Ok(t) => ucal::Stride::tier(t),
+                    Err(tier_err) => match ucal::Stride::calendar(step) {
+                        Ok(s) => s,
+                        // Only *no such calendar* falls back to the tier error.
+                        // Any other refusal means the spec did name a calendar
+                        // and something about it is unusable — a derived solar
+                        // day that is not a whole number of ticks, say — and
+                        // reporting `unknown tier name` about it would send the
+                        // reader to look for a typo that is not there.
+                        Err(e) if e.code == ucal_core::Code::E0016 => {
+                            return Err(tier_err)
+                        }
+                        Err(e) => return Err(e),
+                    },
+                };
+                ucal::cmd_seq_by(from, to, &stride, *max).map(|lines| (sep, lines))
             });
         match out {
             Ok((sep, lines)) => {
@@ -654,6 +678,16 @@ fn main() {
     // once per line. `over` substitutes the line for whichever argument carried
     // the `-`; every other argument is the one the caller typed, so a streamed
     // run and a single run differ in exactly one value.
+    if streamed_twice(&cli.command) {
+        let e = ucal_core::TimeError::with_context(
+            ucal_core::Code::E0018,
+            "`-` on both sides: this command takes two instants and `-` can replace \
+             one of them, with the other held fixed. Two would be a walk over pairs \
+             drawn from one stream, which is a different thing and is not guessed at",
+        );
+        eprintln!("{e}");
+        std::process::exit(exit_code(&e));
+    }
     let streaming = streamed(&cli.command);
     let mut lines: Vec<String> = Vec::new();
     if streaming {
@@ -670,8 +704,19 @@ fn main() {
         }
     }
 
+    /// The stream's line, in place of a `-`.
+    ///
+    /// Conditional on the argument actually being `-`, which matters as soon as
+    /// a command takes two instants: G7 lets `between - <B>` stream one side and
+    /// hold the other, and an unconditional substitution put the line into both.
+    /// For a single-instant command nothing changes — `streamed` has already
+    /// established that its one instant is `-`.
     fn pick<'x>(replacement: Option<&'x str>, typed: &'x str) -> &'x str {
-        replacement.unwrap_or(typed)
+        if typed == "-" {
+            replacement.unwrap_or(typed)
+        } else {
+            typed
+        }
     }
     let dispatch = |replacement: Option<&str>| -> ucal::CmdResult {
         match &cli.command {
@@ -703,9 +748,10 @@ fn main() {
             .and_then(|l| parse_tier_in(l, tier))
             .and_then(ucal::cmd_timeline),
         Command::Ruler { from, to, step } => {
+            let (f, t2) = (pick(replacement, from), pick(replacement, to));
             LocaleId::parse(&cli.locale)
                 .and_then(|l| parse_tier_in(l, step))
-                .and_then(|s| ucal::cmd_ruler(from, to, s))
+                .and_then(|s| ucal::cmd_ruler(f, t2, s))
         }
         #[cfg(all(feature = "body", feature = "civil"))]
         Command::Cal { what } => match what {
@@ -782,12 +828,16 @@ fn main() {
                 cmd_explain(pick(replacement, instant), *claim)
             }
         }
-        Command::Between { from, to, at } => match at {
-            Some(a) => LocaleId::parse(&cli.locale)
-                .and_then(|l| parse_tier_in(l, a))
-                .and_then(|t| ucal::cmd_between(from, to, Some(t))),
-            None => ucal::cmd_between(from, to, None),
-        },
+        Command::Between { from, to, at } => {
+            // G7 — whichever side is `-` takes the line; the other is held.
+            let (f, t2) = (pick(replacement, from), pick(replacement, to));
+            match at {
+                Some(a) => LocaleId::parse(&cli.locale)
+                    .and_then(|l| parse_tier_in(l, a))
+                    .and_then(|tier| ucal::cmd_between(f, t2, Some(tier))),
+                None => ucal::cmd_between(f, t2, None),
+            }
+        }
         Command::Now { precision, form } => run_now(&cli.locale, precision, form),
         #[cfg(feature = "civil")]
         Command::FromCivil {
@@ -1054,9 +1104,33 @@ fn streamed(cmd: &Command) -> bool {
             CalCommand::Show { instant, .. } => Some(instant),
             _ => None,
         },
+        // G7 — a command taking *two* instants streams when exactly one of them
+        // is `-`: the stream is that side and the other is held fixed. Both
+        // sides `-` would be a walk over pairs drawn from one stream, which is
+        // a different feature and is refused rather than guessed at.
+        Command::Between { from, to, .. } => {
+            return (from == "-") ^ (to == "-");
+        }
+        Command::Ruler { from, to, .. } => {
+            return (from == "-") ^ (to == "-");
+        }
         _ => None,
     };
     one.is_some_and(|i| i == "-")
+}
+
+/// Whether a two-instant command was given `-` on both sides (G7).
+///
+/// Reported rather than silently taken as one of the two readings available: a
+/// stream of pairs, or the same line used twice. Neither is obviously right, so
+/// neither is chosen.
+fn streamed_twice(cmd: &Command) -> bool {
+    let both = |a: &String, b: &String| a == "-" && b == "-";
+    match cmd {
+        Command::Between { from, to, .. } => both(from, to),
+        Command::Ruler { from, to, .. } => both(from, to),
+        _ => false,
+    }
 }
 
 /// One JSON document on one line.
