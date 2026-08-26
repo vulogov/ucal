@@ -931,3 +931,106 @@ fn one_figure_carries_five_calendars() {
     }
     assert!(jovian.contains('5'), "{jovian}");
 }
+
+// ---- G4: the figure that decides the month -----------------------------
+
+/// The probe reaches the grouping satellite's period — the figure that decides
+/// a calendar's *cycle*.
+///
+/// F4 covered `solar_day` and `orbital_period`, which feed the intercalation,
+/// and stopped. A calendar's cycles come from a different figure, so a body
+/// whose cycle was one digit from a different cycle passed with no comment — in
+/// the feature built to measure exactly that class of fragility.
+#[test]
+fn the_probe_reaches_the_cycle() {
+    let doc = ucal::cmd_cal_validate("earth-d", None).expect("a report");
+    let v = probe(&doc, "grouping_period");
+    assert!(v.contains("term"), "{v}");
+}
+
+/// **It reports a depth, not a rule, and that is the whole design.**
+///
+/// The first version compared the *chosen* cycle the way the intercalation probe
+/// compares the chosen leap rule, and was worthless: a leap rule is selected by a
+/// drift bound, so which rule it is can survive a nudge, while nothing selects a
+/// cycle and the deepest convergent is the ratio itself. Any nudge changes it, so
+/// the check could only ever print `sensitive`.
+#[test]
+fn the_cycle_probe_reports_a_useful_depth() {
+    let earth = probe(
+        &ucal::cmd_cal_validate("earth-d", None).expect("a report"),
+        "grouping_period",
+    );
+    let depth: usize = earth
+        .split("agrees for ")
+        .nth(1)
+        .and_then(|t| t.split(' ').next())
+        .and_then(|n| n.parse().ok())
+        .unwrap_or_else(|| panic!("no depth in: {earth}"));
+    // A depth of 0 or of the full expansion would both mean the probe had
+    // stopped discriminating. Earth's moon agrees for several terms and then
+    // parts company, which is the informative middle.
+    assert!(depth > 0, "nothing survives, which is the useless answer: {earth}");
+    assert!(
+        earth.contains("becomes"),
+        "no divergence was shown: {earth}"
+    );
+}
+
+/// **A calendar's grouping satellite is the calendar's declaration, not the
+/// body's first moon.**
+///
+/// Mars has Phobos and Deimos and `mars-d` declares neither: D-A5 makes the
+/// choice the calendar's, because no bracket over orbital periods can pick one
+/// without smuggling in an Earth predicate. Reading `satellites().first()` here
+/// made `cal validate mars-d` report a cycle that `cal show mars-d` says the
+/// calendar does not have — one calendar, two answers, because a declaration
+/// existed and the check went round it.
+#[test]
+fn a_calendar_declares_its_grouping_satellite() {
+    let mars = ucal::cmd_cal_validate("mars-d", None).expect("a report");
+    let cycles = verdict(&mars, "cycles");
+    assert!(
+        cycles.starts_with("none"),
+        "mars-d declares no grouping satellite: {cycles}"
+    );
+    assert!(!cycles.contains("phobos"), "{cycles}");
+
+    // Earth's is declared and is found.
+    let earth = ucal::cmd_cal_validate("earth-d", None).expect("a report");
+    assert!(verdict(&earth, "cycles").contains("moon"));
+
+    // And a *file* keeps the first-listed rule, because a file has nowhere to
+    // declare one. Same body, different source, different and correct answer.
+    let (_d, p) = tmp("grouping-from-file", &GOOD);
+    let from_file = ucal::cmd_cal_validate(p.to_str().expect("utf-8"), None).expect("a report");
+    assert!(
+        verdict(&from_file, "cycles").starts_with("none"),
+        "the example body lists no satellite"
+    );
+}
+
+/// The survey accounts for **every** calendar's cycle, including the fourteen
+/// with none.
+///
+/// One of fifteen has a grouping satellite. A section showing that one and
+/// silently omitting the rest is the shape V1 Finding 1 caught fourteen times in
+/// this tree — a report that looks complete because nothing says what it left
+/// out.
+#[test]
+fn the_survey_accounts_for_every_calendar_s_month() {
+    let doc = ucal::cmd_cal_validate_all().expect("a survey");
+    let Some(ucal::emit::Value::Section(rows)) = doc.get("cycles") else {
+        panic!("no cycles section");
+    };
+    let total = match doc.get("calendars") {
+        Some(v) => v.rendered_text().trim().parse::<usize>().expect("a number"),
+        None => panic!("no calendar count"),
+    };
+    assert_eq!(rows.len(), total, "the cycles section omitted calendars");
+    let with = rows
+        .iter()
+        .filter(|(_, v)| v.rendered_text().contains("grouped by"))
+        .count();
+    assert_eq!(with, 1, "only earth-d declares a grouping satellite");
+}

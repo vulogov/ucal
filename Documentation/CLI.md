@@ -602,6 +602,7 @@ first half they were outside the one check built to ask.
 | `intercalation` | The leap rule, **or the reason there is none** — which may be a fact about the body rather than a defect in the file. |
 | `cycles` | The grouping satellite, or that there is none, which §15.3 makes an answer rather than a gap. |
 | `precision` | One row per measured parameter feeding the intercalation. See below. |
+| `grouping_period` | Inside `precision`: the satellite period that decides the cycle, where a calendar declares one. |
 | `anchor:names`, `anchor:evaluable` | With `--anchor`: whether the two files are a pair, and whether the phase is definable from what the body file states. |
 
 An anchor file reports `calendar`, `phase`, `revision`, `method`,
@@ -669,6 +670,53 @@ so `sensitive` means *at the precision this source published*, not *to the same
 tolerance*. Earth's solar day is exact by definition and has no last digit to be
 wrong in; it is reported sensitive because a second either way genuinely does
 change the rule.
+
+#### The cycle is probed differently, on purpose
+
+**And it is a `cycle`, not a `month`.** The word is avoided deliberately: a
+Gregorian month is 28, 29, 30 or 31 days and has not tracked the Moon for
+centuries, so borrowing it for a synodic period would import an Earth
+administrative structure to describe a physical one. D-A5 puts it plainly —
+*"month-like" is an Earth predicate.*
+
+A calendar's cycles come from a third figure — the grouping satellite's own
+orbital period — and until 1.9.0 nothing probed it, so a body whose cycle was
+one digit from a different cycle passed with no comment.
+
+It reports **a depth, not a rule**, and the difference matters. A leap rule is
+selected by a drift bound, so *which rule* is a decision that can survive a
+nudge. Nothing selects a cycle: `derive_cycles` returns every convergent and the
+program shows the deepest, which is the ratio itself to within its own
+precision. Moving any digit changes that, always — so comparing chosen cycles
+could only ever print `sensitive` and would tell an author nothing.
+
+What carries information is **where the continued fraction diverges**, which is
+the quantity this manual has used to explain the whole caveat since 1.4.0. Terms
+that agree are candidate cycle rules that agree:
+
+```
+earth-d   grouped by `moon` — 7 term(s) survive
+```
+
+Earth's cycle is robust to its last published digit for seven terms, then parts
+company.
+
+**Fourteen of the fifteen shipped calendars have no cycle at all**, and which
+satellite groups a calendar is the **calendar's declaration**, not a property of
+the body. `mars-d` declares none although Mars has Phobos and Deimos; a §15.1
+file has nowhere to declare one, so a file gets the first satellite it lists.
+D-A5 gives the reason: no bracket over orbital periods can choose a grouping
+satellite without smuggling in an Earth predicate, so the choice is made
+explicitly or not at all.
+
+Reading the body's first satellite instead of the calendar's declaration is how
+the first version of this check reported `mars-d` as *grouped by phobos* while
+`ucal cal show mars-d` reported *no grouping satellite* — one calendar, two
+answers.
+
+`--all` lists every calendar including the fourteen without a cycle, because a
+section reporting one of fifteen without saying so is exactly the failure the
+1.6.0 audit found fourteen times.
 
 **What is not checked, and cannot be.** Whether the published figures are the
 ones the body actually has. Every check is on internal consistency; a file that

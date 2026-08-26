@@ -516,6 +516,25 @@ intercalation:
                orbital_period 60189.0 d (86400 s) decides the rule
   pluto-d      53/149 — solar_day 153.2820 h (3600 s) decides the rule;
                orbital_period 90560 d (86400 s) decides the rule
+cycles:
+  earth-d      grouped by `moon` — 7 term(s) survive
+  mars-d       no cycle — this calendar declares no grouping satellite, though
+               the body has one. Which satellite groups a calendar is the
+               calendar's declaration (D-A5), because no bracket over orbital
+               periods can pick one without smuggling in an Earth predicate
+  titan-d      no cycle — this body names no satellite at all
+  luna-d       no cycle — this body names no satellite at all
+  mercury-d    no cycle — this body names no satellite at all
+  venus-d      no cycle — this body names no satellite at all
+  jupiter-d    no cycle — this body names no satellite at all
+  io-d         no cycle — this body names no satellite at all
+  europa-d     no cycle — this body names no satellite at all
+  ganymede-d   no cycle — this body names no satellite at all
+  callisto-d   no cycle — this body names no satellite at all
+  enceladus-d  no cycle — this body names no satellite at all
+  uranus-d     no cycle — this body names no satellite at all
+  neptune-d    no cycle — this body names no satellite at all
+  pluto-d      no cycle — this body names no satellite at all
 carried_by_more_than_one:
   4332.589 d (86400 s)    5 calendars: jupiter-d, io-d, europa-d, ganymede-d,
                           callisto-d
@@ -537,6 +556,18 @@ the rule.
 **A satellite's year is its primary's orbit.** So the figures above are shared,
 and a revision to one moves every calendar under it — which is a thing to know
 before revising one.
+
+**Fourteen of the fifteen have no cycle**, because they declare no grouping
+satellite. §15.3 forbids a fallback structure, so that is the answer and not a
+gap — and it is listed per calendar rather than summarised, because a section
+reporting one of fifteen without saying so is the shape V1 Finding 1 caught
+fourteen times in this tree.
+
+**`cycles` counts terms, not rules.** A leap rule is chosen by a drift bound,
+so `which rule` is a decision that can survive a nudge; nothing selects a
+cycle, and the deepest convergent is the ratio itself — which any nudge
+changes. What carries information is how far the continued fraction agrees,
+because terms that agree are candidate cycle rules that agree.
 ```
 
 ## `ucal cal validate Documentation/examples/europa.hjson`
@@ -567,8 +598,9 @@ checks:
                    (Williams, D. R.), Jupiter fact sheet; the original document
                    is available in the Internet Archive
   intercalation    1/24 at convergent 2, 1219 whole days per year
-  cycles           none — no satellite is listed, so the calendar has no month.
-                   §15.3 forbids a fallback, so that is the answer and not a gap
+  cycles           none — no grouping satellite, so this calendar has years and
+                   days and no cycle. §15.3 forbids a fallback structure, which
+                   makes that the answer and not a gap
   precision:
     orbital_period  sensitive — one unit in the last published place derives a
                     different rule. 4332.589 d (86400 s) gives 1/24; 4332.590 d

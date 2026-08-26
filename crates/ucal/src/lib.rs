@@ -3162,6 +3162,7 @@ pub fn cmd_cal_validate_all() -> CmdResult {
     let mut is_sensitive: BTreeMap<String, bool> = BTreeMap::new();
     let mut probed = 0usize;
     let mut derived = 0usize;
+    let mut cycles: Vec<(String, Value)> = Vec::new();
 
     let cals = ucal_body::calendar::registered();
     for (id, body, _) in &cals {
@@ -3216,6 +3217,46 @@ pub fn cmd_cal_validate_all() -> CmdResult {
                 parts.join("; ")
             )),
         ));
+
+        // G4 — how deep the cycle survives its own last published digit. Every
+        // calendar appears, including the fourteen with no cycle: a section
+        // listing one of fifteen without saying so is the shape V1 Finding 1
+        // caught fourteen times in this tree.
+        //
+        // The grouping satellite is the one this *calendar declares*, which for
+        // `mars-d` is none — despite Mars having two moons. Reading
+        // `satellites().first()` here reported a cycle `ucal cal show mars-d`
+        // says the calendar does not have.
+        let grouping = Source::Shipped(id).grouping(body);
+        match grouping.and_then(|g| probe_satellite(body, Some(g))) {
+            None => cycles.push((
+                (*id).to_string(),
+                Value::text(if body.satellites().is_empty() {
+                    "no cycle — this body names no satellite at all"
+                } else {
+                    "no cycle — this calendar declares no grouping satellite, though the \
+                     body has one. Which satellite groups a calendar is the calendar's \
+                     declaration (D-A5), because no bracket over orbital periods can \
+                     pick one without smuggling in an Earth predicate"
+                }),
+            )),
+            Some((_, verdict)) => {
+                let sat = grouping.unwrap_or("—");
+                cycles.push((
+                    (*id).to_string(),
+                    Value::text(if verdict.contains("stable") {
+                        format!("grouped by `{sat}` — the whole expansion survives")
+                    } else {
+                        let depth = verdict
+                            .split("agrees for ")
+                            .nth(1)
+                            .and_then(|t| t.split(' ').next())
+                            .unwrap_or("?");
+                        format!("grouped by `{sat}` — {depth} term(s) survive")
+                    }),
+                ));
+            }
+        }
     }
 
     // The figures more than one calendar rests on. This is the finding the
@@ -3270,6 +3311,7 @@ pub fn cmd_cal_validate_all() -> CmdResult {
             ]),
         )
         .field("intercalation", Value::Section(rows))
+        .field("cycles", Value::Section(cycles))
         .field("carried_by_more_than_one", Value::Section(carried))
         .note(
             "**Sensitive is a measurement, not a verdict.** A leap rule is a convergent of \
@@ -3290,7 +3332,159 @@ pub fn cmd_cal_validate_all() -> CmdResult {
             "**A satellite's year is its primary's orbit.** So the figures above are shared, \
              and a revision to one moves every calendar under it — which is a thing to know \
              before revising one.",
+        )
+        .note(
+            "**Fourteen of the fifteen have no cycle**, because they declare no grouping \
+             satellite. §15.3 forbids a fallback structure, so that is the answer and not \
+             a gap — and it is listed per calendar rather than summarised, because a \
+             section reporting one of fifteen without saying so is the shape V1 Finding 1 \
+             caught fourteen times in this tree.",
+        )
+        .note(
+            "**`cycles` counts terms, not rules.** A leap rule is chosen by a drift bound, \
+             so `which rule` is a decision that can survive a nudge; nothing selects a \
+             cycle, and the deepest convergent is the ratio itself — which any nudge \
+             changes. What carries information is how far the continued fraction agrees, \
+             because terms that agree are candidate cycle rules that agree.",
         ))
+}
+
+/// G4 — the same question, on the figure that decides a calendar's **cycle**.
+///
+/// The probe shipped covering `solar_day` and `orbital_period`, which feed the
+/// intercalation, and nothing else. A calendar's *cycles* come from a different
+/// figure — the grouping satellite's own orbital period — so a body whose cycle
+/// was one digit from a different cycle passed with no comment, in the feature
+/// built to measure exactly that.
+///
+/// # Why this reports a depth and not a rule
+///
+/// The first version of this compared the *chosen* cycle the way the
+/// intercalation probe compares the chosen leap rule, and it was worthless: a
+/// leap rule is selected by a drift bound, so "which rule" is a decision that
+/// can survive a nudge, while `derive_cycles` selects nothing and the program
+/// displays the **deepest** convergent — which is the ratio itself to within its
+/// own precision. Moving any digit changes it, always, so the check could only
+/// ever print `sensitive` and would have told an author nothing.
+///
+/// What carries information is **where the continued fraction diverges**, which
+/// is the quantity `CLI.md` has used to explain this since 1.4.0:
+///
+/// > the continued fraction diverges at the fifth term: `[1, 3, 35, 1, 1, 1, 5,
+/// > 1]` becomes `[1, 3, 35, 1, 106, 6, 3, 1]`
+///
+/// Terms that agree are convergents that agree, so the depth is exactly how much
+/// of the cycle structure survives the last published digit being wrong.
+#[cfg(feature = "body")]
+fn probe_satellite(
+    body: &ucal_body::Body,
+    grouping: Option<&str>,
+) -> Option<(String, String)> {
+    use ucal_body::param::{Measured, RatedParam};
+
+    let sat = body.satellite(grouping?)?;
+    let m = sat.orbital_period().as_measured()?;
+
+    let expansion = |b: &ucal_body::Body| -> Option<Vec<u64>> {
+        let c = ucal_body::derive_cycles(b, Some(sat.id()), 32).ok()?;
+        Some(c.first()?.continued_fraction.clone())
+    };
+    let base = expansion(body)?;
+
+    // Rebuilt rather than substituted: `Body::with_satellite` appends, so
+    // attaching a second satellite of the same id would leave `derive_cycles`
+    // looking the *original* up and reporting a stability it never tested.
+    let rebuilt = |sat_period: RatedParam| -> ucal_body::Body {
+        let b = ucal_body::Body::new(
+            body.id(),
+            body.rotation_period().clone(),
+            body.solar_day().clone(),
+            body.orbital_period().clone(),
+        )
+        .with_satellite(ucal_body::Satellite::new(
+            sat.id(),
+            sat_period,
+            sat.is_retrograde(),
+        ));
+        match body.primary() {
+            Some(p) => b.orbiting(p),
+            None => b,
+        }
+    };
+
+    let mut shallowest: Option<usize> = None;
+    let mut example = String::new();
+    for delta in [1i128, -1] {
+        let Some(mantissa) = m.mantissa.checked_add_signed(delta) else {
+            continue;
+        };
+        if mantissa == 0 {
+            continue;
+        }
+        let moved = Measured::new(mantissa, m.decimals, m.unit, m.citation);
+        let Ok(param) = RatedParam::new(
+            moved,
+            sat.orbital_period().epoch().clone(),
+            sat.orbital_period().valid().clone(),
+        ) else {
+            continue;
+        };
+        let Some(other) = expansion(&rebuilt(param)) else {
+            continue;
+        };
+        let agree = base
+            .iter()
+            .zip(other.iter())
+            .take_while(|(a, b)| a == b)
+            .count();
+        if agree < base.len().min(other.len()) || base.len() != other.len() {
+            if shallowest.is_none_or(|s| agree < s) {
+                shallowest = Some(agree);
+                // Both expansions to one term past the divergence, which is
+                // the form `CLI.md` uses: the shared prefix, then the term
+                // where they part company.
+                let show = |v: &[u64]| {
+                    let n = (agree + 1).min(v.len());
+                    let mut t = format!("{:?}", &v[..n]);
+                    if v.len() > n {
+                        t.pop();
+                        t.push_str(", …]");
+                    }
+                    t
+                };
+                example = format!(
+                    "{}: {} becomes {}",
+                    moved.verbatim(),
+                    show(&base),
+                    show(&other)
+                );
+            }
+        }
+    }
+
+    let verdict = match shallowest {
+        None => format!(
+            "stable — one unit in the last published place, either way, leaves the whole \
+             continued fraction unchanged, so every candidate cycle rule survives it. \
+             {} terms",
+            base.len()
+        ),
+        Some(depth) => format!(
+            "diverges at term {}: the expansion agrees for {depth} term(s), so the first \
+             {depth} candidate cycle rules survive the last published digit being wrong \
+             and nothing deeper does. {example}. The intercalation caveat, on the figure \
+             that decides the cycle — which nothing probed until 1.9.0",
+            depth + 1
+        ),
+    };
+    // A fixed key. The first version returned `moon.orbital_period`, which is a
+    // field name that varies with the input — the thing the comment three
+    // screens up warns against, made three screens later. The satellite is named
+    // in the value, where a varying name belongs.
+    Some((
+        "grouping_period".to_string(),
+        format!("`{}` — {verdict}", sat.id()),
+    ))
 }
 
 /// Where the body being checked came from (G5).
@@ -3317,6 +3511,31 @@ impl Source<'_> {
             Source::File(p) | Source::Shipped(p) => p,
         }
     }
+
+    /// Which satellite groups this calendar's cycle — **as declared**, not as
+    /// listed.
+    ///
+    /// The two differ and it matters. D-A5 makes the grouping satellite the
+    /// *calendar's* declaration rather than a property of the body, because
+    /// "month-like" is an Earth predicate and no bracket over periods can pick
+    /// one honestly. A §15.1 file has nowhere to declare it, so a file gets the
+    /// first satellite it lists; a shipped calendar declares it in
+    /// `calendar::registered`, and `mars-d` declares **none** despite Mars
+    /// having two moons.
+    ///
+    /// The first version of this check read `body.satellites().first()` for both
+    /// and so reported `mars-d` as *grouped by phobos, 1 term survives* while
+    /// `ucal cal show mars-d` said *no grouping satellite*. One calendar, two
+    /// answers, because a declaration existed and this code went round it.
+    fn grouping(&self, body: &ucal_body::Body) -> Option<&'static str> {
+        match self {
+            Source::File(_) => body.satellites().first().map(|s| s.id()),
+            Source::Shipped(id) => ucal_body::calendar::registered()
+                .into_iter()
+                .find(|(cid, _, _)| cid == id || cid.trim_end_matches("-d") == *id)
+                .and_then(|(_, _, g)| g),
+        }
+    }
 }
 
 /// The body half of [`cmd_cal_validate`] — a file, or a shipped calendar.
@@ -3327,6 +3546,7 @@ fn validate_body(
     anchor_path: Option<&str>,
 ) -> CmdResult {
     let from_file = source.is_file();
+    let grouping = source.grouping(body);
     let mut checks: Vec<(String, Value)> = Vec::new();
 
     checks.push(check(
@@ -3428,13 +3648,19 @@ fn validate_body(
 
     checks.push(check(
         "cycles",
-        match body.satellites().first() {
+        match grouping.and_then(|g| body.satellite(g)) {
             Some(sat) => format!(
-                "grouped by `{}`, the first satellite listed (D-A5)",
-                sat.id()
+                "grouped by `{}`{}",
+                sat.id(),
+                if from_file {
+                    ", the first satellite listed — a file has nowhere to declare one (D-A5)"
+                } else {
+                    ", as this calendar declares (D-A5)"
+                }
             ),
-            None => "none — no satellite is listed, so the calendar has no month. §15.3 forbids \
-                a fallback, so that is the answer and not a gap"
+            None => "none — no grouping satellite, so this calendar has years and days and \
+                     no cycle. §15.3 forbids a fallback structure, which makes that the \
+                     answer and not a gap"
                 .to_string(),
         },
     ));
@@ -3444,7 +3670,7 @@ fn validate_body(
     // of them the file states as measured, and a field name that varies with
     // the input is a field name the manual cannot document.
     if let Ok(baseline) = &rule {
-        let probes: Vec<(String, Value)> = [
+        let mut probes: Vec<(String, Value)> = [
             ("solar_day", body.solar_day()),
             ("orbital_period", body.orbital_period()),
         ]
@@ -3457,6 +3683,11 @@ fn validate_body(
             ))
         })
         .collect();
+        // G4 — and the figure that decides the cycle, which this probe did not
+        // reach when it shipped.
+        if let Some((name, verdict)) = probe_satellite(body, grouping) {
+            probes.push((name, Value::text(verdict)));
+        }
         if !probes.is_empty() {
             checks.push(("precision".to_string(), Value::Section(probes)));
         }
