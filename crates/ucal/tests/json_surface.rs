@@ -94,6 +94,14 @@ fn commands() -> Vec<(&'static str, Doc)> {
         v.push(("cal-show", ucal::cmd_cal_show("earth-d", T).unwrap()));
         v.push(("cal-anchor", ucal::cmd_cal_anchor("earth-d").unwrap()));
         v.push(("cal-derive", ucal::cmd_cal_derive(concat!(env!("CARGO_MANIFEST_DIR"), "/../../Documentation/examples/europa.hjson")).unwrap()));
+        // G5/G4 — `cal validate` emits a document and was not in the baseline,
+        // so its fields sat outside the surface promise and outside the schema
+        // generated from it.
+        v.push((
+            "cal-validate",
+            ucal::cmd_cal_validate("earth-d", None).unwrap(),
+        ));
+        v.push(("cal-validate-all", ucal::cmd_cal_validate_all().unwrap()));
         v.push((
             "show",
             ucal::cmd_show(
@@ -132,6 +140,20 @@ fn commands() -> Vec<(&'static str, Doc)> {
             ucal::cmd_cosmo_age_audited("1090..1110", 4, 8, true).unwrap(),
         ));
         v.push(("cosmo-z", ucal::cmd_cosmo_z(T, 1_000_000, 4, 8).unwrap()));
+    }
+    // G8 — a face is a document now, so its fields are part of the promise.
+    // `tui` is not a default feature, so this contributes to the baseline only
+    // in a build that has it — which is what `--features full` runs and what the
+    // schema is generated from.
+    #[cfg(feature = "tui")]
+    {
+        let f = ucal::wallclock::Face::at(
+            ucal::parse_instant(T).unwrap().0,
+            ucal_core::LocaleId::En,
+            Some("earth-d"),
+        )
+        .unwrap();
+        v.push(("wallclock", ucal::cmd_wallclock_json(&f, "plain").unwrap()));
     }
     v
 }
@@ -244,9 +266,29 @@ fn the_json_surface_only_grows() {
     let base = parse(&text);
     assert!(!base.is_empty(), "the baseline is empty");
 
+    // Only commands this build actually has are compared. The baseline is
+    // blessed under `--features full` and this test also runs under the default
+    // features, where `tui` is absent and `wallclock` contributes nothing — its
+    // paths would read as *removed* when they are merely not compiled.
+    //
+    // This does weaken the check in a reduced build: a removal inside a
+    // compiled-out command cannot be seen. It is not weakened where it counts,
+    // because CI runs this suite under `--features full` as well, and that run
+    // has every command and compares every path.
+    let present: std::collections::BTreeSet<String> =
+        commands().iter().map(|(n, _)| (*n).to_string()).collect();
+    let mine = |p: &str| -> bool {
+        p.split('.')
+            .next()
+            .is_some_and(|c| present.contains(c))
+    };
+
     let mut gone = Vec::new();
     let mut changed = Vec::new();
     for (p, k) in &base {
+        if !mine(p) {
+            continue;
+        }
         match now.get(p) {
             None => gone.push(p.clone()),
             Some(n) if n != k => changed.push(format!("{p}: {k} -> {n}")),

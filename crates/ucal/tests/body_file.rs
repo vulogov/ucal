@@ -918,8 +918,10 @@ fn the_shipped_data_has_the_measured_fragility() {
 #[test]
 fn one_figure_carries_five_calendars() {
     let doc = ucal::cmd_cal_validate_all().expect("a survey");
-    let Some(ucal::emit::Value::Section(rows)) = doc.get("carried_by_more_than_one") else {
-        panic!("no shared-figure section");
+    // `Rows` and not `Section`: keyed by a published figure, which is data.
+    let Some(ucal::emit::Value::Rows { rows, .. }) = doc.get("carried_by_more_than_one")
+    else {
+        panic!("no shared-figure rows");
     };
     let jovian = rows
         .iter()
@@ -1020,17 +1022,25 @@ fn a_calendar_declares_its_grouping_satellite() {
 #[test]
 fn the_survey_accounts_for_every_calendar_s_month() {
     let doc = ucal::cmd_cal_validate_all().expect("a survey");
-    let Some(ucal::emit::Value::Section(rows)) = doc.get("cycles") else {
-        panic!("no cycles section");
+    let Some(ucal::emit::Value::Rows { rows, .. }) = doc.get("cycles") else {
+        panic!("no cycles rows");
     };
     let total = match doc.get("calendars") {
         Some(v) => v.rendered_text().trim().parse::<usize>().expect("a number"),
         None => panic!("no calendar count"),
     };
     assert_eq!(rows.len(), total, "the cycles section omitted calendars");
+    // A calendar with a cycle names the satellite; one without says why not.
     let with = rows
         .iter()
-        .filter(|(_, v)| v.rendered_text().contains("grouped by"))
+        .filter(|(_, v)| {
+            let ucal::emit::Value::Section(f) = v else {
+                return false;
+            };
+            f.iter().any(|(k, val)| {
+                k == "grouped_by" && val.rendered_text().trim() != "—"
+            })
+        })
         .count();
     assert_eq!(with, 1, "only earth-d declares a grouping satellite");
 }

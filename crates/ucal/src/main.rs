@@ -805,10 +805,55 @@ fn main() {
             "internal: `seq` is handled before dispatch and should not have reached it",
         )),
         Command::Tour => ucal::cmd_tour(),
-        // Only `--theme list` reaches here; every other value ran the clock and
-        // returned above.
+        // `--theme list` reaches here, and so does `--json` (G8): a face is
+        // structured data and rendering it through the ordinary machinery is
+        // how it gets the same `--json`, colours and width as everything else.
         #[cfg(feature = "tui")]
-        Command::Wallclock { .. } => Ok(ucal::cmd_wallclock_themes()),
+        Command::Wallclock {
+            theme,
+            startrek,
+            gagarin,
+            armstrong,
+            clock_local,
+            tier,
+            since,
+            once,
+            at,
+            ..
+        } => {
+            let key = theme_key(*startrek, *gagarin, *armstrong, theme);
+            if key == "list" {
+                return Ok(ucal::cmd_wallclock_themes());
+            }
+            if !*once {
+                return Err(ucal_core::TimeError::with_context(
+                    ucal_core::Code::E0018,
+                    "--json needs --once. A live clock redraws twenty times a second \
+                     and a stream of documents at that rate is not one; `--once \
+                     --json` is a reading of the ladder at an instant",
+                ));
+            }
+            // The theme is named in the document and does not otherwise reach
+            // it: a face's *data* is the same whichever palette drew it, which
+            // is the point of having a `Theme` be a palette and a layout switch
+            // rather than a source of values.
+            ucal::wallclock::theme::by_name(key)?;
+            let l = LocaleId::parse(&cli.locale)?;
+            let mut dials = ucal::wallclock::Dials::new(l)?.with_clock_local(clock_local);
+            if let Some(t) = tier {
+                dials = dials.with_hero(ucal::parse_tier(t)?);
+            }
+            if let Some(origin) = since {
+                let (t, label) = ucal::wallclock_origin(origin)?;
+                dials = dials.with_since(t, label);
+            }
+            let t = match at.as_deref() {
+                Some(s) => ucal::parse_instant(s)?.0,
+                None => ucal::wallclock::now()?,
+            };
+            ucal::wallclock::Face::of(t, &dials)
+                .and_then(|f| ucal::cmd_wallclock_json(&f, key))
+        }
         // Handled by the early return above; this arm exists only because a
         // `match` must be exhaustive. A diagnostic rather than `unreachable!()`
         // — the CLI crate carries no panicking construct (`no-panic-in-cli`),
@@ -900,13 +945,12 @@ fn main() {
     {
         // The shorthands are mutually exclusive by `conflicts_with_all`, so at
         // most one is set and the order here cannot hide a second choice.
-        let key = match (*startrek, *gagarin, *armstrong) {
-            (true, _, _) => "startrek",
-            (_, true, _) => "gagarin",
-            (_, _, true) => "armstrong",
-            _ => theme.as_str(),
-        };
-        if key != "list" {
+        let key = theme_key(*startrek, *gagarin, *armstrong, theme);
+        // G8 — `--json --once` falls through to the ordinary dispatch, so the
+        // face is rendered by the same machinery every other document uses
+        // rather than a second copy of it here. `--json` without `--once` is
+        // refused there too.
+        if key != "list" && !cli.json {
             // `--width` is the global flag, and off a terminal it resolves to
             // the 80-column baseline — which is the size a committed frame
             // should be, and the reason this reuses it rather than adding a
@@ -1086,6 +1130,22 @@ fn terminal_width() -> Option<usize> {
 /// ones taking **exactly one** instant. `between` and `ruler` take two, and a
 /// line-oriented filter has no natural answer for which of the two a line is —
 /// so they do not accept it rather than accepting it and guessing.
+/// The theme key, from the shorthands or from `--theme`.
+///
+/// The shorthands are mutually exclusive by `conflicts_with_all`, so at most one
+/// is set and the order here cannot hide a second choice. Extracted because two
+/// call sites now need it and two copies of a precedence rule is how they come
+/// to disagree.
+#[cfg(feature = "tui")]
+fn theme_key<'a>(startrek: bool, gagarin: bool, armstrong: bool, theme: &'a str) -> &'a str {
+    match (startrek, gagarin, armstrong) {
+        (true, _, _) => "startrek",
+        (_, true, _) => "gagarin",
+        (_, _, true) => "armstrong",
+        _ => theme,
+    }
+}
+
 fn streamed(cmd: &Command) -> bool {
     let one: Option<&String> = match cmd {
         // Gated for the same reason the variants are. `streamed` named

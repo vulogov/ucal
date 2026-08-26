@@ -1354,6 +1354,43 @@ window beside it, which is the honest way to present it. `bridge-epoch` is exact
 by definition — year 0 of the proleptic Gregorian calendar, a declaration and not
 a measurement — and is the origin for which "time since" is a real reading.
 
+### The face as data: `--json`
+
+```
+ucal --json wallclock --once --at <INSTANT> [--clock-local <ID>]... [--since <ORIGIN>]
+```
+
+`--json` is a global flag and, through 1.9.0's first half, `wallclock` was the
+one command that took it and drew a face anyway. A face *is* structured data —
+hands with tier indices and positions, dials with local fields, an odometer with
+its drums — all of which the text renderer already has and turns into glyphs.
+
+| field | meaning |
+|---|---|
+| `theme` | Which palette was asked for. It does not otherwise reach the document: a face's data is the same whichever theme drew it. |
+| `hero` | The tier in the big readout, which `--tier` chooses. |
+| `hands` | One row per tier, keyed by tier id. |
+| `index` | The tier's index, inside a hand. Never localised. |
+| `position` | The hand's stop, out of 3125 — because every tier is `5^5` of the one below. |
+| `through_day_percent` | Inside a dial: how far through that body's local day the instant falls. |
+| `per_mille` | How far round its dial, in thousandths — what the bars are drawn from. |
+| `dials` | Present only when `--clock-local` was given; keyed by calendar id. |
+| `since` | Present only when `--since` was given. |
+| `origin` | Inside `since`: the origin as the caller asked for it. |
+| `counting_down` | Inside `since`: true when the origin is in the future. |
+| `drums` | Inside `since`: the elapsed span on the same rungs, keyed by tier. |
+
+The **index** is not localised and the **name** is (Rule N), so both are emitted:
+the index is what a reader compares across two machines set to different
+languages.
+
+An absent dial is an absent key, not an empty one — *asked for and empty* is a
+different fact from *not asked for*.
+
+**`--json` needs `--once`.** A live clock redraws twenty times a second and a
+stream of documents at that rate is not one; without `--once` it is refused
+rather than quietly producing a single frame or an endless stream.
+
 **No Earth unit appears on the face as a unit** (Rule A.5), and a test asserts
 it. A clock is where that temptation lives: every clock a reader has ever seen
 counts in hours, minutes and seconds, and the point of this one is that it does

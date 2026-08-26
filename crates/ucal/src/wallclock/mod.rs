@@ -60,6 +60,14 @@ pub mod theme;
 use ucal_core::{Instant, LocaleId, TimeError, UC1};
 
 pub use face::{Dials, Face, Odometer};
+
+/// The system clock, as an instant.
+///
+/// The internal reader is `pub(crate)`; this is the same thing for callers
+/// outside the module, which `--json --once` needs when no `--at` was given.
+pub fn now() -> Result<ucal_core::Instant<ucal_core::UC1>, TimeError> {
+    now_instant()
+}
 pub use frame::once;
 pub use theme::Theme;
 

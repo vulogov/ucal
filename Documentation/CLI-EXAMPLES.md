@@ -486,59 +486,82 @@ figures:
   distinct_sensitive  14
   distinct_stable     5
 intercalation:
-  earth-d      31/128 — solar_day 86400 s decides the rule; orbital_period
-               31556925.216 s has a digit to spare
-  mars-d       45/76 — solar_day 88775.244 s has a digit to spare;
-               orbital_period 686.9726 d (86400 s) decides the rule
-  titan-d      88/117 — solar_day derived, so it has no last digit to move;
-               orbital_period 10759.2058 d (86400 s) decides the rule
-  luna-d       31/84 — solar_day 29.53 d (86400 s) decides the rule;
-               orbital_period 365.256 d (86400 s) decides the rule
-  mercury-d    1/2 — solar_day 15201360 s has a digit to spare; orbital_period
-               87.969 d (86400 s) has a digit to spare
-  venus-d      135/146 — solar_day 10087200 s has a digit to spare;
-               orbital_period 224.701 d (86400 s) decides the rule
-  jupiter-d    68/81 — solar_day 35733.24 s decides the rule; orbital_period
-               4332.589 d (86400 s) decides the rule
-  io-d         58/59 — solar_day derived, so it has no last digit to move;
-               orbital_period 4332.589 d (86400 s) decides the rule
-  europa-d     1/24 — solar_day derived, so it has no last digit to move;
-               orbital_period 4332.589 d (86400 s) decides the rule
-  ganymede-d   149/261 — solar_day derived, so it has no last digit to move;
-               orbital_period 4332.589 d (86400 s) decides the rule
-  callisto-d   17/28 — solar_day derived, so it has no last digit to move;
-               orbital_period 4332.589 d (86400 s) decides the rule
-  enceladus-d  28/151 — solar_day derived, so it has no last digit to move;
-               orbital_period 10759.2058 d (86400 s) decides the rule
-  uranus-d     42/85 — solar_day 17.24 h (3600 s) decides the rule;
-               orbital_period 30685.4 d (86400 s) decides the rule
-  neptune-d    7/179 — solar_day 16.11 h (3600 s) decides the rule;
-               orbital_period 60189.0 d (86400 s) decides the rule
-  pluto-d      53/149 — solar_day 153.2820 h (3600 s) decides the rule;
-               orbital_period 90560 d (86400 s) decides the rule
+  calendar     rule     solar_day
+  ───────────  ───────  ────────────────────────────────
+  earth-d      31/128   86400 s decides it
+               orbital_period  31556925.216 s has a digit to spare
+  mars-d       45/76    88775.244 s has a digit to spare
+               orbital_period  686.9726 d (86400 s) decides it
+  titan-d      88/117   derived — no last digit to move
+               orbital_period  10759.2058 d (86400 s) decides it
+  luna-d       31/84    29.53 d (86400 s) decides it
+               orbital_period  365.256 d (86400 s) decides it
+  mercury-d    1/2      15201360 s has a digit to spare
+               orbital_period  87.969 d (86400 s) has a digit to spare
+  venus-d      135/146  10087200 s has a digit to spare
+               orbital_period  224.701 d (86400 s) decides it
+  jupiter-d    68/81    35733.24 s decides it
+               orbital_period  4332.589 d (86400 s) decides it
+  io-d         58/59    derived — no last digit to move
+               orbital_period  4332.589 d (86400 s) decides it
+  europa-d     1/24     derived — no last digit to move
+               orbital_period  4332.589 d (86400 s) decides it
+  ganymede-d   149/261  derived — no last digit to move
+               orbital_period  4332.589 d (86400 s) decides it
+  callisto-d   17/28    derived — no last digit to move
+               orbital_period  4332.589 d (86400 s) decides it
+  enceladus-d  28/151   derived — no last digit to move
+               orbital_period  10759.2058 d (86400 s) decides it
+  uranus-d     42/85    17.24 h (3600 s) decides it
+               orbital_period  30685.4 d (86400 s) decides it
+  neptune-d    7/179    16.11 h (3600 s) decides it
+               orbital_period  60189.0 d (86400 s) decides it
+  pluto-d      53/149   153.2820 h (3600 s) decides it
+               orbital_period  90560 d (86400 s) decides it
 cycles:
-  earth-d      grouped by `moon` — 7 term(s) survive
-  mars-d       no cycle — this calendar declares no grouping satellite, though
-               the body has one. Which satellite groups a calendar is the
-               calendar's declaration (D-A5), because no bracket over orbital
-               periods can pick one without smuggling in an Earth predicate
-  titan-d      no cycle — this body names no satellite at all
-  luna-d       no cycle — this body names no satellite at all
-  mercury-d    no cycle — this body names no satellite at all
-  venus-d      no cycle — this body names no satellite at all
-  jupiter-d    no cycle — this body names no satellite at all
-  io-d         no cycle — this body names no satellite at all
-  europa-d     no cycle — this body names no satellite at all
-  ganymede-d   no cycle — this body names no satellite at all
-  callisto-d   no cycle — this body names no satellite at all
-  enceladus-d  no cycle — this body names no satellite at all
-  uranus-d     no cycle — this body names no satellite at all
-  neptune-d    no cycle — this body names no satellite at all
-  pluto-d      no cycle — this body names no satellite at all
+  calendar     grouped_by
+  ───────────  ──────────
+  earth-d      moon
+               terms_surviving  7
+  mars-d       —
+               terms_surviving  no grouping satellite declared, though the body
+                                has one
+  titan-d      —
+               terms_surviving  no satellite at all
+  luna-d       —
+               terms_surviving  no satellite at all
+  mercury-d    —
+               terms_surviving  no satellite at all
+  venus-d      —
+               terms_surviving  no satellite at all
+  jupiter-d    —
+               terms_surviving  no satellite at all
+  io-d         —
+               terms_surviving  no satellite at all
+  europa-d     —
+               terms_surviving  no satellite at all
+  ganymede-d   —
+               terms_surviving  no satellite at all
+  callisto-d   —
+               terms_surviving  no satellite at all
+  enceladus-d  —
+               terms_surviving  no satellite at all
+  uranus-d     —
+               terms_surviving  no satellite at all
+  neptune-d    —
+               terms_surviving  no satellite at all
+  pluto-d      —
+               terms_surviving  no satellite at all
 carried_by_more_than_one:
-  4332.589 d (86400 s)    5 calendars: jupiter-d, io-d, europa-d, ganymede-d,
-                          callisto-d
-  10759.2058 d (86400 s)  2 calendars: titan-d, enceladus-d
+  figure
+  ──────────────────────
+  4332.589 d (86400 s)
+                          calendars resting on it  5 calendars: jupiter-d,
+                                                   io-d, europa-d, ganymede-d,
+                                                   callisto-d
+  10759.2058 d (86400 s)
+                          calendars resting on it  2 calendars: titan-d,
+                                                   enceladus-d
 
 **Sensitive is a measurement, not a verdict.** A leap rule is a convergent of a
 continued fraction, and continued fractions are violently sensitive to their

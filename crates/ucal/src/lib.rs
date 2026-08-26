@@ -3133,6 +3133,135 @@ pub fn cmd_cal_derive_with(path: &str, anchor: Option<&str>, at: Option<&str>) -
     ))
 }
 
+/// G8 — a clock face as a document.
+///
+/// # Why a full-screen clock has a `--json`
+///
+/// `--json` is a global flag and `wallclock` was the one command that took it
+/// and drew a face anyway — accepted, and silently ignored. That alone is the
+/// defect G2 catalogued; what makes it worth more than a refusal is that a face
+/// **is** structured data. Hands with tier indices and positions, dials with
+/// local fields, an odometer with its drums: every one of those is a value the
+/// text renderer already has and throws away into glyphs.
+///
+/// # What it buys
+///
+/// A wall clock becomes scriptable — `--once --json` is a reading of the tier
+/// ladder at an instant, in the form every other command emits. And the
+/// wall-clock tests can assert on structure rather than on characters in a
+/// `TestBackend` buffer, which is how a layout change comes to look like a
+/// behaviour change.
+///
+/// **Only with `--once`.** A live clock redraws twenty times a second and a
+/// stream of JSON at that rate is not a document; `--json` without `--once` is
+/// refused rather than quietly producing one frame or an endless stream.
+#[cfg(feature = "tui")]
+pub fn cmd_wallclock_json(face: &wallclock::Face, theme: &str) -> CmdResult {
+    let hands: Vec<(String, Value)> = face
+        .hands
+        .iter()
+        .map(|h| {
+            (
+                h.tier.to_string(),
+                Value::Section(vec![
+                    // The index is not localised and the name is (Rule N), so
+                    // both are emitted: the index is what a reader compares
+                    // across two machines set to different languages.
+                    ("index".into(), Value::number(h.tier.index().to_string())),
+                    ("name".into(), Value::text(h.name.clone())),
+                    ("position".into(), Value::number(h.position.to_string())),
+                    ("per_mille".into(), Value::number(h.per_mille().to_string())),
+                ]),
+            )
+        })
+        .collect();
+
+    let dials: Vec<(String, Value)> = face
+        .dials
+        .iter()
+        .map(|d| {
+            (
+                d.calendar.clone(),
+                Value::Section(vec![
+                    ("year".into(), Value::number(d.year.clone())),
+                    ("day".into(), Value::number(d.day.clone())),
+                    (
+                        "through_day_percent".into(),
+                        Value::number(d.through_day.to_string()),
+                    ),
+                    (
+                        "anchor_revision".into(),
+                        Value::number(d.revision.to_string()),
+                    ),
+                ]),
+            )
+        })
+        .collect();
+
+    let mut doc = Doc::new()
+        .title("ucal wallclock")
+        .field("theme", Value::text(theme))
+        .field("ticks", Value::number(face.at.ticks().to_dec_string()))
+        .field("human", Value::Form(face.human.clone()))
+        .field("hero", Value::text(face.hero.to_string()))
+        // Keyed by tier and by calendar id: data, not schema. `between`'s
+        // `on_the_ladder.*` is the same shape and the same container.
+        .field(
+            "hands",
+            Value::Rows {
+                key: "tier".into(),
+                value: None,
+                rows: hands,
+            },
+        );
+
+    if !dials.is_empty() {
+        doc = doc.field(
+            "dials",
+            Value::Rows {
+                key: "calendar".into(),
+                value: None,
+                rows: dials,
+            },
+        );
+    }
+    if let Some(o) = &face.since {
+        let drums: Vec<(String, Value)> = o
+            .drums
+            .iter()
+            .map(|d| {
+                (
+                    d.tier.to_string(),
+                    Value::number(d.position.to_string()),
+                )
+            })
+            .collect();
+        doc = doc.field(
+            "since",
+            Value::Section(vec![
+                ("origin".into(), Value::text(o.origin.clone())),
+                ("counting_down".into(), Value::Bool(o.counting_down)),
+                (
+                    "drums".into(),
+                    Value::Rows {
+                        key: "tier".into(),
+                        value: Some("stops".into()),
+                        rows: drums,
+                    },
+                ),
+            ]),
+        );
+    }
+
+    Ok(doc.note(
+        "A face, as data. The `position` of each hand is out of 3125, because every \
+         tier is 5^5 of the one below; `per_mille` is that position as thousandths, \
+         which is what the bars are drawn from. No Earth unit appears here as a unit \
+         (Rule A.5) — the tier indices are the ladder and the dials are local \
+         calendars, each labelled with the body whose day it counts.",
+    ))
+}
+
 /// F3 — resolve `ucal wallclock --since <ORIGIN>` to an instant and a label.
 ///
 /// An instant is taken as given. **An event id is looked up and may be
@@ -3318,14 +3447,17 @@ pub fn cmd_cal_validate_all() -> CmdResult {
             continue;
         };
 
-        let mut parts = Vec::new();
+        let mut parts: Vec<(String, Value)> = Vec::new();
         for (what, param) in [
             ("solar_day", body.solar_day()),
             ("orbital_period", body.orbital_period()),
         ] {
             let Some(m) = param.as_measured() else {
                 derived += 1;
-                parts.push(format!("{what} derived, so it has no last digit to move"));
+                parts.push((
+                    what.to_string(),
+                    Value::text("derived — no last digit to move"),
+                ));
                 continue;
             };
             probed += 1;
@@ -3335,6 +3467,14 @@ pub fn cmd_cal_validate_all() -> CmdResult {
                 .push((*id).to_string());
             let verdict = probe_last_digit(m, what, solar, year, &baseline);
             let sens = verdict.starts_with("sensitive");
+            parts.push((
+                what.to_string(),
+                Value::text(format!(
+                    "{} {}",
+                    m.verbatim(),
+                    if sens { "decides it" } else { "has a digit to spare" }
+                )),
+            ));
             // A figure shared by several calendars is probed once per calendar
             // and can come out differently each time — the same Jovian year
             // decides Europa's rule and Io's independently. Sensitive anywhere
@@ -3342,21 +3482,17 @@ pub fn cmd_cal_validate_all() -> CmdResult {
             // the thing a revision would touch.
             let e = is_sensitive.entry(m.verbatim()).or_insert(false);
             *e = *e || sens;
-            if sens {
-                parts.push(format!("{what} {} decides the rule", m.verbatim()));
-            } else {
-                parts.push(format!("{what} {} has a digit to spare", m.verbatim()));
-            }
         }
-        rows.push((
-            (*id).to_string(),
+        let mut fields = vec![(
+            "rule".to_string(),
             Value::text(format!(
-                "{}/{} — {}",
+                "{}/{}",
                 baseline.chosen.value.numer().to_dec_string(),
-                baseline.chosen.value.denom().to_dec_string(),
-                parts.join("; ")
+                baseline.chosen.value.denom().to_dec_string()
             )),
-        ));
+        )];
+        fields.extend(parts);
+        rows.push(((*id).to_string(), Value::Section(fields)));
 
         // G4 — how deep the cycle survives its own last published digit. Every
         // calendar appears, including the fourteen with no cycle: a section
@@ -3371,29 +3507,38 @@ pub fn cmd_cal_validate_all() -> CmdResult {
         match grouping.and_then(|g| probe_satellite(body, Some(g))) {
             None => cycles.push((
                 (*id).to_string(),
-                Value::text(if body.satellites().is_empty() {
-                    "no cycle — this body names no satellite at all"
-                } else {
-                    "no cycle — this calendar declares no grouping satellite, though the \
-                     body has one. Which satellite groups a calendar is the calendar's \
-                     declaration (D-A5), because no bracket over orbital periods can \
-                     pick one without smuggling in an Earth predicate"
-                }),
+                Value::Section(vec![
+                    ("grouped_by".into(), Value::text("—")),
+                    (
+                        "terms_surviving".into(),
+                        Value::text(if body.satellites().is_empty() {
+                            "no satellite at all"
+                        } else {
+                            "no grouping satellite declared, though the body has one"
+                        }),
+                    ),
+                ]),
             )),
             Some((_, verdict)) => {
                 let sat = grouping.unwrap_or("—");
                 cycles.push((
                     (*id).to_string(),
-                    Value::text(if verdict.contains("stable") {
-                        format!("grouped by `{sat}` — the whole expansion survives")
-                    } else {
-                        let depth = verdict
-                            .split("agrees for ")
-                            .nth(1)
-                            .and_then(|t| t.split(' ').next())
-                            .unwrap_or("?");
-                        format!("grouped by `{sat}` — {depth} term(s) survive")
-                    }),
+                    Value::Section(vec![
+                        ("grouped_by".into(), Value::text(sat)),
+                        (
+                            "terms_surviving".into(),
+                            Value::text(if verdict.contains("stable") {
+                                "the whole expansion".to_string()
+                            } else {
+                                verdict
+                                    .split("agrees for ")
+                                    .nth(1)
+                                    .and_then(|t| t.split(' ').next())
+                                    .unwrap_or("?")
+                                    .to_string()
+                            }),
+                        ),
+                    ]),
                 ));
             }
         }
@@ -3450,9 +3595,35 @@ pub fn cmd_cal_validate_all() -> CmdResult {
                 ),
             ]),
         )
-        .field("intercalation", Value::Section(rows))
-        .field("cycles", Value::Section(cycles))
-        .field("carried_by_more_than_one", Value::Section(carried))
+        // `Rows` and not `Section`: these are keyed by *data* — a calendar id,
+        // a published figure — and `ucal-json/1` distinguishes the two. A data
+        // key emitted as a schema key puts every calendar id into the schema,
+        // and `4332.589 d (86400 s)` even carries dots, which the surface file's
+        // dotted paths cannot represent at all. The json-surface check caught it.
+        .field(
+            "intercalation",
+            Value::Rows {
+                key: "calendar".into(),
+                value: None,
+                rows,
+            },
+        )
+        .field(
+            "cycles",
+            Value::Rows {
+                key: "calendar".into(),
+                value: None,
+                rows: cycles,
+            },
+        )
+        .field(
+            "carried_by_more_than_one",
+            Value::Rows {
+                key: "figure".into(),
+                value: Some("calendars resting on it".into()),
+                rows: carried,
+            },
+        )
         .note(
             "**Sensitive is a measurement, not a verdict.** A leap rule is a convergent of \
              a continued fraction, and continued fractions are violently sensitive to their \

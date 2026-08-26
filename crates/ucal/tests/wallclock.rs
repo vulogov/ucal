@@ -778,3 +778,100 @@ fn the_leading_drum_carries_the_whole_count() {
     let b = far.since.as_ref().expect("an odometer").drums[0].position;
     assert_eq!(b, a + 3125, "the leading drum wrapped: {a} then {b}");
 }
+
+// ---- G8: a face as a document ------------------------------------------
+
+/// `--json` was the one global flag `wallclock` accepted and ignored.
+///
+/// It drew a face anyway. That alone is the defect G2 catalogued; what makes it
+/// worth more than a refusal is that a face **is** structured data — hands with
+/// tier indices and positions, dials with local fields, an odometer with its
+/// drums — every one of which the text renderer already has and throws into
+/// glyphs.
+#[test]
+fn a_face_renders_as_a_document() {
+    let f = face();
+    let doc = ucal::cmd_wallclock_json(&f, "plain").expect("a document");
+    let Some(ucal::emit::Value::Rows { rows: hands, .. }) = doc.get("hands") else {
+        panic!("no hands");
+    };
+    assert_eq!(hands.len(), 5, "T3 down to T-1");
+
+    // The index is not localised and the name is (Rule N). Both are emitted,
+    // because the index is what a reader compares across two machines set to
+    // different languages.
+    for (_, v) in hands {
+        let ucal::emit::Value::Section(fields) = v else {
+            panic!("a hand is a section");
+        };
+        for want in ["index", "name", "position", "per_mille"] {
+            assert!(
+                fields.iter().any(|(k, _)| k == want),
+                "a hand has no `{want}`"
+            );
+        }
+    }
+}
+
+/// The document is a *reading*, and matches the face it came from.
+///
+/// A second rendering of the same data is a second place for it to be wrong, so
+/// the check is that the two agree rather than that the JSON looks plausible.
+#[test]
+fn the_document_agrees_with_the_face_it_came_from() {
+    let ru = LocaleId::parse("ru").expect("ru ships");
+    let d = Dials::new(ru)
+        .expect("defaults")
+        .with_clock_local(&["earth-d".to_string()]);
+    let f = Face::of(instant(), &d).expect("a face");
+    let doc = ucal::cmd_wallclock_json(&f, "gagarin").expect("a document");
+
+    let Some(ucal::emit::Value::Rows { rows: hands, .. }) = doc.get("hands") else {
+        panic!("no hands");
+    };
+    for h in &f.hands {
+        let (_, v) = hands
+            .iter()
+            .find(|(k, _)| *k == h.tier.to_string())
+            .unwrap_or_else(|| panic!("no hand for {}", h.tier));
+        let text = v.rendered_text();
+        assert!(
+            text.contains(&h.position.to_string()),
+            "{} position missing: {text}",
+            h.tier
+        );
+        // The localised name travels with it.
+        assert!(text.contains(&h.name), "{} name missing: {text}", h.tier);
+    }
+
+    // The dial is there, and named by its calendar.
+    let Some(ucal::emit::Value::Rows { rows: dials, .. }) = doc.get("dials") else {
+        panic!("no dials");
+    };
+    assert_eq!(dials.len(), 1);
+    assert_eq!(dials[0].0, "earth-d");
+}
+
+/// A face with no second dial and no odometer emits neither key.
+///
+/// An empty section would say *asked for and empty*, which is a different fact
+/// from *not asked for*.
+#[test]
+fn absent_dials_are_absent_rather_than_empty() {
+    let doc = ucal::cmd_wallclock_json(&face(), "plain").expect("a document");
+    assert!(doc.get("dials").is_none(), "an unasked dial was emitted");
+    assert!(doc.get("since").is_none(), "an unasked odometer was emitted");
+}
+
+/// `--tier` reaches the document, so a scripted reader sees which hand is the
+/// hero rather than having to know the default.
+#[test]
+fn the_hero_is_named_in_the_document() {
+    let d = dials().with_hero(Tier::new(2).expect("a tier"));
+    let f = Face::of(instant(), &d).expect("a face");
+    let doc = ucal::cmd_wallclock_json(&f, "plain").expect("a document");
+    assert_eq!(
+        doc.get("hero").map(ucal::emit::Value::rendered_text),
+        Some("T2 ".to_string())
+    );
+}
