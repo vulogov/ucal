@@ -169,7 +169,7 @@ fn an_event_id_is_not_an_instant_and_says_so() {
     let msg = e.to_string();
     assert!(msg.contains("an interval rather than an instant"), "{msg}");
     // And it names where to go instead.
-    assert!(msg.contains("events show recombination"), "{msg}");
+    assert!(msg.contains("events show"), "{msg}");
     assert!(msg.contains("wallclock --since"), "{msg}");
 }
 

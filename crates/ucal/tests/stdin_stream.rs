@@ -35,12 +35,18 @@ fn run(args: &[&str], input: &str) -> Option<(String, i32)> {
         .stderr(Stdio::null())
         .spawn()
         .ok()?;
-    child
-        .stdin
-        .as_mut()
-        .expect("stdin")
-        .write_all(input.as_bytes())
-        .expect("write");
+    // A broken pipe is not a test failure. G7 made `between - -` a refusal that
+    // happens *before* a byte is read, so the child can exit while this is still
+    // writing — which is the program behaving correctly. The assertions are on
+    // the status and the output, both of which survive it.
+    //
+    // It is a race, so it passed locally and failed on CI's bigint job: the
+    // child has to win to produce it.
+    match child.stdin.as_mut().expect("stdin").write_all(input.as_bytes()) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::BrokenPipe => {}
+        Err(e) => panic!("write: {e}"),
+    }
     let out = child.wait_with_output().expect("wait");
     Some((
         String::from_utf8_lossy(&out.stdout).into_owned(),

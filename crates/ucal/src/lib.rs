@@ -89,17 +89,23 @@ pub fn parse_instant(s: &str) -> Result<(Instant<UC1>, Precision), TimeError> {
     // `ucal wallclock --since` accepts an event id and applies a width check
     // before it does — that is the one place the conversion is honest, and the
     // message says so.
+    //
+    // The message is a literal rather than the id interpolated into one: the
+    // interning `leak` that would make an owned string `&'static str` lives in
+    // `body_file`, which is gated behind `body`, and this arm is gated behind
+    // `events`. A build with `events` and without `body` is one of the
+    // twenty-two the features workflow compiles, and it caught this — the fifth
+    // feature-gating miss that workflow has found by building a combination
+    // nobody would type.
     #[cfg(feature = "events")]
     if events::by_id(s).is_ok() {
         return Err(TimeError::with_context(
             Code::E0023,
-            body_file::leak(format!(
-                "`{s}` is an event, and an event is an interval rather than an instant. \
-                 `ucal events show {s}` prints its window and what it was published as. \
-                 `ucal wallclock --since {s}` will count from it if the window is \
-                 narrower than the finest hand on the face, which is the one place \
-                 collapsing it to a point is honest"
-            )),
+            "that is an event id, and an event is an interval rather than an instant. \
+             `ucal events show <id>` prints its window and what it was published as; \
+             `ucal wallclock --since <id>` will count from it when the window is \
+             narrower than the finest hand on the face, which is the one place \
+             collapsing an interval to a point is honest",
         ));
     }
     // G3 — `-` gets its own answer. F2 added stdin and left this message
