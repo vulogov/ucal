@@ -24,6 +24,8 @@ pub mod wallclock;
 #[cfg(feature = "body")]
 pub mod body_file;
 pub mod emit;
+#[cfg(feature = "body")]
+pub mod body_export;
 pub mod clock;
 pub mod style;
 pub mod table;
@@ -3472,10 +3474,20 @@ pub fn cmd_cal_validate(path: &str, anchor_path: Option<&str>) -> CmdResult {
     // with by accident, and if they did, the file is what they get.
     let p = std::path::Path::new(path);
     if !p.exists() {
-        if let Ok(cal) = ucal_body::calendar::by_id(path) {
-            return validate_body(Source::Shipped(path), cal.body(), anchor_path);
-        }
-        if let Some(body) = ucal_body::data::by_id(path) {
+        // `registered()` and not `calendar::by_id`: the latter *builds* a
+        // calendar, which needs an anchor, and thirteen of the fifteen have
+        // none — so `cal validate titan-d` reported *no such body file* about a
+        // calendar `cal list` prints. Validating a body needs no phase.
+        //
+        // The same defect, and the same fix, as `Stride::calendar` in G6. It was
+        // fixed there and not carried here, and only `earth-d` and `mars-d`
+        // worked for a whole release.
+        if let Some(body) = ucal_body::calendar::registered()
+            .into_iter()
+            .find(|(cid, _, _)| *cid == path)
+            .map(|(_, b, _)| b)
+            .or_else(|| ucal_body::data::by_id(path))
+        {
             return validate_body(Source::Shipped(path), &body, anchor_path);
         }
     }
@@ -3501,6 +3513,28 @@ pub fn cmd_cal_validate(path: &str, anchor_path: Option<&str>) -> CmdResult {
 #[cfg(feature = "body")]
 fn check(name: &str, verdict: impl Into<String>) -> (String, Value) {
     (name.to_string(), Value::text(verdict.into()))
+}
+
+/// N2 — a shipped calendar, as the §15.1 file that would declare it.
+///
+/// Lines rather than a `Doc`, for the same reason `seq` and `completions` are:
+/// a generator's output is an input to something else. Here that something is
+/// `ucal cal validate` and `ucal cal derive`, and the round trip is the point —
+/// see [`body_export`] for what it replaces.
+#[cfg(feature = "body")]
+pub fn cmd_cal_export(id: &str) -> Result<String, TimeError> {
+    // A calendar id first, then a bare body id: `mars-d` and `mars` both name
+    // the same parameters, and `cal list` prints the first.
+    let body = ucal_body::calendar::registered()
+        .into_iter()
+        .find(|(cid, _, _)| *cid == id)
+        .map(|(_, b, _)| b)
+        .or_else(|| ucal_body::data::by_id(id))
+        .ok_or(TimeError::with_context(
+            Code::E0016,
+            "no such calendar or body; `ucal cal list` names every one",
+        ))?;
+    body_export::body_file(&body)
 }
 
 /// G5 — the precision probe over every calendar this project ships.

@@ -565,6 +565,43 @@ leak or change a published type, and the second is a breaking change. This one
 leaks, bounded by a process that exits — which is safe in a binary and would not
 be in a library.
 
+### `cal export`
+
+```
+ucal cal export <ID>
+```
+
+Write a shipped calendar out as the §15.1 body file that declares it — HJSON on
+stdout, because a generator's output is an input to something else, here
+`cal validate` and `cal derive`.
+
+```
+ucal cal export mars > mars.hjson
+ucal cal validate mars.hjson
+ucal cal derive mars.hjson          # 45/76, the same rule mars-d has
+```
+
+**A template that is correct by construction.** Before this, an author started
+from [`europa.hjson`](examples/europa.hjson) and edited — which is how that
+example came to cite NASA for a solar day NASA does not publish, wrong in the
+third decimal, deriving `202/279` where the body derives `1/24`.
+
+**A derived parameter exports as `derived:`, never as its own result.** Six
+shipped calendars compute their solar day from two published figures; writing
+the computed value down would be writing down a rounding, and a rounded
+parameter is a different calendar. `ucal cal export europa-d` emits
+`derived: synodic` and no `value:` at all.
+
+**It refuses rather than approximating.** A validity window that is not a whole
+number of Julian years cannot be written as `valid_years`, and a unit with no
+§15.1 key cannot be written at all — both are `UCAL-E0018`/`UCAL-E0043` rather
+than a value the loader would silently misread.
+
+What it buys beyond the template is that **the round trip is a property rather
+than a fixture**. That a file can express exactly what a compiled-in body
+expresses used to be checked by hand-typed test literals, for the bodies somebody
+bothered to type. It is now checked for all fifteen, `europa-d` included.
+
 ### `cal validate`
 
 ```

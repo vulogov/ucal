@@ -404,6 +404,15 @@ enum CalCommand {
         #[arg(long, value_name = "INSTANT")]
         at: Option<String>,
     },
+    /// Write a shipped calendar out as the §15.1 file that declares it.
+    ///
+    /// A template that is correct by construction, and a round trip:
+    /// `ucal cal export mars > mars.hjson && ucal cal derive mars.hjson`
+    /// derives the same calendar the compiled-in body does.
+    Export {
+        /// Calendar id like `mars-d`, or a bare body id like `mars`.
+        id: String,
+    },
     /// Check a §15.1 file: does it load, and does a calendar follow from it?
     ///
     /// Two questions, because they have different answers. A file can be
@@ -579,6 +588,25 @@ fn main() {
         let name = cmd.get_name().to_string();
         clap_complete::generate(*shell, &mut cmd, name, &mut std::io::stdout());
         return;
+    }
+    // N2 — a §15.1 file on stdout, for the same reason `seq` is lines: a
+    // generator's output is an input to something else, here `cal validate` and
+    // `cal derive`.
+    #[cfg(feature = "body")]
+    if let Command::Cal {
+        what: CalCommand::Export { id },
+    } = &cli.command
+    {
+        match ucal::cmd_cal_export(id) {
+            Ok(text) => {
+                print!("{text}");
+                return;
+            }
+            Err(e) => {
+                eprintln!("{e}");
+                std::process::exit(exit_code(&e));
+            }
+        }
     }
     // Plain lines, not a `Doc`, for the same reason `completions` is: a
     // generator's output is an input to something else — here `ucal to-civil -`.
@@ -774,6 +802,12 @@ fn main() {
             CalCommand::List => ucal::cmd_cal_list(),
             CalCommand::Show { id, instant } => ucal::cmd_cal_show(id, pick(replacement, instant)),
             CalCommand::Anchor { id } => ucal::cmd_cal_anchor(id),
+            // Handled before dispatch, like `seq`: it emits a file, not a
+            // document. This arm exists because a `match` must be exhaustive.
+            CalCommand::Export { .. } => Err(ucal_core::TimeError::with_context(
+                ucal_core::Code::E0001,
+                "internal: `cal export` is handled before dispatch",
+            )),
             CalCommand::Validate { file, all, anchor } => {
                 if *all {
                     ucal::cmd_cal_validate_all()

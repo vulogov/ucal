@@ -1044,3 +1044,106 @@ fn the_survey_accounts_for_every_calendar_s_month() {
         .count();
     assert_eq!(with, 1, "only earth-d declares a grouping satellite");
 }
+
+// ---- N2: a shipped calendar, exported and read back ---------------------
+
+/// **Every shipped calendar survives a round trip through §15.1.**
+///
+/// The claim that a file can express exactly what a compiled-in body expresses
+/// was checked by hand-written fixtures: somebody typed Mars's parameters into a
+/// string literal and asserted `45/76` came back. That tests the fixture as much
+/// as the loader, and only for the bodies somebody bothered to type.
+///
+/// Exported, it is a property over all fifteen — and it holds for the derived
+/// solar days too, because those export as `derived:` rather than as a rounding
+/// of their own result. 1.9.0 measured what that rounding would cost: Europa's
+/// rule moves through five values across the first six decimals of its solar
+/// day, and `europa-d` is in this loop.
+#[test]
+fn every_shipped_calendar_round_trips_through_a_file() {
+    let mut checked = 0usize;
+    for (id, body, _) in ucal_body::calendar::registered() {
+        let text = ucal::cmd_cal_export(id).unwrap_or_else(|e| panic!("{id}: {e}"));
+        let (_d, p) = tmp(&format!("roundtrip-{id}"), &text);
+
+        // What the compiled-in body derives.
+        let want = ucal_body::derive_leap_rule(
+            body.solar_day().value_at_epoch(),
+            body.orbital_period().value_at_epoch(),
+            ucal_body::DriftBound::DEFAULT,
+            32,
+        )
+        .unwrap_or_else(|e| panic!("{id} derives nothing: {e}"));
+
+        // What the exported file derives, through the real loader.
+        let loaded = ucal::body_file::load(&p).unwrap_or_else(|e| panic!("{id}: {e}"));
+        let got = ucal_body::derive_leap_rule(
+            loaded.solar_day().value_at_epoch(),
+            loaded.orbital_period().value_at_epoch(),
+            ucal_body::DriftBound::DEFAULT,
+            32,
+        )
+        .unwrap_or_else(|e| panic!("{id} from file derives nothing: {e}"));
+
+        assert_eq!(
+            want.chosen.value.numer().to_dec_string(),
+            got.chosen.value.numer().to_dec_string(),
+            "{id}: the exported file derives a different rule"
+        );
+        assert_eq!(
+            want.chosen.value.denom().to_dec_string(),
+            got.chosen.value.denom().to_dec_string(),
+            "{id}: the exported file derives a different rule"
+        );
+        checked += 1;
+    }
+    // A floor. A loop over an empty registry would pass having compared nothing,
+    // which is the shape the 1.6.0 audit found fourteen times.
+    assert_eq!(checked, 15, "expected every shipped calendar");
+}
+
+/// The exported file passes the validator, and is a *file* to it.
+#[test]
+fn an_exported_file_validates_as_a_file() {
+    let text = ucal::cmd_cal_export("mars-d").expect("exports");
+    let (_d, p) = tmp("export-validates", &text);
+    let doc = ucal::cmd_cal_validate(p.to_str().expect("utf-8"), None).expect("a report");
+    assert!(verdict(&doc, "loads").starts_with("ok"), "{}", verdict(&doc, "loads"));
+    assert!(verdict(&doc, "intercalation").starts_with("45/76"));
+}
+
+/// **A derived parameter exports as `derived:`, never as its own result.**
+///
+/// Writing the computed solar day down would be writing down a rounding, which
+/// is the exact defect the documented Europa example carried — a solar day no
+/// source publishes, wrong in the third decimal.
+#[test]
+fn a_derived_parameter_does_not_export_as_a_decimal() {
+    let text = ucal::cmd_cal_export("europa-d").expect("exports");
+    assert!(
+        text.contains("derived: synodic"),
+        "europa's solar day was flattened into a number:\n{text}"
+    );
+    // And the block for it carries no `value:` at all.
+    let solar = text
+        .split("solar_day: {")
+        .nth(1)
+        .and_then(|s| s.split('}').next())
+        .expect("a solar_day block");
+    assert!(!solar.contains("value:"), "{solar}");
+}
+
+/// **G5's lookup reached two of fifteen calendars.**
+///
+/// `cal validate <id>` resolved a body through `calendar::by_id`, which *builds*
+/// a calendar and so needs an anchor — and thirteen of the fifteen have none. So
+/// it reported *no such body file* about a calendar `cal list` prints. The same
+/// defect and the same fix as `Stride::calendar` in G6, which was corrected there
+/// and not carried here.
+#[test]
+fn every_shipped_calendar_id_validates() {
+    for (id, _, _) in ucal_body::calendar::registered() {
+        ucal::cmd_cal_validate(id, None)
+            .unwrap_or_else(|e| panic!("`cal validate {id}` failed: {e}"));
+    }
+}
