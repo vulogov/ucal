@@ -14,7 +14,7 @@ members = [
 exclude = ["fuzz"]
 
 [workspace.package]
-version = "1.8.0"
+version = "1.9.0"
 edition = "2021"
 # Set by the `tui` feature's tree in 1.5.0: ratatui reaches instability and
 # darling, which declare 1.88. Before that it was set by the default backend —
@@ -36,11 +36,11 @@ description = "Universe Calendar: absolute time in Planck ticks with a base-5 ti
 # is silent — a 0.3.0 facade resolving against a 0.2.x core still builds.
 # `xtask -- lint` now asserts that every one of these equals the workspace
 # package version, so the drift is caught rather than published.
-ucal-core = { version = "1.8.0", path = "crates/ucal-core", default-features = false }
-ucal-civil = { version = "1.8.0", path = "crates/ucal-civil", default-features = false }
-ucal-body = { version = "1.8.0", path = "crates/ucal-body", default-features = false }
-ucal-events = { version = "1.8.0", path = "crates/ucal-events", default-features = false }
-ucal-cosmo = { version = "1.8.0", path = "crates/ucal-cosmo", default-features = false }
+ucal-core = { version = "1.9.0", path = "crates/ucal-core", default-features = false }
+ucal-civil = { version = "1.9.0", path = "crates/ucal-civil", default-features = false }
+ucal-body = { version = "1.9.0", path = "crates/ucal-body", default-features = false }
+ucal-events = { version = "1.9.0", path = "crates/ucal-events", default-features = false }
+ucal-cosmo = { version = "1.9.0", path = "crates/ucal-cosmo", default-features = false }
 
 # Default backend (RFC §3.1, D-4). NOTE: bnum 0.14 restructured its type surface
 # and renamed `parse_str_radix` -> `from_str_radix`; `ZERO`/`ONE` became private.

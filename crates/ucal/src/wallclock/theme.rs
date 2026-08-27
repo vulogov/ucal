@@ -198,14 +198,16 @@ pub const TARGETING: Theme = Theme {
 /// state. It is the only theme here that is light by default, and it is light
 /// because the object was.
 ///
-/// **Its chrome is Cyrillic and its tier names are not.** `--locale` decides the
-/// language of a tier's name (Rule N) and a theme does not get to override it,
-/// so `--gagarin` alone draws Cyrillic chrome around English names. The intended
-/// pairing is `--gagarin --locale ru`, and the two flags stay independent for
-/// the same reason `--clock-local` is not `--locale`.
+/// **Its Cyrillic is the locale's and not the theme's.** Through 1.8.0 this
+/// panel's chrome was hardcoded Cyrillic, which made it the one place a theme
+/// overrode a user's flag: `--gagarin --locale en` drew Russian anyway. Since
+/// 1.9.0 the chrome follows `--locale` like everything else it prints, so the
+/// panel is Cyrillic under `--locale ru` and English under `--locale en` — and
+/// the words a Vostok panel actually bore are not chrome, so nothing about the
+/// object is lost. See [`super::chrome`] for where that line is drawn.
 pub const PANEL: Theme = Theme {
     key: "gagarin",
-    about: "a Vostok instrument panel — enamelled plate, bezelled gauges, Cyrillic",
+    about: "a Vostok instrument panel — enamelled surface, bezelled gauges, engraved plates",
     layout: Layout::Panel,
     background: Color::Rgb(0xE8, 0xE2, 0xD0),
     text: Color::Rgb(0x1C, 0x1C, 0x18),

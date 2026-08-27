@@ -274,6 +274,15 @@ impl Doc {
         &self.fields
     }
 
+    /// Every trailing note, in order.
+    ///
+    /// For a caller rebuilding a document from another one — `cal validate`
+    /// does, so that a shipped calendar and a file go through one check list
+    /// rather than two that can disagree.
+    pub fn notes(&self) -> &[String] {
+        &self.notes
+    }
+
     /// The field keys, in order. Used by the golden tests to pin §19.2's ordering.
     pub fn keys(&self) -> Vec<&str> {
         self.fields.iter().map(|(k, _)| k.as_str()).collect()

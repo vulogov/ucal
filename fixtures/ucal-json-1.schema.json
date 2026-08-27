@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/vulogov/ucal/blob/main/fixtures/ucal-json-1.schema.json",
   "title": "ucal-json/1",
-  "description": "Generated from fixtures/json-surface.txt by `cargo run -p xtask -- gen-schema`; do not edit. 385 field paths across 24 commands. `--json` output is per-command: validate `ucal datum --json` against #/$defs/datum. Every object permits additional properties, because ucal-json/1 promises that new fields may appear and existing ones never change name, shape or meaning; a consumer must ignore what it does not recognise. Fields shown only under `--bridge` are described but not required. An object whose keys are data - a tier, a body, an event id - is expressed as additionalProperties rather than named properties, so adding one changes no schema.",
+  "description": "Generated from fixtures/json-surface.txt by `cargo run -p xtask -- gen-schema`; do not edit. 448 field paths across 27 commands. `--json` output is per-command: validate `ucal datum --json` against #/$defs/datum. Every object permits additional properties, because ucal-json/1 promises that new fields may appear and existing ones never change name, shape or meaning; a consumer must ignore what it does not recognise. Fields shown only under `--bridge` are described but not required. An object whose keys are data - a tier, a body, an event id - is expressed as additionalProperties rather than named properties, so adding one changes no schema.",
   "$defs": {
     "between": {
       "type": "object",
@@ -168,6 +168,82 @@
             "properties": {
               "above_rung": { "type": "string" },
               "rung": { "type": "string" }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "cal-validate": {
+      "type": "object",
+      "properties": {
+        "checks": {
+          "type": "object",
+          "properties": {
+            "cycles": { "type": "string" },
+            "id": { "type": "string" },
+            "intercalation": { "type": "string" },
+            "loads": { "type": "string" },
+            "orbital_period": { "type": "string" },
+            "precision": {
+              "type": "object",
+              "properties": {
+                "grouping_period": { "type": "string" },
+                "orbital_period": { "type": "string" },
+                "solar_day": { "type": "string" }
+              },
+              "additionalProperties": true
+            },
+            "primary": { "type": "string" },
+            "rotation_period": { "type": "string" },
+            "solar_day": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "kind": { "type": "string" },
+        "source": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "cal-validate-all": {
+      "type": "object",
+      "properties": {
+        "calendars": { "type": "string" },
+        "carried_by_more_than_one": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "cycles": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "grouped_by": { "type": "string" },
+              "terms_surviving": { "type": "string" }
+            },
+            "additionalProperties": true
+          }
+        },
+        "figures": {
+          "type": "object",
+          "properties": {
+            "distinct_figures": { "type": "string" },
+            "distinct_sensitive": { "type": "string" },
+            "distinct_stable": { "type": "string" },
+            "parameters_derived": { "type": "string" },
+            "parameters_probed": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "intercalation": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "orbital_period": { "type": "string" },
+              "rule": { "type": "string" },
+              "solar_day": { "type": "string" }
             },
             "additionalProperties": true
           }
@@ -497,6 +573,18 @@
       "type": "object",
       "properties": {
         "backend": { "type": "string" },
+        "clock": {
+          "type": "object",
+          "properties": {
+            "accuracy": { "type": "string" },
+            "finest_tier": { "type": "string" },
+            "granularity": { "type": "string" },
+            "granularity_ticks": { "type": "string" },
+            "in_a_difference": { "type": "string" },
+            "rendering_floor": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
         "datum_provenance": {
           "type": "object",
           "properties": {
@@ -730,6 +818,18 @@
     "now": {
       "type": "object",
       "properties": {
+        "clock": {
+          "type": "object",
+          "properties": {
+            "accuracy": { "type": "string" },
+            "finest_tier": { "type": "string" },
+            "granularity": { "type": "string" },
+            "granularity_ticks": { "type": "string" },
+            "in_a_difference": { "type": "string" },
+            "rendering_floor": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
         "human": { "type": "string" },
         "precision": { "type": "string" },
         "rendered": { "type": "string" },
@@ -905,6 +1005,42 @@
         },
         "profile": { "type": "string" },
         "what_this_does_not_establish": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "wallclock": {
+      "type": "object",
+      "properties": {
+        "dials": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "anchor_revision": { "type": "string" },
+              "day": { "type": "string" },
+              "through_day_percent": { "type": "string" },
+              "year": { "type": "string" }
+            },
+            "additionalProperties": true
+          }
+        },
+        "hands": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "index": { "type": "string" },
+              "name": { "type": "string" },
+              "per_mille": { "type": "string" },
+              "position": { "type": "string" }
+            },
+            "additionalProperties": true
+          }
+        },
+        "hero": { "type": "string" },
+        "human": { "type": "string" },
+        "theme": { "type": "string" },
+        "ticks": { "type": "string" }
       },
       "additionalProperties": true
     }

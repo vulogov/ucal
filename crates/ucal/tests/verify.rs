@@ -157,3 +157,73 @@ fn the_output_refuses_to_be_mistaken_for_verification() {
         "the output should point at the check that would establish it"
     );
 }
+
+/// G12 — `doctor` names **every** optional feature this binary can have.
+///
+/// It reported `u512, std, civil` for a binary built with `--features full`:
+/// `body`, `events`, `cosmo` and `tui` were compiled in and unlisted, so four of
+/// the commands a reader could run were invisible to the command whose whole job
+/// is to enumerate what is in the build.
+///
+/// The failure mode is a feature added and `cmd_doctor` not revisited, which is
+/// exactly what happened — so this checks the list against the manifest rather
+/// than against a copy of itself.
+#[test]
+fn doctor_knows_every_feature_in_the_manifest() {
+    let manifest = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/Cargo.toml"
+    ))
+    .expect("the ucal manifest");
+
+    // The `[features]` table, minus the aggregates that are lists of others.
+    let aggregates = ["default", "full"];
+    let mut declared: Vec<String> = Vec::new();
+    let mut in_features = false;
+    for line in manifest.lines() {
+        let l = line.trim();
+        if l.starts_with('[') {
+            in_features = l == "[features]";
+            continue;
+        }
+        if !in_features || l.is_empty() || l.starts_with('#') {
+            continue;
+        }
+        if let Some((name, _)) = l.split_once('=') {
+            let name = name.trim();
+            // `dep:` entries and optional-dependency shims are not user-facing
+            // feature names a reader would type.
+            if !aggregates.contains(&name) && !name.starts_with("dep:") {
+                declared.push(name.to_string());
+            }
+        }
+    }
+    assert!(!declared.is_empty(), "no features parsed from the manifest");
+
+    let known: Vec<&str> = ucal::ALL_FEATURES.iter().map(|(n, _)| *n).collect();
+    for d in &declared {
+        assert!(
+            known.contains(&d.as_str()),
+            "`{d}` is a feature of this crate and `doctor` has never heard of it. \
+             Add it to ALL_FEATURES.\nknown: {known:?}"
+        );
+    }
+}
+
+/// And the ones that are on are the ones reported.
+#[test]
+fn doctor_reports_the_features_that_are_on() {
+    let doc = ucal::cmd_doctor().expect("a report");
+    let listed = doc
+        .get("features")
+        .map(ucal::emit::Value::rendered_text)
+        .unwrap_or_default();
+    for (name, on) in ucal::ALL_FEATURES {
+        assert_eq!(
+            listed.split_whitespace().any(|w| w == *name),
+            *on,
+            "`{name}` is {} and the report says otherwise: {listed}",
+            if *on { "compiled in" } else { "absent" }
+        );
+    }
+}

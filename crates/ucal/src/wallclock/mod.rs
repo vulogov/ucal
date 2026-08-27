@@ -25,9 +25,14 @@
 //!
 //! # Themes
 //!
-//! [`Theme`] is a palette and a layout switch, not a plug-in system. Two ship:
-//! `plain`, which is the default, and `startrek`, which is LCARS. Adding one is
-//! a `const` in [`theme`] and an entry in [`theme::by_name`].
+//! [`Theme`] is a palette and a layout switch, not a plug-in system. Nine ship
+//! across six layouts; `ucal wallclock --theme list` names them. Adding one is a
+//! `const` in [`theme`] and an entry in [`theme::by_name`].
+//!
+//! A theme decides how a face looks and never what language it speaks. The words
+//! live in [`chrome`], resolved from `--locale` — including the Vostok panel's,
+//! which was hardcoded Cyrillic through 1.8.0 and was the one place in this
+//! program where a theme beat a user's flag.
 //!
 //! # Not in the default install
 //!
@@ -45,6 +50,7 @@
 //!
 //! [`GE-U4-tier-navigator.md`]: https://github.com/vulogov/ucal/blob/main/Documentation/Proposals/GE-U4-tier-navigator.md
 
+pub mod chrome;
 pub mod dial;
 pub mod digits;
 pub mod face;
@@ -53,7 +59,15 @@ pub mod theme;
 
 use ucal_core::{Instant, LocaleId, TimeError, UC1};
 
-pub use face::Face;
+pub use face::{Dials, Face, Odometer};
+
+/// The system clock, as an instant.
+///
+/// The internal reader is `pub(crate)`; this is the same thing for callers
+/// outside the module, which `--json --once` needs when no `--at` was given.
+pub fn now() -> Result<ucal_core::Instant<ucal_core::UC1>, TimeError> {
+    now_instant()
+}
 pub use frame::once;
 pub use theme::Theme;
 
@@ -85,20 +99,27 @@ pub fn run(
     locale: LocaleId,
     clock_local: Option<&str>,
 ) -> Result<(), TimeError> {
-    let theme = theme::by_name(theme_name)?;
-    // Read the second dial once before taking over the terminal. A calendar id
-    // that does not exist, or one that exists and has no anchor, is a message
-    // and an exit code — not a full-screen clock with an empty panel on it and
-    // no way to see why.
+    let mut dials = Dials::new(locale)?;
     if let Some(id) = clock_local {
-        Face::at(now_instant()?, locale, Some(id))?;
+        dials = dials.with_clock_local(&[id.to_string()]);
     }
+    run_with(theme_name, &dials)
+}
+
+/// Run the clock with everything [`Dials`] can ask for (F3).
+pub fn run_with(theme_name: &str, dials: &Dials) -> Result<(), TimeError> {
+    let theme = theme::by_name(theme_name)?;
+    // Read the face once before taking over the terminal. A calendar id that
+    // does not exist, or one that exists and has no anchor, is a message and an
+    // exit code — not a full-screen clock with an empty panel on it and no way
+    // to see why.
+    Face::of(now_instant()?, dials)?;
 
     let mut term = enter()?;
     // The clock's own result is kept separate from the restore, so a failure
     // inside the loop cannot leave the terminal in raw mode. Both are reported;
     // the loop's failure wins, because it is the one that explains anything.
-    let outcome = clock_loop(&mut term, theme, locale, clock_local);
+    let outcome = clock_loop(&mut term, theme, dials);
     let restored = leave(&mut term);
     outcome.and(restored)
 }
@@ -116,12 +137,28 @@ pub fn run_once(
     height: u16,
     color: bool,
 ) -> Result<String, TimeError> {
+    let mut dials = Dials::new(locale)?;
+    if let Some(id) = clock_local {
+        dials = dials.with_clock_local(&[id.to_string()]);
+    }
+    run_once_with(theme_name, &dials, at, width, height, color)
+}
+
+/// One frame, with everything [`Dials`] can ask for (F3).
+pub fn run_once_with(
+    theme_name: &str,
+    dials: &Dials,
+    at: Option<&str>,
+    width: u16,
+    height: u16,
+    color: bool,
+) -> Result<String, TimeError> {
     let theme = theme::by_name(theme_name)?;
     let t = match at {
         Some(s) => crate::parse_instant(s)?.0,
         None => now_instant()?,
     };
-    let face = Face::at(t, locale, clock_local)?;
+    let face = Face::of(t, dials)?;
     frame::once(&face, theme, width, height, color)
 }
 
@@ -161,12 +198,11 @@ fn terminal_failure(e: std::io::Error) -> TimeError {
 fn clock_loop(
     term: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     theme: &'static Theme,
-    locale: LocaleId,
-    clock_local: Option<&str>,
+    dials: &Dials,
 ) -> Result<(), TimeError> {
     let mut last = StdInstant::now();
     loop {
-        let face = Face::read_now(locale, clock_local)?;
+        let face = Face::now(dials)?;
         term.draw(|f| face.render(f, theme))
             .map_err(terminal_failure)?;
 

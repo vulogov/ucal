@@ -579,3 +579,468 @@ fn distinct_strings_are_not_conflated() {
     assert_ne!(a.id(), b.id());
     assert!(!std::ptr::eq(a.id().as_ptr(), b.id().as_ptr()));
 }
+
+/// F5 — hours and minutes, so a file can quote its source verbatim.
+///
+/// **The check that matters.** `data::jupiter` states its rotation in seconds
+/// and converts in a comment — `9.9250 h x 3600 = 35 730 s, exact` — because the
+/// fact sheet publishes hours and the format had no way to say so. A file
+/// quoting the fact sheet as printed must derive the same calendar as the
+/// hand-converted body, or the new units are a second and laxer way of stating
+/// a parameter.
+#[test]
+fn a_file_quoting_hours_derives_what_the_shipped_body_does() {
+    let jupiter = r#"
+id: jupiter
+primary: sun
+rotation_period: {
+  value: 9.9250
+  unit: h
+  citation: NASA Planetary Fact Sheets
+  valid_years: 1000
+}
+solar_day: {
+  value: 9.9259
+  unit: h
+  citation: NASA Planetary Fact Sheets
+  valid_years: 1000
+}
+orbital_period: {
+  value: 4332.589
+  unit: d
+  citation: NASA Planetary Fact Sheets
+  valid_years: 10000
+}
+"#;
+    let (_d, p) = tmp("jupiter-hours", jupiter);
+    let from_file = rule_of(&body_file::load(&p).expect("jupiter in hours loads"));
+    let shipped = rule_of(&ucal_body::data::jupiter());
+    assert_eq!(
+        (
+            from_file.chosen.value.numer().to_dec_string(),
+            from_file.chosen.value.denom().to_dec_string()
+        ),
+        (
+            shipped.chosen.value.numer().to_dec_string(),
+            shipped.chosen.value.denom().to_dec_string()
+        ),
+        "hours and the hand conversion to seconds disagree"
+    );
+    assert_eq!(shipped.chosen.value.denom().to_dec_string(), "81");
+}
+
+/// Minutes work too, and the conversion is exact.
+///
+/// 60 and 3600 are exact multiples of the second, which is the condition Z1.2
+/// set for admitting a unit at all: one that was not would put a rounding inside
+/// the conversion, and that is a different decision from this one.
+#[test]
+fn a_minute_is_sixty_seconds_exactly() {
+    let a = GOOD_EUROPA.replace(
+        "SOLAR_DAY",
+        "solar_day: {\n  value: 120\n  unit: min\n  citation: c\n  valid_years: 10000\n}",
+    );
+    let b = GOOD_EUROPA.replace(
+        "SOLAR_DAY",
+        "solar_day: {\n  value: 7200\n  unit: s\n  citation: c\n  valid_years: 10000\n}",
+    );
+    let (_d1, p1) = tmp("minutes", &a);
+    let (_d2, p2) = tmp("seconds", &b);
+    let m = body_file::load(&p1).expect("minutes load");
+    let s = body_file::load(&p2).expect("seconds load");
+    assert_eq!(
+        m.solar_day().value_at_epoch().cmp_exact(s.solar_day().value_at_epoch()),
+        core::cmp::Ordering::Equal,
+        "120 min is not 7200 s"
+    );
+}
+
+/// A unit the format does not accept is still refused, and says what it takes.
+#[test]
+fn an_unknown_unit_is_still_refused() {
+    let bad = GOOD.replace("unit: d", "unit: parsec");
+    let (_d, p) = tmp("bad-unit-f5", &bad);
+    let e = body_file::load(&p).expect_err("parsec is not a duration");
+    assert_eq!(e.code, Code::E0018);
+    assert!(e.to_string().contains("`h`"), "{e}");
+}
+
+// ---- F4: `ucal cal validate` -------------------------------------------
+
+/// The finding this command exists for: **the file is fine and the calendar is
+/// not**.
+///
+/// `cal derive` on a body whose year is a whole number of its solar days returns
+/// `UCAL-E0060`, and an author reading a red exit code cannot tell whether their
+/// file is malformed or their body simply has no fractional day to distribute.
+/// `validate` answers both questions separately, and this is the case where the
+/// two answers differ.
+#[test]
+fn validate_separates_a_bad_file_from_a_body_with_no_calendar() {
+    let whole = GOOD_EUROPA
+        .replace(
+            "SOLAR_DAY",
+            "solar_day: {\n  value: 1\n  unit: d\n  citation: c\n  valid_years: 10000\n}",
+        )
+        .replace("value: 4332.589", "value: 4332");
+    let (_d, p) = tmp("validate-whole-days", &whole);
+
+    // `cal derive` refuses outright.
+    assert!(ucal::cmd_cal_derive(p.to_str().expect("utf-8")).is_err());
+
+    // `validate` succeeds, and says both things.
+    let doc = ucal::cmd_cal_validate(p.to_str().expect("utf-8"), None).expect("a report");
+    assert!(
+        verdict(&doc, "loads").starts_with("ok"),
+        "the file did not load: {}",
+        verdict(&doc, "loads")
+    );
+    let why = verdict(&doc, "intercalation");
+    assert!(
+        why.contains("whole number of its solar days"),
+        "the wrong reason: {why}"
+    );
+    assert!(
+        why.contains("not a defect in what declares it"),
+        "the two answers were not separated: {why}"
+    );
+    // And not the bound-failure advice, which cannot help here.
+    assert!(!why.contains("widen the bound"), "{why}");
+}
+
+/// One check's verdict, read from the report rather than from its rendering.
+///
+/// `to_text` word-wraps, so a `contains` over the rendered page fails on any
+/// phrase long enough to be worth asserting.
+fn probe(doc: &ucal::emit::Doc, parameter: &str) -> String {
+    let Some(ucal::emit::Value::Section(rows)) = doc.get("checks") else {
+        panic!("no checks section");
+    };
+    let Some((_, ucal::emit::Value::Section(probes))) =
+        rows.iter().find(|(k, _)| k == "precision")
+    else {
+        panic!("no precision probes");
+    };
+    probes
+        .iter()
+        .find(|(k, _)| k == parameter)
+        .map(|(_, v)| v.rendered_text())
+        .unwrap_or_else(|| panic!("`{parameter}` was not probed"))
+}
+
+fn verdict(doc: &ucal::emit::Doc, name: &str) -> String {
+    let Some(ucal::emit::Value::Section(rows)) = doc.get("checks") else {
+        panic!("no checks section");
+    };
+    rows.iter()
+        .find(|(k, _)| k == name)
+        .map(|(_, v)| v.rendered_text())
+        .unwrap_or_else(|| panic!("no check named `{name}`"))
+}
+
+/// A malformed file still fails, and with the loader's own diagnosis.
+///
+/// A validator that reported "does not load" and nothing else would be worse
+/// than the error it replaced.
+#[test]
+fn validate_still_fails_on_a_malformed_file() {
+    let bad = GOOD.replace("unit: d", "unit: parsec");
+    let (_d, p) = tmp("validate-bad-unit", &bad);
+    let e = ucal::cmd_cal_validate(p.to_str().expect("utf-8"), None).expect_err("parsec");
+    assert_eq!(e.code, Code::E0018);
+}
+
+/// An anchor file handed to the positional argument is recognised as one.
+///
+/// The body loader is strict, so an anchor file fed to it reports `UCAL-E0012`,
+/// *unknown key* — which is true, unhelpful, and about a file that is perfectly
+/// valid. The second loader is tried before that error is reported.
+#[test]
+fn validate_names_the_kind_of_file_it_was_given() {
+    let doc = ucal::cmd_cal_validate(&anchor_example(), None).expect("an anchor report");
+    let text = doc.to_text();
+    assert!(text.contains("anchor file"), "{text}");
+    assert!(!text.contains("unknown key"), "{text}");
+    assert_eq!(verdict(&doc, "calendar"), "`earth-d` ");
+}
+
+/// The precision probe is a measurement and reports both outcomes.
+///
+/// Every release note this project has published carries *a rounded parameter is
+/// a different calendar*, and until now it was unmeasurable. Europa's orbital
+/// period is the case that proves the probe is not a rubber stamp: one unit in
+/// its last published place moves the rule off `1/24`.
+#[test]
+fn the_precision_probe_finds_a_parameter_its_last_digit_decides() {
+    let doc = ucal::cmd_cal_validate(&body_example(), None).expect("a report");
+    let v = probe(&doc, "orbital_period");
+    assert!(v.starts_with("sensitive"), "{v}");
+    assert!(v.contains("gives 1/24"), "{v}");
+}
+
+/// And it reports *stable* where the figure is precise enough, which is the
+/// half that makes the other half mean something.
+#[test]
+fn the_precision_probe_is_not_only_ever_alarmed() {
+    // Europa's rotation period is not probed — it does not feed the
+    // intercalation — so the stable case needs a body whose two feeding
+    // parameters are stated at different precisions. Mars is one.
+    let mars = r#"
+id: mars
+primary: sun
+rotation_period: {
+  value: 88642.663
+  unit: s
+  citation: c
+  valid_years: 10000
+}
+solar_day: {
+  value: 88775.244
+  unit: s
+  citation: c
+  valid_years: 10000
+}
+orbital_period: {
+  value: 59355036.0
+  unit: s
+  citation: c
+  valid_years: 10000
+}
+"#;
+    let (_d, p) = tmp("validate-stable", mars);
+    let doc = ucal::cmd_cal_validate(p.to_str().expect("utf-8"), None).expect("a report");
+    let v = probe(&doc, "orbital_period");
+    assert!(v.starts_with("stable"), "{v}");
+}
+
+/// A body file and an anchor file that are not a pair are told so.
+#[test]
+fn validate_checks_the_pair() {
+    let doc = ucal::cmd_cal_validate(&body_example(), Some(&anchor_example())).expect("a report");
+    let v = verdict(&doc, "anchor:names");
+    assert!(v.contains("not a pair"), "europa and earth's anchor are not a pair: {v}");
+}
+
+fn body_example() -> String {
+    format!(
+        "{}/../../Documentation/examples/europa.hjson",
+        env!("CARGO_MANIFEST_DIR")
+    )
+}
+
+fn anchor_example() -> String {
+    format!(
+        "{}/../../Documentation/examples/earth-anchor.hjson",
+        env!("CARGO_MANIFEST_DIR")
+    )
+}
+
+// ---- G5: the probe, turned on this project's own data -------------------
+
+/// `cal validate` takes a shipped calendar id, not only a file.
+///
+/// F4 built the probe and pointed it only at files somebody else wrote, which
+/// left this project's own fifteen calendars outside the one check built to
+/// measure how fragile a calendar's parameters are.
+#[test]
+fn validate_takes_a_shipped_calendar_id() {
+    let doc = ucal::cmd_cal_validate("earth-d", None).expect("a report");
+    assert_eq!(verdict(&doc, "loads").split(' ').next(), Some("compiled"));
+    assert!(verdict(&doc, "intercalation").starts_with("31/128"), "{doc:?}");
+    // And the probe runs on it, which is the point.
+    assert!(probe(&doc, "solar_day").starts_with("sensitive"));
+    assert!(probe(&doc, "orbital_period").starts_with("stable"));
+}
+
+/// A path wins over an id.
+///
+/// Both are accepted in one argument, so the tie has to be broken somewhere and
+/// stated. A caller who names a file that exists means that file.
+#[test]
+fn a_file_that_exists_wins_over_a_calendar_id() {
+    let (_d, p) = tmp("earth-d-shadow", &GOOD);
+    let named = p.to_str().expect("utf-8");
+    let doc = ucal::cmd_cal_validate(named, None).expect("a report");
+    assert!(
+        verdict(&doc, "loads").starts_with("ok"),
+        "the file was not read: {}",
+        verdict(&doc, "loads")
+    );
+}
+
+/// **The G5 measurement, asserted so a data change cannot move it silently.**
+///
+/// Fifteen calendars rest on nineteen distinct published figures, and fourteen
+/// of those decide their calendar's leap rule outright. That is not a defect: a
+/// leap rule is a convergent of a continued fraction and continued fractions are
+/// violently sensitive to their inputs, which `CLI.md` has said in words since
+/// 1.4.0. This is that sentence measured.
+///
+/// The numbers are asserted rather than merely printed for the same reason W4's
+/// were: a finding nobody can notice changing is a finding that will change.
+#[test]
+fn the_shipped_data_has_the_measured_fragility() {
+    let doc = ucal::cmd_cal_validate_all().expect("a survey");
+    let n = |k: &str| -> usize {
+        let Some(ucal::emit::Value::Section(rows)) = doc.get("figures") else {
+            panic!("no figures section");
+        };
+        rows.iter()
+            .find(|(name, _)| name == k)
+            .map(|(_, v)| v.rendered_text().trim().parse::<usize>().expect("a number"))
+            .unwrap_or_else(|| panic!("no `{k}`"))
+    };
+
+    // Fifteen calendars, two intercalation parameters each.
+    assert_eq!(n("parameters_probed") + n("parameters_derived"), 30);
+    // Six solar days are `derived:` — the tidally locked moons, which have no
+    // published figure to have a last digit.
+    assert_eq!(n("parameters_derived"), 6);
+    // The parts must sum to the whole, which is the arithmetic the first
+    // version of this got wrong: it counted parameter slots and reported
+    // nineteen sensitive out of nineteen distinct figures.
+    assert_eq!(
+        n("distinct_sensitive") + n("distinct_stable"),
+        n("distinct_figures"),
+        "the sensitive and stable counts do not partition the distinct figures"
+    );
+    assert_eq!(n("distinct_figures"), 19);
+    assert_eq!(n("distinct_sensitive"), 14);
+}
+
+/// **One published figure decides five calendars.**
+///
+/// A satellite's year is its primary's orbit, so Jupiter's `4332.589 d` is the
+/// orbital period of `jupiter-d`, `io-d`, `europa-d`, `ganymede-d` and
+/// `callisto-d` alike — and its last digit decides all five leap rules. A count
+/// of sensitive *parameters* hides that completely; it is the reason this survey
+/// reports distinct figures and who rests on each.
+#[test]
+fn one_figure_carries_five_calendars() {
+    let doc = ucal::cmd_cal_validate_all().expect("a survey");
+    // `Rows` and not `Section`: keyed by a published figure, which is data.
+    let Some(ucal::emit::Value::Rows { rows, .. }) = doc.get("carried_by_more_than_one")
+    else {
+        panic!("no shared-figure rows");
+    };
+    let jovian = rows
+        .iter()
+        .find(|(fig, _)| fig.starts_with("4332.589"))
+        .map(|(_, v)| v.rendered_text())
+        .expect("Jupiter's year is not reported as shared");
+    for who in ["jupiter-d", "io-d", "europa-d", "ganymede-d", "callisto-d"] {
+        assert!(jovian.contains(who), "{who} is missing: {jovian}");
+    }
+    assert!(jovian.contains('5'), "{jovian}");
+}
+
+// ---- G4: the figure that decides the month -----------------------------
+
+/// The probe reaches the grouping satellite's period — the figure that decides
+/// a calendar's *cycle*.
+///
+/// F4 covered `solar_day` and `orbital_period`, which feed the intercalation,
+/// and stopped. A calendar's cycles come from a different figure, so a body
+/// whose cycle was one digit from a different cycle passed with no comment — in
+/// the feature built to measure exactly that class of fragility.
+#[test]
+fn the_probe_reaches_the_cycle() {
+    let doc = ucal::cmd_cal_validate("earth-d", None).expect("a report");
+    let v = probe(&doc, "grouping_period");
+    assert!(v.contains("term"), "{v}");
+}
+
+/// **It reports a depth, not a rule, and that is the whole design.**
+///
+/// The first version compared the *chosen* cycle the way the intercalation probe
+/// compares the chosen leap rule, and was worthless: a leap rule is selected by a
+/// drift bound, so which rule it is can survive a nudge, while nothing selects a
+/// cycle and the deepest convergent is the ratio itself. Any nudge changes it, so
+/// the check could only ever print `sensitive`.
+#[test]
+fn the_cycle_probe_reports_a_useful_depth() {
+    let earth = probe(
+        &ucal::cmd_cal_validate("earth-d", None).expect("a report"),
+        "grouping_period",
+    );
+    let depth: usize = earth
+        .split("agrees for ")
+        .nth(1)
+        .and_then(|t| t.split(' ').next())
+        .and_then(|n| n.parse().ok())
+        .unwrap_or_else(|| panic!("no depth in: {earth}"));
+    // A depth of 0 or of the full expansion would both mean the probe had
+    // stopped discriminating. Earth's moon agrees for several terms and then
+    // parts company, which is the informative middle.
+    assert!(depth > 0, "nothing survives, which is the useless answer: {earth}");
+    assert!(
+        earth.contains("becomes"),
+        "no divergence was shown: {earth}"
+    );
+}
+
+/// **A calendar's grouping satellite is the calendar's declaration, not the
+/// body's first moon.**
+///
+/// Mars has Phobos and Deimos and `mars-d` declares neither: D-A5 makes the
+/// choice the calendar's, because no bracket over orbital periods can pick one
+/// without smuggling in an Earth predicate. Reading `satellites().first()` here
+/// made `cal validate mars-d` report a cycle that `cal show mars-d` says the
+/// calendar does not have — one calendar, two answers, because a declaration
+/// existed and the check went round it.
+#[test]
+fn a_calendar_declares_its_grouping_satellite() {
+    let mars = ucal::cmd_cal_validate("mars-d", None).expect("a report");
+    let cycles = verdict(&mars, "cycles");
+    assert!(
+        cycles.starts_with("none"),
+        "mars-d declares no grouping satellite: {cycles}"
+    );
+    assert!(!cycles.contains("phobos"), "{cycles}");
+
+    // Earth's is declared and is found.
+    let earth = ucal::cmd_cal_validate("earth-d", None).expect("a report");
+    assert!(verdict(&earth, "cycles").contains("moon"));
+
+    // And a *file* keeps the first-listed rule, because a file has nowhere to
+    // declare one. Same body, different source, different and correct answer.
+    let (_d, p) = tmp("grouping-from-file", &GOOD);
+    let from_file = ucal::cmd_cal_validate(p.to_str().expect("utf-8"), None).expect("a report");
+    assert!(
+        verdict(&from_file, "cycles").starts_with("none"),
+        "the example body lists no satellite"
+    );
+}
+
+/// The survey accounts for **every** calendar's cycle, including the fourteen
+/// with none.
+///
+/// One of fifteen has a grouping satellite. A section showing that one and
+/// silently omitting the rest is the shape V1 Finding 1 caught fourteen times in
+/// this tree — a report that looks complete because nothing says what it left
+/// out.
+#[test]
+fn the_survey_accounts_for_every_calendar_s_month() {
+    let doc = ucal::cmd_cal_validate_all().expect("a survey");
+    let Some(ucal::emit::Value::Rows { rows, .. }) = doc.get("cycles") else {
+        panic!("no cycles rows");
+    };
+    let total = match doc.get("calendars") {
+        Some(v) => v.rendered_text().trim().parse::<usize>().expect("a number"),
+        None => panic!("no calendar count"),
+    };
+    assert_eq!(rows.len(), total, "the cycles section omitted calendars");
+    // A calendar with a cycle names the satellite; one without says why not.
+    let with = rows
+        .iter()
+        .filter(|(_, v)| {
+            let ucal::emit::Value::Section(f) = v else {
+                return false;
+            };
+            f.iter().any(|(k, val)| {
+                k == "grouped_by" && val.rendered_text().trim() != "—"
+            })
+        })
+        .count();
+    assert_eq!(with, 1, "only earth-d declares a grouping satellite");
+}

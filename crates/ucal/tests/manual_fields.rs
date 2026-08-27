@@ -80,6 +80,16 @@ fn all_commands() -> Vec<(&'static str, Doc)> {
         v.push(("cal show", ucal::cmd_cal_show("earth-d", T).unwrap()));
         v.push(("cal anchor", ucal::cmd_cal_anchor("earth-d").unwrap()));
         v.push(("cal derive", ucal::cmd_cal_derive(concat!(env!("CARGO_MANIFEST_DIR"), "/../../Documentation/examples/europa.hjson")).unwrap()));
+        // Both halves: the anchor rows only appear when a pair is given, and the
+        // manual documents them.
+        v.push(("cal validate", ucal::cmd_cal_validate(
+            concat!(env!("CARGO_MANIFEST_DIR"), "/../../Documentation/examples/earth.hjson"),
+            Some(concat!(env!("CARGO_MANIFEST_DIR"), "/../../Documentation/examples/earth-anchor.hjson")),
+        ).unwrap()));
+        v.push(("cal validate anchor", ucal::cmd_cal_validate(
+            concat!(env!("CARGO_MANIFEST_DIR"), "/../../Documentation/examples/earth-anchor.hjson"),
+            None,
+        ).unwrap()));
         v.push((
             "show",
             ucal::cmd_show(
@@ -108,6 +118,27 @@ fn all_commands() -> Vec<(&'static str, Doc)> {
             )
             .unwrap(),
         ));
+    }
+    // G8 — the face is a document now, so the manual's account of its fields is
+    // held to the same standard as every other command's.
+    #[cfg(feature = "tui")]
+    {
+        let f = ucal::wallclock::Face::at(
+            ucal::parse_instant(T).unwrap().0,
+            ucal_core::LocaleId::En,
+            Some("earth-d"),
+        )
+        .unwrap();
+        v.push(("wallclock", ucal::cmd_wallclock_json(&f, "plain").unwrap()));
+        // And one with the optional keys present: `dials` and `since` are
+        // emitted only when asked for, so a face without them documents fields
+        // no command emitted.
+        let d = ucal::wallclock::Dials::new(ucal_core::LocaleId::En)
+            .unwrap()
+            .with_clock_local(&["earth-d".to_string()])
+            .with_since(ucal::parse_instant("0").unwrap().0, "the datum");
+        let g = ucal::wallclock::Face::of(ucal::parse_instant(T).unwrap().0, &d).unwrap();
+        v.push(("wallclock-full", ucal::cmd_wallclock_json(&g, "plain").unwrap()));
     }
     #[cfg(feature = "cosmo")]
     {
@@ -256,6 +287,21 @@ const NOT_A_FIELD: &[&str] = &[
     "doctor",
 ];
 
+/// Fields only a `tui` build emits.
+///
+/// The manual documents `ucal --json wallclock`, and this suite also runs under
+/// the default features where `tui` is absent and that command does not exist —
+/// so its fields would read as *documented and never emitted*. The same
+/// reasoning as `json_surface`'s presence filter, and the same mitigation: CI
+/// runs this suite under `--features full` too, where nothing is skipped.
+#[cfg(not(feature = "tui"))]
+const TUI_ONLY: &[&str] = &[
+    "hands", "hero", "dials", "since", "index", "per_mille", "origin",
+    "counting_down", "drums", "theme", "position", "through_day_percent",
+];
+#[cfg(feature = "tui")]
+const TUI_ONLY: &[&str] = &[];
+
 #[test]
 fn every_documented_field_is_emitted_by_some_command() {
     // Catches a description of something that no longer exists — which is how
@@ -266,6 +312,7 @@ fn every_documented_field_is_emitted_by_some_command() {
         .into_iter()
         .filter(|d| !emitted.contains(d))
         .filter(|d| !NOT_A_FIELD.contains(&d.as_str()))
+        .filter(|d| !TUI_ONLY.contains(&d.as_str()))
         .collect();
     assert!(
         missing.is_empty(),

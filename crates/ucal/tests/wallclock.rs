@@ -229,7 +229,12 @@ fn an_unanchored_calendar_is_refused_as_a_dial() {
     let e = Face::at(instant(), en(), Some("titan-d")).expect_err("titan has no anchor");
     assert_eq!(e.code, ucal_core::Code::E0062);
 
-    let e = Face::at(instant(), en(), Some("pluto-d")).expect_err("no such calendar");
+    // `vulcan-d` and not `pluto-d`. Pluto was the stand-in for a calendar this
+    // program does not have, and 1.9.0 added it — so the test began asserting
+    // something false about the catalogue rather than about the lookup. The same
+    // substitution was needed in `data::tests` in the same commit, which is how
+    // often a body name gets used to mean "absent".
+    let e = Face::at(instant(), en(), Some("vulcan-d")).expect_err("no such calendar");
     assert_eq!(e.code, ucal_core::Code::E0016);
 }
 
@@ -419,8 +424,12 @@ fn the_space_programme_faces_draw_their_own_furniture() {
         false,
     )
     .expect("a frame");
-    assert!(gagarin.contains("ВРЕМЯ ВСЕЛЕННОЙ"), "{gagarin}");
-    assert!(gagarin.contains("ГОТОВ"), "{gagarin}");
+    // The furniture, not the language: which language the plates are engraved
+    // in is `--locale`'s business and is asserted in
+    // `a_theme_does_not_override_the_locale`. This face is a *surface*, and what
+    // makes it one is the bezels and the plate under the main instrument.
+    assert!(gagarin.contains("READY"), "no lamp:\n{gagarin}");
+    assert!(gagarin.contains("PRIMARY COUNT"), "no engraved plate:\n{gagarin}");
     assert!(gagarin.contains("┌────────────┐"), "no bezel:\n{gagarin}");
 
     let armstrong = ucal::wallclock::once(
@@ -439,23 +448,59 @@ fn the_space_programme_faces_draw_their_own_furniture() {
     assert!(armstrong.contains("65"), "{armstrong}");
 }
 
-/// The Cyrillic chrome does not become the tier names.
+/// A theme does not override `--locale` — not even the Cyrillic one.
 ///
-/// `--locale` decides a name's language (Rule N) and a theme does not get to
-/// override it. `--gagarin` alone draws Cyrillic chrome around English names,
-/// which looks odd and is correct; `--gagarin --locale ru` is the pairing.
+/// Through 1.8.0 the Vostok panel's chrome was hardcoded Russian while its tier
+/// names followed the flag, so `--gagarin --locale en` drew Cyrillic plates
+/// around English names. That was the one place in the program where a theme
+/// beat a user's flag, and F10 closed it: under `--locale en` the whole face is
+/// English, and under `--locale ru` the whole face is Russian.
 #[test]
 fn a_theme_does_not_override_the_locale() {
     let gagarin = theme::by_name("gagarin").expect("a theme");
     let f_en = Face::at(instant(), en(), None).expect("a face");
     let out = ucal::wallclock::once(&f_en, gagarin, 96, 28, false).expect("a frame");
-    assert!(out.contains("ВРЕМЯ ВСЕЛЕННОЙ"), "chrome should be Cyrillic");
+    assert!(out.contains("UNIVERSE CALENDAR"), "chrome should be English:\n{out}");
     assert!(out.contains("T0 BEAT"), "names should follow --locale:\n{out}");
+    assert!(
+        !out.contains("ВРЕМЯ ВСЕЛЕННОЙ"),
+        "the 1.8.0 behaviour, and the bug:\n{out}"
+    );
 
     let ru = LocaleId::parse("ru").expect("ru ships");
     let f_ru = Face::at(instant(), ru, None).expect("a face");
     let out_ru = ucal::wallclock::once(&f_ru, gagarin, 96, 28, false).expect("a frame");
+    assert!(out_ru.contains("ВРЕМЯ ВСЕЛЕННОЙ"), "{out_ru}");
     assert!(out_ru.contains("ДУГА"), "{out_ru}");
+}
+
+/// Every face, in both locales, prints chrome in the language that was asked
+/// for.
+///
+/// The Vostok panel is the one that was *reported*, because Cyrillic under
+/// `--locale en` is visibly a flag being ignored. English chrome under
+/// `--locale ru` is the same bug and looks like a translation nobody finished,
+/// so it went unnoticed on the other six faces. This test is over all of them.
+#[test]
+fn every_face_follows_the_locale() {
+    let ru = LocaleId::parse("ru").expect("ru ships");
+    for t in theme::ALL {
+        let f_en = Face::at(instant(), en(), None).expect("a face");
+        let out_en = ucal::wallclock::once(&f_en, t, 100, 30, false).expect("a frame");
+        assert!(
+            !out_en.chars().any(|c| ('\u{400}'..='\u{4ff}').contains(&c)),
+            "{}: Cyrillic under --locale en:\n{out_en}",
+            t.key
+        );
+
+        let f_ru = Face::at(instant(), ru, None).expect("a face");
+        let out_ru = ucal::wallclock::once(&f_ru, t, 100, 30, false).expect("a frame");
+        assert!(
+            out_ru.chars().any(|c| ('\u{400}'..='\u{4ff}').contains(&c)),
+            "{}: nothing Russian under --locale ru:\n{out_ru}",
+            t.key
+        );
+    }
 }
 
 /// The targeting face draws its instrument furniture.
@@ -559,4 +604,274 @@ fn the_orbit_face_has_hands_and_no_block_digits() {
     for h in &f.hands {
         assert!(out.contains(&h.position.to_string()), "{out}");
     }
+}
+
+// ---- F3: several dials, a chosen hero, and an odometer ------------------
+
+use ucal::wallclock::Dials;
+
+fn dials() -> Dials {
+    Dials::new(en()).expect("defaults")
+}
+
+/// An airport wall: both dials are drawn, in the order asked for.
+///
+/// Only two of the fifteen calendars can be a dial at all — a dial shows local
+/// fields, local fields need a phase, and phase is empirical (Rule J.3) — so
+/// this is the whole wall that can be built today, and that is a fact about
+/// anchors rather than about the flag.
+#[test]
+fn several_dials_are_all_drawn() {
+    let d = dials().with_clock_local(&["earth-d".to_string(), "mars-d".to_string()]);
+    let f = Face::of(instant(), &d).expect("a face");
+    assert_eq!(f.dials.len(), 2, "{:?}", f.dials);
+    let out = drawn_face(&f, "plain", 100, 32);
+    let earth = out.find("EARTH-D").expect("no earth dial");
+    let mars = out.find("MARS-D").expect("no mars dial");
+    assert!(earth < mars, "the dials came out in the wrong order:\n{out}");
+}
+
+/// A dial that cannot exist is a message and an exit code, not a blank panel —
+/// and adding a second dial did not lose that.
+#[test]
+fn an_unanchored_dial_is_still_refused() {
+    let d = dials().with_clock_local(&["earth-d".to_string(), "titan-d".to_string()]);
+    assert!(
+        Face::of(instant(), &d).is_err(),
+        "titan-d has no anchor and was accepted as a dial"
+    );
+}
+
+/// `--tier` promotes a hand to the big readout.
+#[test]
+fn the_hero_tier_can_be_chosen() {
+    let t2 = Tier::new(2).expect("a tier");
+    let d = dials().with_hero(t2);
+    let f = Face::of(instant(), &d).expect("a face");
+    let beat = f.beat().expect("a hero");
+    assert_eq!(beat.tier.index(), 2);
+
+    // And the readout actually shows it: T2's position, not T0's.
+    let plain = Face::of(instant(), &dials()).expect("a face");
+    let t0 = plain.beat().expect("a hero").position;
+    assert_ne!(beat.position, t0, "T2 and T0 happened to coincide");
+}
+
+/// Z2's kill criterion for `--tier`, answered in the display.
+///
+/// "Every choice but `T0` produces a screen where nothing moves, which is a
+/// stopped clock with extra steps." `T1` moves every 2 min 26 s and is still a
+/// clock; `T2` is 5.3 days and `T3` is 45 years, and those are calendar
+/// displays. Refusing them would refuse the flag's stated purpose, so the face
+/// says which it is — a hand that changes every 45 years is pixel-identical to a
+/// clock that has stopped.
+#[test]
+fn a_slow_hero_says_it_is_a_calendar_and_not_a_clock() {
+    for (k, expected) in [(0i8, false), (1, false), (2, true), (3, true)] {
+        let d = dials().with_hero(Tier::new(k).expect("a tier"));
+        let f = Face::of(instant(), &d).expect("a face");
+        let out = drawn_face(&f, "plain", 100, 32);
+        assert_eq!(
+            out.contains("does not move while you watch"),
+            expected,
+            "T{k} said the wrong thing about itself:\n{out}"
+        );
+    }
+}
+
+/// The odometer counts up from an origin, on the same ladder the hands are on.
+#[test]
+#[cfg(feature = "events")]
+fn the_odometer_counts_from_an_origin() {
+    let (origin, label) = ucal::wallclock_origin("bridge-epoch").expect("an exact origin");
+    let d = dials().with_since(origin, label);
+    let f = Face::of(instant(), &d).expect("a face");
+    let o = f.since.as_ref().expect("an odometer");
+    assert!(!o.counting_down, "the bridge epoch is in the past");
+    assert_eq!(o.drums.len(), 5, "five rungs, like the face");
+
+    let out = drawn_face(&f, "plain", 100, 32);
+    assert!(out.contains("SINCE"), "{out}");
+    assert!(out.contains("bridge-epoch"), "{out}");
+}
+
+/// An origin in the future counts towards it rather than reporting a negative.
+///
+/// Absolute time is unsigned (Rule B) and `Ticks` cannot hold a negative, so the
+/// direction is a word beside a magnitude — which is what `SignedWindow` already
+/// does, for the same reason.
+#[test]
+fn an_origin_in_the_future_counts_down() {
+    let later: String = {
+        let mut s = T.to_string();
+        s.push('0'); // ten times further out, and comfortably later
+        s
+    };
+    let (origin, label) = ucal::wallclock_origin(&later).expect("an instant");
+    let d = dials().with_since(origin, label);
+    let f = Face::of(instant(), &d).expect("a face");
+    assert!(f.since.as_ref().expect("an odometer").counting_down);
+    let out = drawn_face(&f, "plain", 100, 32);
+    assert!(out.contains("UNTIL"), "{out}");
+}
+
+/// **Z2's kill criterion for `--since`, and the reason it is a feature.**
+///
+/// > Stop if: the window of the chosen origin exceeds the resolution of the
+/// > display [...] Then it should refuse and say why, rather than render a
+/// > number whose last twelve digits are decoration.
+///
+/// Checked both ways over the whole catalogue: every event with a window wider
+/// than `T-1` is refused, and every event with one no wider is accepted. A check
+/// that only ever refused would pass with the accept path broken.
+#[test]
+#[cfg(feature = "events")]
+fn a_wide_window_is_refused_and_an_exact_one_is_not() {
+    let finest = Tier::new(-1).expect("a tier");
+    let mut refused = 0;
+    let mut accepted = 0;
+    for e in ucal_events::all() {
+        let got = ucal::wallclock_origin(e.id);
+        if e.uncertainty().ticks() > &finest.ticks() {
+            let err = got.expect_err("a window wider than the finest hand was accepted");
+            assert_eq!(err.code, ucal_core::Code::E0023, "{}: {err}", e.id);
+            refused += 1;
+        } else {
+            got.unwrap_or_else(|e| panic!("an exact origin was refused: {e}"));
+            accepted += 1;
+        }
+    }
+    assert!(refused > 0, "no event in the catalogue was refused");
+    assert!(
+        accepted > 0,
+        "no event in the catalogue was accepted, so the accept path is untested"
+    );
+}
+
+/// The odometer's leading drum does not wrap.
+///
+/// Every other rung is a position out of 3125 and reads mod 3125, like the
+/// face's hands. Without an unwrapped leading drum this reading could not tell
+/// 2 000 years from 142 000: one `T3` span is 45 years and 3125 of them is
+/// 141 000.
+#[test]
+#[cfg(feature = "events")]
+fn the_leading_drum_carries_the_whole_count() {
+    let (origin, label) = ucal::wallclock_origin("bridge-epoch").expect("an origin");
+    let near = Face::of(instant(), &dials().with_since(origin, label)).expect("a face");
+    let a = near.since.as_ref().expect("an odometer").drums[0].position;
+
+    // The same origin, read 3125 T3 spans later. A wrapping drum reads the same.
+    let far = {
+        let bump = Tier::new(3)
+            .expect("a tier")
+            .ticks()
+            .try_mul(&<Ticks as TickInt>::from_u64(3125))
+            .expect("in range");
+        let t = Instant::<UC1>::from_ticks(
+            instant().ticks().try_add(&bump).expect("in range"),
+        )
+        .expect("inside the domain");
+        let (origin, label) = ucal::wallclock_origin("bridge-epoch").expect("an origin");
+        Face::of(t, &dials().with_since(origin, label)).expect("a face")
+    };
+    let b = far.since.as_ref().expect("an odometer").drums[0].position;
+    assert_eq!(b, a + 3125, "the leading drum wrapped: {a} then {b}");
+}
+
+// ---- G8: a face as a document ------------------------------------------
+
+/// `--json` was the one global flag `wallclock` accepted and ignored.
+///
+/// It drew a face anyway. That alone is the defect G2 catalogued; what makes it
+/// worth more than a refusal is that a face **is** structured data — hands with
+/// tier indices and positions, dials with local fields, an odometer with its
+/// drums — every one of which the text renderer already has and throws into
+/// glyphs.
+#[test]
+fn a_face_renders_as_a_document() {
+    let f = face();
+    let doc = ucal::cmd_wallclock_json(&f, "plain").expect("a document");
+    let Some(ucal::emit::Value::Rows { rows: hands, .. }) = doc.get("hands") else {
+        panic!("no hands");
+    };
+    assert_eq!(hands.len(), 5, "T3 down to T-1");
+
+    // The index is not localised and the name is (Rule N). Both are emitted,
+    // because the index is what a reader compares across two machines set to
+    // different languages.
+    for (_, v) in hands {
+        let ucal::emit::Value::Section(fields) = v else {
+            panic!("a hand is a section");
+        };
+        for want in ["index", "name", "position", "per_mille"] {
+            assert!(
+                fields.iter().any(|(k, _)| k == want),
+                "a hand has no `{want}`"
+            );
+        }
+    }
+}
+
+/// The document is a *reading*, and matches the face it came from.
+///
+/// A second rendering of the same data is a second place for it to be wrong, so
+/// the check is that the two agree rather than that the JSON looks plausible.
+#[test]
+fn the_document_agrees_with_the_face_it_came_from() {
+    let ru = LocaleId::parse("ru").expect("ru ships");
+    let d = Dials::new(ru)
+        .expect("defaults")
+        .with_clock_local(&["earth-d".to_string()]);
+    let f = Face::of(instant(), &d).expect("a face");
+    let doc = ucal::cmd_wallclock_json(&f, "gagarin").expect("a document");
+
+    let Some(ucal::emit::Value::Rows { rows: hands, .. }) = doc.get("hands") else {
+        panic!("no hands");
+    };
+    for h in &f.hands {
+        let (_, v) = hands
+            .iter()
+            .find(|(k, _)| *k == h.tier.to_string())
+            .unwrap_or_else(|| panic!("no hand for {}", h.tier));
+        let text = v.rendered_text();
+        assert!(
+            text.contains(&h.position.to_string()),
+            "{} position missing: {text}",
+            h.tier
+        );
+        // The localised name travels with it.
+        assert!(text.contains(&h.name), "{} name missing: {text}", h.tier);
+    }
+
+    // The dial is there, and named by its calendar.
+    let Some(ucal::emit::Value::Rows { rows: dials, .. }) = doc.get("dials") else {
+        panic!("no dials");
+    };
+    assert_eq!(dials.len(), 1);
+    assert_eq!(dials[0].0, "earth-d");
+}
+
+/// A face with no second dial and no odometer emits neither key.
+///
+/// An empty section would say *asked for and empty*, which is a different fact
+/// from *not asked for*.
+#[test]
+fn absent_dials_are_absent_rather_than_empty() {
+    let doc = ucal::cmd_wallclock_json(&face(), "plain").expect("a document");
+    assert!(doc.get("dials").is_none(), "an unasked dial was emitted");
+    assert!(doc.get("since").is_none(), "an unasked odometer was emitted");
+}
+
+/// `--tier` reaches the document, so a scripted reader sees which hand is the
+/// hero rather than having to know the default.
+#[test]
+fn the_hero_is_named_in_the_document() {
+    let d = dials().with_hero(Tier::new(2).expect("a tier"));
+    let f = Face::of(instant(), &d).expect("a face");
+    let doc = ucal::cmd_wallclock_json(&f, "plain").expect("a document");
+    assert_eq!(
+        doc.get("hero").map(ucal::emit::Value::rendered_text),
+        Some("T2 ".to_string())
+    );
 }

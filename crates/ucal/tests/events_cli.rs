@@ -151,3 +151,49 @@ fn an_inverted_ruler_is_refused() {
 fn an_unknown_event_is_an_error() {
     assert!(cmd_events_show("nonexistent").is_err());
 }
+
+/// G10 — an event id used where an instant belongs says what it is.
+///
+/// The catalogue's ids are words no accepted instant form could be confused
+/// with, and `ucal between recombination <B>` reported *malformed timestamp*
+/// about a name this program knows perfectly well.
+///
+/// **It is a refusal, not a conversion.** An event is an interval:
+/// `recombination`'s window is hundreds of thousands of years wide, and quietly
+/// taking one end would be the substitution Rule U refuses while taking the
+/// midpoint would be a rendering choice presented as a measurement.
+#[test]
+fn an_event_id_is_not_an_instant_and_says_so() {
+    let e = ucal::parse_instant("recombination").expect_err("an event is an interval");
+    assert_eq!(e.code, ucal_core::Code::E0023);
+    let msg = e.to_string();
+    assert!(msg.contains("an interval rather than an instant"), "{msg}");
+    // And it names where to go instead.
+    assert!(msg.contains("events show"), "{msg}");
+    assert!(msg.contains("wallclock --since"), "{msg}");
+}
+
+/// Every id in the catalogue is refused the same way, rather than a handful
+/// being special-cased.
+#[test]
+fn the_whole_catalogue_is_refused_as_an_instant() {
+    for e in ucal_events::all() {
+        let err = ucal::parse_instant(e.id)
+            .err()
+            .unwrap_or_else(|| panic!("`{}` was accepted as an instant", e.id));
+        assert_eq!(err.code, ucal_core::Code::E0023, "{}", e.id);
+    }
+}
+
+/// **`wallclock --since` still takes one**, which is the point of the message.
+///
+/// That is the one place the collapse to a point is checked before it is made:
+/// an event whose window is wider than the finest hand on the face is refused,
+/// and `bridge-epoch` is exact by declaration.
+#[test]
+#[cfg(feature = "tui")]
+fn the_one_command_that_resolves_an_event_still_does() {
+    let (_, label) = ucal::wallclock_origin("bridge-epoch").expect("exact by declaration");
+    assert!(label.contains("bridge-epoch"), "{label}");
+    assert!(ucal::wallclock_origin("recombination").is_err());
+}

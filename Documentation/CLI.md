@@ -53,7 +53,7 @@ Accepted by every command (§19.1).
 |---|---|---|
 | `--profile <TAG>` | `UC-1` | The profile to compute in. Only `UC-1` exists; anything else is exit 5 (Rule P). |
 | `--sep <CHAR>` | `·` | Group separator inside the base-5 text forms. Must not be a digit (§6.3). |
-| `--locale <TAG>` | `en` | Locale for tier names. `en` or `ru`. Affects both display *and* parsing — under `--locale ru`, `--step пролёт` and `--step пр` resolve. |
+| `--locale <TAG>` | `en` | Locale for tier names, and for the wall clock's chrome. `en` or `ru`. Affects both display *and* parsing — under `--locale ru`, `--step пролёт` and `--step пр` resolve. |
 | `--json` | off | Stable, versioned JSON instead of text. Never coloured. |
 | `--color <WHEN>` | `auto` | `auto`, `always` or `never`. `auto` colours only into a terminal. |
 | `--no-color` | off | Alias for `--color never`, and it wins over `--color`. |
@@ -133,6 +133,12 @@ handler is the backstop for the libraries beneath it.
 ## `ucal now`
 
 The current instant, from the system clock. Performs no network access (§8.4).
+
+**`precision` is the tier the reading was rendered to, not how well the instant
+is known.** `--precision` is documented as *tier to render to*, and the same
+field name means something else in `ucal explain`, where `tick (exact)` is a real
+statement about digits the caller typed. The `clock` section beside it says what
+a reading can actually fill; see [`ucal doctor --clock`](#the-clock-this-program-reads---clock).
 
 ```
 ucal now [--precision <TIER>] [--form human|digit5|named]
@@ -488,10 +494,22 @@ a file makes far easier than a constant does.
 | `fields` | Only with `--anchor` **and** `--at`: the instant in the derived calendar's local fields, interval-valued and carrying the anchor revision. |
 
 **Every parameter needs Rule C's obligations** — the published value verbatim,
-its unit (`s`, `d` or `yr`), a citation, and the half-width of its validity
+its unit (`s`, `min`, `h`, `d` or `yr`), a citation, and the half-width of its validity
 window in Julian years. A file omitting any of them is refused rather than
 defaulted, because a format that let them be optional would be a second and
 laxer way of declaring a body.
+
+**The units exist so a file can quote its source.** Rule C asks for the published
+value *verbatim*, and the NASA fact sheets this project cites more than any other
+print rotation periods and lengths of day **in hours**. `data::jupiter` converts
+one in a comment — `9.9250 h × 3600 = 35 730 s, exact` — which a file could not
+do until 1.9.0: an author had to convert by hand, which is either a rounding (and
+a rounded parameter is a different calendar) or an exact conversion whose working
+the file no longer shows.
+
+`min` and `h` are exact multiples of the second, so nothing is lost in the unit
+itself. A unit that was not an exact multiple would put a rounding *inside* the
+conversion, which is a different decision and has not been made.
 
 **A parameter may be derived instead of measured.** `derived: synodic` computes
 the solar day as `1 / (1/rotation_period - 1/orbital_period)`, exactly, in ticks:
@@ -536,9 +554,9 @@ means a rounded parameter is a different calendar.
 Europa's rule moves through `47/105`, `2/27`, `5/126`, `5/116` and then `1/24`
 across the first six decimals of its solar day. Six settle it, and that is a
 fact about Europa rather than a rule anyone can apply to a body they have not
-tried. Use `derived:` where the quantity is derivable, and where it is not,
-shorten the value until `ucal cal derive` reports a different rule and then put
-a digit back.
+tried. Use `derived:` where the quantity is derivable, and where it is not, ask
+[`cal validate`](#cal-validate), which moves the last published digit each way
+and reports whether the rule survives.
 
 **Loaded by the binary, not by `ucal-body`.** §15.1 puts the loader in the
 library; [D-A20](../spec/SPEC-DELTAS.md) records that it is not there. Every
@@ -546,6 +564,169 @@ string in the data model is a `&'static str`, so a runtime loader must either
 leak or change a published type, and the second is a breaking change. This one
 leaks, bounded by a process that exits — which is safe in a binary and would not
 be in a library.
+
+### `cal validate`
+
+```
+ucal cal validate <FILE|CALENDAR> [--anchor <FILE>]
+ucal cal validate --all
+```
+
+Check a §15.1 file and report **two** things: whether it loads, and whether a
+calendar follows from it. They are separate questions with separate answers, and
+`cal derive` could only ever give one — it returns `UCAL-E0060` for a body whose
+year is a whole number of its solar days, and an author reading a red exit code
+cannot tell a malformed file from a body that simply has no fractional day to
+distribute. `validate` succeeds in that case and says so in the `intercalation`
+row.
+
+`<FILE>` may be either kind. A body file is tried first; if the file is an
+anchor file the anchor loader is tried before any error is reported, because a
+perfectly valid anchor file fed to the body loader raises `UCAL-E0012`,
+*unknown key*, which is true and unhelpful.
+
+**It also takes a shipped calendar id** — `ucal cal validate mars-d`. The
+argument is a path if a file of that name exists and an id otherwise, because a
+caller who names a file that exists means that file. The checks are the same
+code; only the `loads` row differs, since a compiled-in calendar has no file to
+be well-formed and its parameters were checked by `Measured`'s constructors
+instead of a deserialiser.
+
+This project's own fifteen calendars quote published figures under the same
+Rule C as anybody's and are exactly as subject to the answer. Through 1.9.0's
+first half they were outside the one check built to ask.
+
+| field | meaning |
+|---|---|
+| `file` | The path given. |
+| `kind` | Which of §15.1's two files this turned out to be. |
+| `checks` | Everything below. |
+| `loads` | Strict HJSON, every key known, every parameter carrying Rule C's obligations. |
+| `id` | The calendar this file derives, and whether one of that id already ships. |
+| `primary` | What the file says this body orbits, or that it names nothing. |
+| `rotation_period`, `solar_day`, `orbital_period` | What the file states for each: a measured figure with its unit, or a `derived:` relation, and the citation either way. |
+| `intercalation` | The leap rule, **or the reason there is none** — which may be a fact about the body rather than a defect in the file. |
+| `cycles` | The grouping satellite, or that there is none, which §15.3 makes an answer rather than a gap. |
+| `precision` | One row per measured parameter feeding the intercalation. See below. |
+| `grouping_period` | Inside `precision`: the satellite period that decides the cycle, where a calendar declares one. |
+| `anchor:names`, `anchor:evaluable` | With `--anchor`: whether the two files are a pair, and whether the phase is definable from what the body file states. |
+
+An anchor file reports `calendar`, `phase`, `revision`, `method`,
+`uncertainty`, `window` and `citation` instead — the same fields
+[`cal anchor`](#cal-anchor) prints for a compiled-in one.
+
+**`precision:` measures the caveat this project has carried since 0.2.0.** Every
+release note says *a rounded parameter is a different calendar*, and until 1.9.0
+that was true and unmeasurable. For each measured parameter feeding the
+intercalation, the last published digit is moved by one in each direction and
+the rule re-derived. `Measured` holds its figure as a mantissa and a decimal
+count rather than as a parsed number, so one unit in the last place is exactly
+`mantissa ± 1` and the probe is exact.
+
+```
+ucal cal validate Documentation/examples/europa.hjson
+```
+
+reports its `orbital_period` probe as **sensitive**: `4332.589 d` gives `1/24`,
+`4332.590 d` gives `5/119`, `4332.588 d` gives `7/169`.
+
+That is a measurement and not a verdict. A figure exact by definition — Earth's
+`86400 s` solar day — has no last digit to be wrong in, and will be reported
+sensitive because moving it by a second does change the calendar. What the check
+tells you is whether *this* figure's precision is what decides *this* calendar;
+whether that matters is a question about the source, which no program can
+answer.
+
+### The whole shipped set: `--all`
+
+```
+ucal cal validate --all
+```
+
+The probe over every calendar this project ships, and a measurement of the
+caveat carried since 0.2.0.
+
+| | |
+|---|---|
+| calendars | **15** |
+| intercalation parameters | 30 — a solar day and an orbital period each |
+| of those, `derived:` | 6, the tidally locked moons, which publish no solar day and so have no last digit |
+| **distinct published figures** | **19** |
+| **whose last digit decides the leap rule** | **14** |
+
+**That is not a defect.** A leap rule is a convergent of a continued fraction
+and continued fractions are violently sensitive to their inputs — the paragraph
+above says so and has since 1.4.0. What `--all` adds is the number.
+
+**The sharp finding is the sharing.** A satellite's year is its primary's orbit,
+so one figure decides several calendars at once:
+
+- Jupiter's year, 4332.589 d, is the orbital period of **five** calendars —
+  `jupiter-d`, `io-d`, `europa-d`, `ganymede-d` and `callisto-d` — and its last
+  digit decides all five leap rules.
+- Saturn's year, 10759.2058 d, carries two: `titan-d` and `enceladus-d`.
+
+A revision to Jupiter's published orbital period moves five leap rules
+simultaneously, and a count of sensitive *parameters* hides that entirely —
+which is why the survey reports distinct figures and who rests on each.
+
+**The probe is not comparable between bodies.** One unit in the last place is a
+whole second for Earth's `86400 s` and a millisecond for Mars's `88775.244 s`,
+so `sensitive` means *at the precision this source published*, not *to the same
+tolerance*. Earth's solar day is exact by definition and has no last digit to be
+wrong in; it is reported sensitive because a second either way genuinely does
+change the rule.
+
+#### The cycle is probed differently, on purpose
+
+**And it is a `cycle`, not a `month`.** The word is avoided deliberately: a
+Gregorian month is 28, 29, 30 or 31 days and has not tracked the Moon for
+centuries, so borrowing it for a synodic period would import an Earth
+administrative structure to describe a physical one. D-A5 puts it plainly —
+*"month-like" is an Earth predicate.*
+
+A calendar's cycles come from a third figure — the grouping satellite's own
+orbital period — and until 1.9.0 nothing probed it, so a body whose cycle was
+one digit from a different cycle passed with no comment.
+
+It reports **a depth, not a rule**, and the difference matters. A leap rule is
+selected by a drift bound, so *which rule* is a decision that can survive a
+nudge. Nothing selects a cycle: `derive_cycles` returns every convergent and the
+program shows the deepest, which is the ratio itself to within its own
+precision. Moving any digit changes that, always — so comparing chosen cycles
+could only ever print `sensitive` and would tell an author nothing.
+
+What carries information is **where the continued fraction diverges**, which is
+the quantity this manual has used to explain the whole caveat since 1.4.0. Terms
+that agree are candidate cycle rules that agree:
+
+```
+earth-d   grouped by `moon` — 7 term(s) survive
+```
+
+Earth's cycle is robust to its last published digit for seven terms, then parts
+company.
+
+**Fourteen of the fifteen shipped calendars have no cycle at all**, and which
+satellite groups a calendar is the **calendar's declaration**, not a property of
+the body. `mars-d` declares none although Mars has Phobos and Deimos; a §15.1
+file has nowhere to declare one, so a file gets the first satellite it lists.
+D-A5 gives the reason: no bracket over orbital periods can choose a grouping
+satellite without smuggling in an Earth predicate, so the choice is made
+explicitly or not at all.
+
+Reading the body's first satellite instead of the calendar's declaration is how
+the first version of this check reported `mars-d` as *grouped by phobos* while
+`ucal cal show mars-d` reported *no grouping satellite* — one calendar, two
+answers.
+
+`--all` lists every calendar including the fourteen without a cycle, because a
+section reporting one of fifteen without saying so is exactly the failure the
+1.6.0 audit found fourteen times.
+
+**What is not checked, and cannot be.** Whether the published figures are the
+ones the body actually has. Every check is on internal consistency; a file that
+cites the wrong fact sheet perfectly will pass all of them.
 
 ### `cal anchor`
 
@@ -578,10 +759,35 @@ ucal show <INSTANT> [--calendars <ID,ID,…>]
 | `calendars.<id>.rendered` | The local label. |
 | `calendars.<id>.kind` | `derived (Rule K)` or `legacy (§8.6)`, on every row. |
 | `calendars.<id>.anchor_revision` | Which anchor revision produced it. |
+| `calendars.<id>.source` | Present only for a calendar loaded from §15.1 files, saying so. |
 | `calendars.<id>.window_ticks` | The uncertainty the anchor contributes, in ticks. A local date is only as sharp as the anchor behind it. |
 | `calendars.<id>.day_is_ambiguous` | Whether the instant falls close enough to a day boundary that the anchor's window straddles it. |
 | `calendars.<id>.error` | Present instead of fields when a calendar cannot render — a missing anchor is `UCAL-E0062`, not a guess. |
 | `calendars.<id>.arbitrary` | For a legacy calendar: which of its parameters are declared by convention rather than derived from a body. |
+
+---
+
+### A calendar from files, beside the shipped ones
+
+```
+ucal show <INSTANT> --calendars earth-d,mars-d \
+  --body Documentation/examples/earth.hjson \
+  --anchor Documentation/examples/earth-anchor.hjson
+```
+
+`--body` and `--anchor` add **one** calendar defined by §15.1 files to the table,
+rendered by the same code path as every other row. Both are required together:
+local fields need a phase, and phase is empirical (Rule J.3), so a body file
+alone cannot produce a date.
+
+This is the comparison the loaders exist for — a body this program does not ship,
+in the same table as the ones it does. `cal derive --anchor --at` could already
+produce that body's date on its own; what it could not do was put it beside
+anything.
+
+**`cal show` deliberately does not take the same flags.** `cal derive <body>
+--anchor <anchor> --at <instant>` prints that view already, from the same code,
+and two spellings of one question is how they come to disagree.
 
 ---
 
@@ -935,7 +1141,8 @@ wrong five would be useful.
 A full-screen clock showing universe time. `q`, `Esc` or `Ctrl-C` quits.
 
 ```
-ucal wallclock [--theme <KEY>] [--startrek|--gagarin|--armstrong] [--clock-local <ID>]
+ucal wallclock [--theme <KEY>] [--startrek|--gagarin|--armstrong]
+ucal wallclock [--clock-local <ID>]... [--tier <T>] [--since <ORIGIN>]
 ucal wallclock --once [--at <INSTANT>] [--height <N>]
 ucal wallclock --theme list
 ```
@@ -988,9 +1195,10 @@ wrong before it is drawn; printing nothing would hide it.
 
 - **gagarin** — a Vostok instrument panel. An enamelled plate with bezelled
   gauges set into it, an engraved label under each, and a red lamp. The only
-  light theme by default, because the object was. Its chrome is Cyrillic and its
-  tier names are not: `--locale` decides a name's language and a theme does not
-  get to override it, so the intended pairing is `--gagarin --locale ru`.
+  light theme by default, because the object was. Its Cyrillic comes from
+  `--locale ru`, not from the theme: through 1.8.0 the plates were hardcoded
+  Russian and `--gagarin --locale en` drew them anyway, which made this the one
+  place a theme overrode a user's flag.
 - **armstrong** — an Apollo DSKY. A column of annunciator lamps, `PROG`, `VERB`
   and `NOUN`, and three registers. `V16 N65` is a real pair: monitor, decimal,
   time. The lamps are drawn unlit except `COMP ACTY` — the rest report
@@ -1058,7 +1266,7 @@ an escape sequence in a committed file is a diff nobody can read.
 
 `--at` without `--once` is refused: a live clock's instant is now.
 
-### A second dial: `--clock-local <ID>`
+### More dials: `--clock-local <ID>`
 
 A wall clock's second face has always shown another *place*, and so does this
 one. `--clock-local mars-d` puts Mars beside the universal readout: local year,
@@ -1068,6 +1276,16 @@ revision produced it.
 ```
 ucal wallclock --startrek --clock-local mars-d
 ```
+
+**Repeatable** — an airport wall:
+
+```
+ucal wallclock --clock-local earth-d --clock-local mars-d
+```
+
+Today that is the whole wall that can be built. Only an anchored calendar can be
+a dial, and two of the fifteen have an anchor; the limit is a fact about anchors
+rather than about this flag.
 
 **`--clock-local` and not `--locale`.** `--locale` is this program's *language*
 flag — Rule N makes a tier's name locale-scoped and display-only — and it now
@@ -1087,11 +1305,237 @@ have no anchor — the ordinary case, for the reason
 them is `UCAL-E0062`, reported **before** the clock takes over the terminal, so
 the failure is a message rather than a full-screen panel with nothing in it.
 
+### Choosing the hero: `--tier <T>`
+
+The big readout is `T0` because that is the tier that moves at a rate a person
+watches — about 21 stops a second. `--tier` promotes another, which is what makes
+the face usable as a *calendar* display rather than a *clock* display:
+
+```
+ucal wallclock --tier T2
+```
+
+Z2 named the risk in as many words — *"every choice but `T0` produces a screen
+where nothing moves, which is a stopped clock with extra steps"* — and the answer
+is to say so rather than to refuse. `T1` changes every 2 min 26 s and is still a
+clock. `T2` is 5.3 days and `T3` is 45 years, so at those the face prints **a
+calendar display: this hand does not move while you watch**. Refusing them would
+refuse the flag's stated purpose; a hand that changes every 45 years is
+pixel-identical to a clock that has stopped, so it is labelled.
+
+### An odometer: `--since <ORIGIN>`
+
+Elapsed time from a stated origin, read on the same ladder the hands are on — a
+tier is a duration, so an elapsed count divides by one exactly as an instant's
+does. `<ORIGIN>` is an instant, or an event id from `ucal events list`:
+
+```
+ucal wallclock --since bridge-epoch
+```
+
+The **leading drum does not wrap**. Every other rung is a position out of 3125
+and reads mod 3125, exactly as the face's hands do; the coarsest carries the
+whole count, which is what the leading drum of an odometer has always done.
+Without it the reading could not tell 2 000 years from 142 000 — one `T3` span is
+45 years and 3125 of them is 141 000.
+
+An origin in the future **counts towards it** and is labelled `UNTIL` rather than
+`SINCE`. Absolute time is unsigned (Rule B) and a tick count cannot be negative,
+so the direction is a word beside a magnitude — the same shape `SignedWindow`
+takes, for the same reason.
+
+**An event with a wide window is refused**, which is this flag's kill criterion
+and the interesting part of it:
+
+```
+$ ucal wallclock --since holocene
+UCAL-E0023: comparison indeterminate at stated precision (this event's window is
+wider than the finest hand on the face ...)
+```
+
+`holocene` is uncertain by about two centuries. An odometer ticking 66 000 times
+a second against that figure would be theatre, and
+[`ucal events show`](#ucal-events) already prints the elapsed span with its
+window beside it, which is the honest way to present it. `bridge-epoch` is exact
+by definition — year 0 of the proleptic Gregorian calendar, a declaration and not
+a measurement — and is the origin for which "time since" is a real reading.
+
+### The face as data: `--json`
+
+```
+ucal --json wallclock --once --at <INSTANT> [--clock-local <ID>]... [--since <ORIGIN>]
+```
+
+`--json` is a global flag and, through 1.9.0's first half, `wallclock` was the
+one command that took it and drew a face anyway. A face *is* structured data —
+hands with tier indices and positions, dials with local fields, an odometer with
+its drums — all of which the text renderer already has and turns into glyphs.
+
+| field | meaning |
+|---|---|
+| `theme` | Which palette was asked for. It does not otherwise reach the document: a face's data is the same whichever theme drew it. |
+| `hero` | The tier in the big readout, which `--tier` chooses. |
+| `hands` | One row per tier, keyed by tier id. |
+| `index` | The tier's index, inside a hand. Never localised. |
+| `position` | The hand's stop, out of 3125 — because every tier is `5^5` of the one below. |
+| `through_day_percent` | Inside a dial: how far through that body's local day the instant falls. |
+| `per_mille` | How far round its dial, in thousandths — what the bars are drawn from. |
+| `dials` | Present only when `--clock-local` was given; keyed by calendar id. |
+| `since` | Present only when `--since` was given. |
+| `origin` | Inside `since`: the origin as the caller asked for it. |
+| `counting_down` | Inside `since`: true when the origin is in the future. |
+| `drums` | Inside `since`: the elapsed span on the same rungs, keyed by tier. |
+
+The **index** is not localised and the **name** is (Rule N), so both are emitted:
+the index is what a reader compares across two machines set to different
+languages.
+
+An absent dial is an absent key, not an empty one — *asked for and empty* is a
+different fact from *not asked for*.
+
+**`--json` needs `--once`.** A live clock redraws twenty times a second and a
+stream of documents at that rate is not one; without `--once` it is refused
+rather than quietly producing a single frame or an endless stream.
+
 **No Earth unit appears on the face as a unit** (Rule A.5), and a test asserts
 it. A clock is where that temptation lives: every clock a reader has ever seen
 counts in hours, minutes and seconds, and the point of this one is that it does
 not. The two places a second is named — the arc's pace and the flicker's rate —
 are statements *about the display*, not units the clock counts in.
+
+---
+
+## `ucal seq`
+
+`seq`, for time: instants at a tier interval, one decimal tick count per line.
+
+```
+ucal seq <FROM> <TO> [--step <TIER|CALENDAR>] [--max <N>]
+ucal seq <FROM> <TO> --step T1 | ucal to-civil -
+```
+
+| | |
+|---|---|
+| `--step` | the interval, as a tier: `T0`, `T1`, `T-3`, or a name like `arc`. Default `T1`. |
+| `--max` | refuse rather than print more than this many lines. Default 1 000 000. |
+
+**The output is lines, not a document**, which is the one place this program
+breaks its own habit. It does so for the same reason `completions` does: a
+generator's output is an input to something else, and the something else is the
+`-` reader above.
+
+**The count is bounded and the refusal is honest.** A tier interval can be very
+small and a span very large — one tick across one second is 1.8 × 10⁴³ lines —
+so the step count is computed *before* anything is printed, and a walk over the
+cap is refused with the number it would have produced and the three ways out. A
+program that starts printing and never stops is worse than one that says why.
+
+The span is inclusive at both ends, counts forwards only, and a span shorter than
+one step yields the start and nothing else — which is an answer, where an empty
+list would be indistinguishable from a caller's mistake.
+
+---
+
+### `seq` and `ruler` are not two spellings of one question
+
+They both walk instants at an interval, which is a fair thing to be suspicious
+of — this project refused a second spelling of `cal derive` in this same cycle.
+Measured, they differ in what they produce rather than in how it looks:
+
+| | `seq` | `ruler` |
+|---|---|---|
+| emits | plain lines, exact tick counts | a document with a `marks` table |
+| each mark | the tick count itself | **rendered at the step's tier**, so truncated to that resolution |
+| too many steps | refused, with the count | truncated at 64 marks, with the count |
+| `--step` | a tier **or a calendar's own unit** | a tier only |
+
+The second row is the structural difference and it settles the question: a
+ruler's marks are rendered *at* the tier they step by, which is what makes it a
+ruler and is meaningless for a body's solar day. The third row follows from the
+first — a stream that silently stopped at 64 would be piped somewhere and not
+noticed, while a document that says it truncated has told its reader everything.
+
+### Stepping by a body's own unit
+
+`--step` takes a tier — `T1`, `arc`, `5^e` — **or a calendar's own unit**:
+
+```
+ucal seq A B --step mars-d          # one Martian solar day
+ucal seq A B --step mars-d-year     # one Martian year
+ucal seq A B --step mars            # the body, same as mars-d
+```
+
+`ucal seq A B --step mars-d | ucal show - --calendars mars-d` walks consecutive
+Martian days, each at the same fraction through the day — which is what an exact
+stride means and a truncated one could not do.
+
+A tier is tried first, so no existing spelling changes meaning, and a name that
+is neither reports the tier error because a mistyped tier is the likelier
+mistake. A name that *is* a calendar but cannot be a stride reports its own
+reason instead.
+
+**A stride must be a whole number of ticks, and a derived solar day usually is
+not.** Six shipped calendars compute their solar day from two published figures
+and the result is a rational; `--step europa-d` is `UCAL-E0043` rather than a
+truncation, because truncating would make every step short by a little and the
+walk wrong by the accumulated remainder. Tiers cannot have that problem —
+`5^(60+5k)` is an integer by construction, which is why `--step` took one to
+begin with.
+
+**A local unit is not a tier** and this does not pretend otherwise (Rule A.5).
+It counts in the unit named, and every message says which one.
+
+An unanchored calendar is still a stride: thirteen of the fifteen have no anchor,
+and a stride is a *duration*, which needs no phase.
+
+**Which global flags reach it.** `--tick-sep` does, and groups the digits —
+which will break `| ucal to-civil -`, loudly, at the parser on the other end.
+Before 1.9.0 it was accepted here and silently did nothing.
+
+`--decimals` and `--round` do not, and cannot: they govern how a *rational* is
+rendered and `seq` emits exact integers, so there is nothing for them to act on.
+`--json` does not either — the output is lines rather than a document, for the
+same reason `completions`' is, because a generator's output is an input to
+something else.
+
+## Reading instants from stdin
+
+```
+cat ticks.txt | ucal --json to-civil -
+ucal cal show earth-d - < instants.txt
+```
+
+**`-` in place of an instant reads lines from stdin**, and the whole command runs
+once per line. Every other argument is the one you typed, so a streamed run and a
+single run differ in exactly one value — and a test holds them to agreeing.
+
+| | |
+|---|---|
+| accepted by | the commands taking **exactly one** instant: `to-civil`, `explain`, `show`, `cal show` |
+| and by | `between` and `ruler`, which take two — `-` replaces **one** side and the other is held fixed |
+| not accepted by | commands with no instant at all, which have nowhere to put it |
+| `-` on both sides | refused. Two readings are available — a walk over pairs drawn from one stream, or the same line used twice — and neither is obviously right, so neither is guessed at |
+| with `--json` | **JSON Lines**: one `ucal-json/1` record per line, so the output is a filter's output |
+| without `--json` | one rendered document per line, which is complete and verbose |
+| blank lines | skipped, not an error — a file ending in a newline is not a mistake |
+| a bad line | reported on stderr, **and the stream continues**; the exit status is still non-zero |
+
+**One side streamed, the other held** is the shape a stream of timestamps is
+usually asked about — *how long ago was each of these?*
+
+```
+cat ticks.txt | ucal between - "$(ucal --json now | sed -n 's/.*"ticks": "\([0-9]*\)".*/\1/p')"
+```
+
+Through 1.9.0's first half `between` refused `-` outright, on the reasoning that
+a filter has no answer for which of two instants a line is. It does when only one
+of them is `-`.
+
+The bad-line row is two decisions, and they pull in opposite directions. A filter
+that dies on line 3 of 10 000 has thrown away 9 997 answers it had already
+computed. A filter that exits 0 after skipping a line lets a script treat a
+partial run as a complete one. So it does both: every good line is answered, and
+the exit code says something was not.
 
 ---
 
@@ -1118,6 +1562,87 @@ ucal doctor
 | `leap_seconds.network` | `never` — the table is bundled and offline (§8.4). |
 | `spec.rfc` | Which specification this build implements. |
 | `spec.deltas[]` | Every recorded correction to the RFC, with its class: amendment, correction or editorial. |
+| `clock.granularity` | How finely this program can place a reading: **1 ns**, structural, the same on every machine. |
+| `clock.granularity_ticks` | That nanosecond as an exact tick count. |
+| `clock.finest_tier` | The finest rung a nanosecond can fill — **`T-2`**. |
+| `clock.rendering_floor` | Where `ucal now` renders by default, and how many rungs below the clock that is. |
+| `clock.accuracy` | That accuracy is **not measurable here**, and why. |
+| `clock.in_a_difference` | Which error terms cancel between two readings and which do not. |
+
+### The clock this program reads: `--clock`
+
+```
+ucal doctor --clock
+```
+
+`doctor` reports what the clock can do **structurally** — the same on every
+machine, no sampling, which is why it is in the ordinary output that a committed
+example is compared against. `--clock` adds what the clocks on *this* machine
+actually do, which is a measurement and varies by machine and by run.
+
+**Three different numbers, and the distinction is the whole point.**
+
+- **Granularity** is structural: readings are converted through nine decimal
+  places, so one nanosecond is the finest an instant can be placed by this code,
+  whatever the hardware does. A nanosecond fills `T-2` and no lower.
+- **Resolution** is what this machine's clock actually moves in. On the machine
+  these notes were written on: `SystemTime` steps in **1000 ns** and the
+  monotonic clock in **41 ns**.
+- **Accuracy** is the distance from the truth, and this program does not measure
+  it. §8.4 makes operation offline, so there is no reference — and a rate error
+  estimated from a short baseline reports quantisation as drift.
+
+**`ucal now` renders to `T-12`, which is one Planck tick.** That is ten rungs
+below what a nanosecond can fill and eleven below what a microsecond can. A rung
+is `5^5`, so the bottom of a `now` reading is the conversion's arithmetic and not
+the instrument's. The tiers are a coordinate system; being able to *address* a
+position was never a claim that anything can be *observed* there — the same
+posture the datum takes by being stipulated rather than measured.
+
+For scale: the shortest interval anyone has measured is of order `10⁻¹⁹` s, which
+lands between `T-5` and `T-6`. `T-12` is about `10²⁴` times finer than that.
+
+**Interpolating between wall ticks with the monotonic clock is real and buys
+almost nothing.** `--clock` reports it: 1000 ns to 41 ns is a factor of 24, and a
+rung is 3125, so it is **24/3125 of a rung** and the finest fillable tier does
+not move.
+
+### One process, one clock
+
+Every reading comes from a **session clock**, and it exists for monotonicity
+rather than precision — interpolation being worth the fraction of a rung above.
+
+The system clock is disciplined by something outside this process and can step
+*backwards*: NTP correcting a large offset, a VM resuming, an operator setting
+the date. A one-shot command never notices. `ucal wallclock` reads the clock
+twenty times a second for as long as it is left running, and a backward step
+there is a face that goes back in time.
+
+The rule is:
+
+```
+reading = max(wall_now, anchor + monotonic_elapsed)
+```
+
+- Ordinarily the two agree within the clock's quantum and either wins.
+- A **backward step** loses to the monotonic branch, which keeps advancing at the
+  oscillator's rate rather than freezing until the wall clock catches up.
+- A **forward step** wins, because a forward jump is a correction arriving, and
+  refusing it would prefer this process's opinion of the time to the system's.
+
+So a reading never goes backwards and the clock still tracks the system forwards.
+Neither property is a claim about accuracy, and a session reading lands on
+exactly the same rung a raw one does. Over a long run the two branches diverge by
+the rate difference between the oscillator and whatever disciplines the wall
+clock; `max` bounds the result by whichever is ahead, and that bound is the
+honest statement of what a session clock costs.
+
+**`features[]` names every optional feature this crate has**, and did not until
+1.9.0: it listed four and the crate had eight, so a binary built with
+`--features full` reported `u512, std, civil` while `body`, `events`, `cosmo`
+and `tui` were compiled in and unlisted. A test now checks the list against the
+manifest, because the failure mode is a feature added and this command not
+revisited — which is what happened.
 
 ---
 

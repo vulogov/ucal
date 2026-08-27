@@ -10,7 +10,8 @@ use clap_complete::Shell;
 use ucal::style::{parse_group_sep, resolve_for_output, ColorChoice, Render, Role, Style};
 use ucal_core::Rounding;
 use ucal::{
-    cmd_datum, cmd_doctor, cmd_explain, cmd_ladder, exit_code, parse_rounding, parse_tier_in,
+    cmd_datum, cmd_doctor, cmd_doctor_measuring, cmd_explain, cmd_ladder, exit_code,
+    parse_rounding, parse_tier_in,
 };
 use ucal_core::LocaleId;
 use ucal_core::codec::Form;
@@ -41,7 +42,8 @@ struct Cli {
     #[arg(long, global = true)]
     sep: Option<char>,
 
-    /// Locale for tier names (Rule N: names are display-only). Shipped: en, ru.
+    /// Locale for tier names, and for the wall clock's chrome (Rule N: names
+    /// are display-only). Shipped: en, ru.
     #[arg(long, global = true, default_value = "en", value_parser = locale_values())]
     locale: String,
 
@@ -174,6 +176,13 @@ enum Command {
     Show {
         /// A `UC1` text form, a UCID, or a decimal tick count.
         instant: String,
+        /// A body file (§15.1), shown alongside the calendars named by
+        /// `--calendars`. Needs `--anchor`: local fields need a phase (Rule J.3).
+        #[arg(long, value_name = "FILE", requires = "anchor")]
+        body: Option<String>,
+        /// The anchor file matching `--body`.
+        #[arg(long, value_name = "FILE")]
+        anchor: Option<String>,
         /// Comma-separated calendar ids, e.g. `earth-d,mars-d,earth-civil`.
         #[arg(long, default_value = "earth-d,mars-d,earth-civil")]
         calendars: String,
@@ -211,6 +220,26 @@ enum Command {
     Verify,
     /// The first five minutes: what to type, what it shows, and why.
     Tour,
+    /// Instants at a tier interval, one per line. `seq`, for time.
+    #[cfg(feature = "body")]
+    Seq {
+        /// The first instant, and the first line of output.
+        from: String,
+        /// The last instant. The walk stops at or before it.
+        to: String,
+        /// The interval: a tier like `T1` or a name like `arc`, **or a
+        /// calendar's own unit** — `mars-d` for one Martian solar day,
+        /// `mars-d-year` for one Martian year.
+        ///
+        /// A local unit is not a tier and this does not pretend otherwise
+        /// (Rule A.5). It counts in the unit named and the refusal message says
+        /// which one it was.
+        #[arg(long, default_value = "T1")]
+        step: String,
+        /// Refuse rather than print more lines than this.
+        #[arg(long, default_value = "1000000")]
+        max: u64,
+    },
     /// A full-screen clock showing universe time. `q` quits.
     #[cfg(feature = "tui")]
     Wallclock {
@@ -226,7 +255,13 @@ enum Command {
         /// Shorthand for `--theme armstrong`, an Apollo DSKY.
         #[arg(long, conflicts_with_all = ["startrek", "gagarin"])]
         armstrong: bool,
-        /// A body's own calendar, shown as a second dial: `earth-d`, `mars-d`.
+        /// A body's own calendar, shown as a further dial: `earth-d`, `mars-d`.
+        ///
+        /// **Repeatable.** `--clock-local earth-d --clock-local mars-d` is an
+        /// airport wall. Only an anchored calendar can be a dial at all (Rule
+        /// J.3), which today is two of fifteen — so the wall is a wall of two
+        /// until a third anchor is established, and that is a fact about anchors
+        /// rather than about this flag.
         ///
         /// `--clock-local` and not `--locale`, which is already this program's
         /// *language* flag (Rule N). The two are different vocabularies and one
@@ -234,7 +269,24 @@ enum Command {
         /// `--locale ru` translates the tier names on the face, and
         /// `--clock-local mars-d` puts Mars beside them.
         #[arg(long = "clock-local", value_name = "ID")]
-        clock_local: Option<String>,
+        clock_local: Vec<String>,
+        /// The tier in the big readout: `T0`, `T2`, or a name like `sweep`.
+        ///
+        /// `T0` by default, because it is the tier that moves at a rate a person
+        /// watches. Promoting a slower one turns the face from a clock display
+        /// into a calendar display, and the face says so — a hand that changes
+        /// every 45 years is pixel-identical to a clock that has stopped.
+        #[arg(long, value_name = "T")]
+        tier: Option<String>,
+        /// An origin to count from, shown as an odometer: an instant, or an
+        /// event id from `ucal events list`.
+        ///
+        /// An event is refused when its window is wider than the finest tier on
+        /// the face. A reading that ticks 66 000 times a second against a
+        /// citation uncertain by two centuries is theatre, and `ucal events show`
+        /// already prints that number honestly, which is statically.
+        #[arg(long, value_name = "ORIGIN")]
+        since: Option<String>,
         /// Draw one frame to stdout and exit, instead of taking over the screen.
         #[arg(long)]
         once: bool,
@@ -256,7 +308,16 @@ enum Command {
         command: Option<String>,
     },
     /// Profile, backend, domain ceiling, leap table, features, provenance.
-    Doctor,
+    Doctor {
+        /// Also sample the clocks on this machine.
+        ///
+        /// Off by default because the result is a *measurement*: it varies by
+        /// machine and by run, and the rest of this report does not. What it
+        /// measures is **resolution**, never accuracy — §8.4 makes operation
+        /// offline, so there is no reference to compare against.
+        #[arg(long)]
+        clock: bool,
+    },
 }
 
 #[cfg(feature = "cosmo")]
@@ -316,6 +377,11 @@ enum CalCommand {
     /// Every calendar, with its kind.
     List,
     /// One calendar's derivation in full: anchor, intercalation, cycles.
+    ///
+    /// For a calendar defined by §15.1 files rather than compiled in, use
+    /// `ucal cal derive <body> --anchor <anchor> --at <instant>`, which prints
+    /// the same derivation from the same code. A second spelling here would be
+    /// two ways to ask one question.
     Show {
         /// Calendar id, e.g. `earth-d`.
         id: String,
@@ -337,6 +403,28 @@ enum CalCommand {
         /// The instant to render in the derived calendar. Requires --anchor.
         #[arg(long, value_name = "INSTANT")]
         at: Option<String>,
+    },
+    /// Check a §15.1 file: does it load, and does a calendar follow from it?
+    ///
+    /// Two questions, because they have different answers. A file can be
+    /// well-formed and still derive nothing — a body whose year is a whole
+    /// number of its solar days has no fractional day to intercalate — and an
+    /// author reading a red exit code from `cal derive` cannot tell which of the
+    /// two they have.
+    Validate {
+        /// A body file, an anchor file, or a shipped calendar id like `mars-d`.
+        ///
+        /// A path wins over an id: a caller who names a file that exists means
+        /// that file.
+        #[arg(required_unless_present = "all")]
+        file: Option<String>,
+        /// Every shipped calendar at once: which published figure decides which
+        /// leap rule, and which figures more than one calendar rests on.
+        #[arg(long, conflicts_with = "anchor")]
+        all: bool,
+        /// An anchor file to check the body file against.
+        #[arg(long, value_name = "FILE")]
+        anchor: Option<String>,
     },
 }
 
@@ -492,6 +580,72 @@ fn main() {
         clap_complete::generate(*shell, &mut cmd, name, &mut std::io::stdout());
         return;
     }
+    // Plain lines, not a `Doc`, for the same reason `completions` is: a
+    // generator's output is an input to something else — here `ucal to-civil -`.
+    #[cfg(feature = "body")]
+    if let Command::Seq {
+        from,
+        to,
+        step,
+        max,
+    } = &cli.command
+    {
+        // G2 — `--tick-sep` reaches here too. It is a global flag and every
+        // other command honours it; `seq` ran before the flag was even parsed,
+        // so passing it did nothing and said nothing, which is worse than
+        // refusing it. A caller who asks for separators in a stream they meant
+        // to pipe into `ucal to-civil -` gets a loud failure from the parser at
+        // the other end rather than a silent one here.
+        let out = cli
+            .tick_sep
+            .as_deref()
+            .map(parse_group_sep)
+            .transpose()
+            .and_then(|sep| {
+                // A tier first, because that is what `--step` has always taken
+                // and what its default is. A calendar id is tried only when the
+                // tier parser refuses, so no existing spelling changes meaning.
+                let stride = match LocaleId::parse(&cli.locale)
+                    .and_then(|l| parse_tier_in(l, step))
+                {
+                    Ok(t) => ucal::Stride::tier(t),
+                    Err(tier_err) => match ucal::Stride::calendar(step) {
+                        Ok(s) => s,
+                        // Only *no such calendar* falls back to the tier error.
+                        // Any other refusal means the spec did name a calendar
+                        // and something about it is unusable — a derived solar
+                        // day that is not a whole number of ticks, say — and
+                        // reporting `unknown tier name` about it would send the
+                        // reader to look for a typo that is not there.
+                        Err(e) if e.code == ucal_core::Code::E0016 => {
+                            return Err(tier_err)
+                        }
+                        Err(e) => return Err(e),
+                    },
+                };
+                ucal::cmd_seq_by(from, to, &stride, *max).map(|lines| (sep, lines))
+            });
+        match out {
+            Ok((sep, lines)) => {
+                // `PLAIN`, because this runs before the style is resolved and
+                // a generator cannot borrow colours from machinery that has not
+                // started. Grouping is not colour: it is what the caller asked
+                // for in as many words.
+                let render = Render::PLAIN.group(sep);
+                for l in lines {
+                    println!("{}", ucal::style::group_decimal(&render, &l));
+                }
+                return;
+            }
+            Err(e) => {
+                // Before the style is resolved, so this one prints plain. A
+                // generator that runs before the rendering machinery cannot
+                // borrow its colours from it.
+                eprintln!("{e}");
+                std::process::exit(exit_code(&e));
+            }
+        }
+    }
     if let Command::Man { command } = &cli.command {
         // roff on stdout, for the same reason as the completions above: a page
         // written by hand is a second description of the CLI, and this one comes
@@ -530,9 +684,60 @@ fn main() {
         return;
     }
 
-    let result = match &cli.command {
+    // F2. `-` as an instant reads lines from stdin, and the whole dispatch runs
+    // once per line. `over` substitutes the line for whichever argument carried
+    // the `-`; every other argument is the one the caller typed, so a streamed
+    // run and a single run differ in exactly one value.
+    if streamed_twice(&cli.command) {
+        let e = ucal_core::TimeError::with_context(
+            ucal_core::Code::E0018,
+            "`-` on both sides: this command takes two instants and `-` can replace \
+             one of them, with the other held fixed. Two would be a walk over pairs \
+             drawn from one stream, which is a different thing and is not guessed at",
+        );
+        eprintln!("{e}");
+        std::process::exit(exit_code(&e));
+    }
+    let streaming = streamed(&cli.command);
+    let mut lines: Vec<String> = Vec::new();
+    if streaming {
+        use std::io::BufRead;
+        for line in std::io::stdin().lock().lines() {
+            match line {
+                Ok(l) if !l.trim().is_empty() => lines.push(l.trim().to_string()),
+                Ok(_) => {}
+                Err(_) => {
+                    eprintln!("could not read stdin");
+                    std::process::exit(2);
+                }
+            }
+        }
+    }
+
+    /// The stream's line, in place of a `-`.
+    ///
+    /// Conditional on the argument actually being `-`, which matters as soon as
+    /// a command takes two instants: G7 lets `between - <B>` stream one side and
+    /// hold the other, and an unconditional substitution put the line into both.
+    /// For a single-instant command nothing changes — `streamed` has already
+    /// established that its one instant is `-`.
+    fn pick<'x>(replacement: Option<&'x str>, typed: &'x str) -> &'x str {
+        if typed == "-" {
+            replacement.unwrap_or(typed)
+        } else {
+            typed
+        }
+    }
+    let dispatch = |replacement: Option<&str>| -> ucal::CmdResult {
+        match &cli.command {
         Command::Datum => cmd_datum(),
-        Command::Doctor => cmd_doctor(),
+        Command::Doctor { clock } => {
+            if *clock {
+                cmd_doctor_measuring()
+            } else {
+                cmd_doctor()
+            }
+        }
         #[cfg(feature = "cosmo")]
         Command::Cosmo { what } => match what {
             CosmoCommand::Age {
@@ -559,15 +764,31 @@ fn main() {
             .and_then(|l| parse_tier_in(l, tier))
             .and_then(ucal::cmd_timeline),
         Command::Ruler { from, to, step } => {
+            let (f, t2) = (pick(replacement, from), pick(replacement, to));
             LocaleId::parse(&cli.locale)
                 .and_then(|l| parse_tier_in(l, step))
-                .and_then(|s| ucal::cmd_ruler(from, to, s))
+                .and_then(|s| ucal::cmd_ruler(f, t2, s))
         }
         #[cfg(all(feature = "body", feature = "civil"))]
         Command::Cal { what } => match what {
             CalCommand::List => ucal::cmd_cal_list(),
-            CalCommand::Show { id, instant } => ucal::cmd_cal_show(id, instant),
+            CalCommand::Show { id, instant } => ucal::cmd_cal_show(id, pick(replacement, instant)),
             CalCommand::Anchor { id } => ucal::cmd_cal_anchor(id),
+            CalCommand::Validate { file, all, anchor } => {
+                if *all {
+                    ucal::cmd_cal_validate_all()
+                } else {
+                    match file {
+                        Some(f) => ucal::cmd_cal_validate(f, anchor.as_deref()),
+                        // Unreachable: clap's `required_unless_present` has
+                        // already refused. Said rather than unwrapped.
+                        None => Err(ucal_core::TimeError::with_context(
+                            ucal_core::Code::E0018,
+                            "cal validate needs a file, a calendar id, or --all",
+                        )),
+                    }
+                }
+            }
             CalCommand::Derive { file, anchor, at } => {
                 ucal::cmd_cal_derive_with(file, anchor.as_deref(), at.as_deref())
             }
@@ -576,19 +797,79 @@ fn main() {
         Command::Show {
             instant,
             calendars,
+            body,
+            anchor,
         } => {
             let ids: Vec<String> = calendars.split(',').map(|s| s.trim().to_string()).collect();
-            ucal::cmd_show(instant, &ids)
+            match (body, anchor) {
+                (Some(b), Some(a)) => {
+                    ucal::cmd_show_with_file(pick(replacement, instant), &ids, b, a)
+                }
+                _ => ucal::cmd_show(pick(replacement, instant), &ids),
+            }
         }
         Command::Ladder { named_only } => {
             LocaleId::parse(&cli.locale).and_then(|l| cmd_ladder(l, *named_only))
         }
         Command::Verify => ucal::cmd_verify(),
+        // Handled by the early return above, like `completions` and `man`: its
+        // output is lines, not a document. A diagnostic rather than
+        // `unreachable!()`, because this crate carries no panicking construct.
+        #[cfg(feature = "body")]
+        Command::Seq { .. } => Err(ucal_core::TimeError::with_context(
+            ucal_core::Code::E0001,
+            "internal: `seq` is handled before dispatch and should not have reached it",
+        )),
         Command::Tour => ucal::cmd_tour(),
-        // Only `--theme list` reaches here; every other value ran the clock and
-        // returned above.
+        // `--theme list` reaches here, and so does `--json` (G8): a face is
+        // structured data and rendering it through the ordinary machinery is
+        // how it gets the same `--json`, colours and width as everything else.
         #[cfg(feature = "tui")]
-        Command::Wallclock { .. } => Ok(ucal::cmd_wallclock_themes()),
+        Command::Wallclock {
+            theme,
+            startrek,
+            gagarin,
+            armstrong,
+            clock_local,
+            tier,
+            since,
+            once,
+            at,
+            ..
+        } => {
+            let key = theme_key(*startrek, *gagarin, *armstrong, theme);
+            if key == "list" {
+                return Ok(ucal::cmd_wallclock_themes());
+            }
+            if !*once {
+                return Err(ucal_core::TimeError::with_context(
+                    ucal_core::Code::E0018,
+                    "--json needs --once. A live clock redraws twenty times a second \
+                     and a stream of documents at that rate is not one; `--once \
+                     --json` is a reading of the ladder at an instant",
+                ));
+            }
+            // The theme is named in the document and does not otherwise reach
+            // it: a face's *data* is the same whichever palette drew it, which
+            // is the point of having a `Theme` be a palette and a layout switch
+            // rather than a source of values.
+            ucal::wallclock::theme::by_name(key)?;
+            let l = LocaleId::parse(&cli.locale)?;
+            let mut dials = ucal::wallclock::Dials::new(l)?.with_clock_local(clock_local);
+            if let Some(t) = tier {
+                dials = dials.with_hero(ucal::parse_tier(t)?);
+            }
+            if let Some(origin) = since {
+                let (t, label) = ucal::wallclock_origin(origin)?;
+                dials = dials.with_since(t, label);
+            }
+            let t = match at.as_deref() {
+                Some(s) => ucal::parse_instant(s)?.0,
+                None => ucal::wallclock::now()?,
+            };
+            ucal::wallclock::Face::of(t, &dials)
+                .and_then(|f| ucal::cmd_wallclock_json(&f, key))
+        }
         // Handled by the early return above; this arm exists only because a
         // `match` must be exhaustive. A diagnostic rather than `unreachable!()`
         // — the CLI crate carries no panicking construct (`no-panic-in-cli`),
@@ -603,17 +884,21 @@ fn main() {
         }
         Command::Explain { instant, claim, why } => {
             if *why {
-                ucal::cmd_explain_why(instant, *claim)
+                ucal::cmd_explain_why(pick(replacement, instant), *claim)
             } else {
-                cmd_explain(instant, *claim)
+                cmd_explain(pick(replacement, instant), *claim)
             }
         }
-        Command::Between { from, to, at } => match at {
-            Some(a) => LocaleId::parse(&cli.locale)
-                .and_then(|l| parse_tier_in(l, a))
-                .and_then(|t| ucal::cmd_between(from, to, Some(t))),
-            None => ucal::cmd_between(from, to, None),
-        },
+        Command::Between { from, to, at } => {
+            // G7 — whichever side is `-` takes the line; the other is held.
+            let (f, t2) = (pick(replacement, from), pick(replacement, to));
+            match at {
+                Some(a) => LocaleId::parse(&cli.locale)
+                    .and_then(|l| parse_tier_in(l, a))
+                    .and_then(|tier| ucal::cmd_between(f, t2, Some(tier))),
+                None => ucal::cmd_between(f, t2, None),
+            }
+        }
         Command::Now { precision, form } => run_now(&cli.locale, precision, form),
         #[cfg(feature = "civil")]
         Command::FromCivil {
@@ -635,9 +920,12 @@ fn main() {
             // half-even is still the default for both.
             .and_then(|s| parse_calendar(calendar).map(|c| (s, c)))
             .and_then(|(s, c)| {
-                cmd_to_civil(instant, s, *digits, round.unwrap_or(Rounding::HalfEven), c)
+                cmd_to_civil(pick(replacement, instant), s, *digits, round.unwrap_or(Rounding::HalfEven), c)
             }),
+        }
     };
+
+
 
     // --no-color beats --color, because it is the flag a script sets when it
     // cannot know what the caller's environment has already put in `--color`.
@@ -664,6 +952,8 @@ fn main() {
         gagarin,
         armstrong,
         clock_local,
+        tier,
+        since,
         once,
         at,
         height,
@@ -671,24 +961,31 @@ fn main() {
     {
         // The shorthands are mutually exclusive by `conflicts_with_all`, so at
         // most one is set and the order here cannot hide a second choice.
-        let key = match (*startrek, *gagarin, *armstrong) {
-            (true, _, _) => "startrek",
-            (_, true, _) => "gagarin",
-            (_, _, true) => "armstrong",
-            _ => theme.as_str(),
-        };
-        if key != "list" {
+        let key = theme_key(*startrek, *gagarin, *armstrong, theme);
+        // G8 — `--json --once` falls through to the ordinary dispatch, so the
+        // face is rendered by the same machinery every other document uses
+        // rather than a second copy of it here. `--json` without `--once` is
+        // refused there too.
+        if key != "list" && !cli.json {
             // `--width` is the global flag, and off a terminal it resolves to
             // the 80-column baseline — which is the size a committed frame
             // should be, and the reason this reuses it rather than adding a
             // second width nobody would keep in step with the first.
             let cols = Render::resolve_width(cli.width, terminal) as u16;
             let result = LocaleId::parse(&cli.locale).and_then(|l| {
+                let mut dials =
+                    ucal::wallclock::Dials::new(l)?.with_clock_local(clock_local);
+                if let Some(t) = tier {
+                    dials = dials.with_hero(ucal::parse_tier(t)?);
+                }
+                if let Some(origin) = since {
+                    let (t, label) = ucal::wallclock_origin(origin)?;
+                    dials = dials.with_since(t, label);
+                }
                 if *once {
-                    ucal::wallclock::run_once(
+                    ucal::wallclock::run_once_with(
                         key,
-                        l,
-                        clock_local.as_deref(),
+                        &dials,
                         at.as_deref(),
                         cols,
                         *height,
@@ -708,7 +1005,7 @@ fn main() {
                          a live clock's instant is now",
                     ))
                 } else {
-                    ucal::wallclock::run(key, l, clock_local.as_deref())
+                    ucal::wallclock::run_with(key, &dials)
                 }
             });
             if let Err(e) = result {
@@ -734,6 +1031,39 @@ fn main() {
         .bridge(cli.bridge)
         .width(Render::resolve_width(cli.width, terminal));
 
+    // F2: one document per input line, in whichever form the caller asked for.
+    if streaming {
+        let mut bad = 0;
+        for line in &lines {
+            match dispatch(Some(line)) {
+                Ok(doc) => {
+                    if cli.json {
+                        // JSON Lines: one record, one line, so the stream is a
+                        // filter rather than a concatenation of documents.
+                        println!("{}", compact_json(&doc.to_json_with(&render)));
+                    } else {
+                        print!("{}", doc.render(&render));
+                    }
+                }
+                Err(e) => {
+                    // A bad line is reported and the stream continues: a filter
+                    // that dies on line 3 of 10 000 has thrown away the other
+                    // 9 999 answers. The exit code still says something went
+                    // wrong, so a script cannot mistake a partial run for a
+                    // clean one.
+                    let err_style = error_style(choice);
+                    eprintln!("{}: {}", line, err_style.paint(Role::Error, &e.to_string()));
+                    bad += 1;
+                }
+            }
+        }
+        if bad > 0 {
+            std::process::exit(6);
+        }
+        return;
+    }
+
+    let result = dispatch(None);
     match result {
         Ok(doc) => {
             print!(
@@ -807,5 +1137,143 @@ fn terminal_width() -> Option<usize> {
         terminal_size::terminal_size().map(|(terminal_size::Width(w), _)| w as usize)
     } else {
         None
+    }
+}
+
+/// Does this invocation read its instant from stdin?
+///
+/// F2. `-` is the conventional spelling, and the commands that accept it are the
+/// ones taking **exactly one** instant. `between` and `ruler` take two, and a
+/// line-oriented filter has no natural answer for which of the two a line is —
+/// so they do not accept it rather than accepting it and guessing.
+/// The theme key, from the shorthands or from `--theme`.
+///
+/// The shorthands are mutually exclusive by `conflicts_with_all`, so at most one
+/// is set and the order here cannot hide a second choice. Extracted because two
+/// call sites now need it and two copies of a precedence rule is how they come
+/// to disagree.
+#[cfg(feature = "tui")]
+fn theme_key<'a>(startrek: bool, gagarin: bool, armstrong: bool, theme: &'a str) -> &'a str {
+    match (startrek, gagarin, armstrong) {
+        (true, _, _) => "startrek",
+        (_, true, _) => "gagarin",
+        (_, _, true) => "armstrong",
+        _ => theme,
+    }
+}
+
+fn streamed(cmd: &Command) -> bool {
+    let one: Option<&String> = match cmd {
+        // Gated for the same reason the variants are. `streamed` named
+        // `Command::ToCivil` unconditionally and the `features` workflow caught
+        // it on `--no-default-features --features u512,std`, where `civil` is
+        // absent and the variant does not exist — the fourth time that workflow
+        // has found a feature-gating miss by building a combination nobody
+        // would type.
+        #[cfg(feature = "civil")]
+        Command::ToCivil { instant, .. } => Some(instant),
+        Command::Explain { instant, .. } => Some(instant),
+        #[cfg(all(feature = "body", feature = "civil"))]
+        Command::Show { instant, .. } => Some(instant),
+        #[cfg(feature = "body")]
+        Command::Cal { what } => match what {
+            CalCommand::Show { instant, .. } => Some(instant),
+            _ => None,
+        },
+        // G7 — a command taking *two* instants streams when exactly one of them
+        // is `-`: the stream is that side and the other is held fixed. Both
+        // sides `-` would be a walk over pairs drawn from one stream, which is
+        // a different feature and is refused rather than guessed at.
+        Command::Between { from, to, .. } => {
+            return (from == "-") ^ (to == "-");
+        }
+        Command::Ruler { from, to, .. } => {
+            return (from == "-") ^ (to == "-");
+        }
+        _ => None,
+    };
+    one.is_some_and(|i| i == "-")
+}
+
+/// Whether a two-instant command was given `-` on both sides (G7).
+///
+/// Reported rather than silently taken as one of the two readings available: a
+/// stream of pairs, or the same line used twice. Neither is obviously right, so
+/// neither is chosen.
+fn streamed_twice(cmd: &Command) -> bool {
+    let both = |a: &String, b: &String| a == "-" && b == "-";
+    match cmd {
+        Command::Between { from, to, .. } => both(from, to),
+        Command::Ruler { from, to, .. } => both(from, to),
+        _ => false,
+    }
+}
+
+/// One JSON document on one line.
+///
+/// F2. A stream is only a filter if each record is a line, and `to_json_with`
+/// pretty-prints — so this removes the whitespace *between* tokens and touches
+/// nothing inside a string.
+///
+/// Deliberately a post-pass over the one serialiser rather than a second
+/// serialiser. A compact writer beside the pretty one would be two descriptions
+/// of the `ucal-json/1` surface, and `fixtures/json-surface.txt` pins only one
+/// of them — which is exactly how the two would come to disagree.
+fn compact_json(pretty: &str) -> String {
+    let mut out = String::with_capacity(pretty.len());
+    let mut in_string = false;
+    let mut escaped = false;
+    for ch in pretty.chars() {
+        if in_string {
+            out.push(ch);
+            if escaped {
+                escaped = false;
+            } else if ch == '\\' {
+                escaped = true;
+            } else if ch == '"' {
+                in_string = false;
+            }
+            continue;
+        }
+        match ch {
+            '"' => {
+                in_string = true;
+                out.push(ch);
+            }
+            ' ' | '\n' | '\t' | '\r' => {}
+            _ => out.push(ch),
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod stream_tests {
+    use super::compact_json;
+
+    /// Compaction removes layout and preserves content.
+    #[test]
+    fn compaction_touches_nothing_inside_a_string() {
+        let pretty = "{\n  \"a\": \"two words\",\n  \"b\": [\n    1,\n    2\n  ]\n}";
+        assert_eq!(compact_json(pretty), "{\"a\":\"two words\",\"b\":[1,2]}");
+    }
+
+    /// An escaped quote does not end the string early.
+    ///
+    /// The failure this guards against is silent: a citation containing `\"`
+    /// would flip the parser's idea of where the string ends and the rest of the
+    /// document would have its spaces eaten.
+    #[test]
+    fn an_escaped_quote_does_not_end_the_string() {
+        let pretty = "{\"q\": \"a \\\" b\",  \"n\": 1}";
+        assert_eq!(compact_json(pretty), "{\"q\":\"a \\\" b\",\"n\":1}");
+    }
+
+    /// And a trailing backslash inside a string is not treated as an escape of
+    /// the closing quote.
+    #[test]
+    fn a_literal_backslash_is_handled() {
+        let pretty = "{\"p\": \"a\\\\\", \"n\": 2}";
+        assert_eq!(compact_json(pretty), "{\"p\":\"a\\\\\",\"n\":2}");
     }
 }

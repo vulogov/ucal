@@ -19,6 +19,7 @@
 mod citations;
 mod corpus;
 mod publish;
+mod release;
 mod declared;
 mod derivation;
 mod gendocs;
@@ -125,6 +126,14 @@ const MODES: &[(&str, &str)] = &[
     ("verify-vectors", "re-derive the conformance vectors"),
     ("corpus", "run the defect corpus: every check must reject a known defect"),
     ("publish", "the release procedure"),
+    (
+        "verify-release",
+        "check a published version against this tree (needs the network)",
+    ),
+    (
+        "sign-release",
+        "sign a release's checksums, from the laptop that holds the key",
+    ),
 ];
 
 fn main() {
@@ -172,6 +181,28 @@ fn main() {
     }
     if mode == "check-links" {
         std::process::exit(links::run(&workspace_root()));
+    }
+    if mode == "verify-release" {
+        let Some(version) = std::env::args().nth(2) else {
+            eprintln!("xtask verify-release: which version?\n");
+            eprintln!("  cargo run -p xtask -- verify-release 1.8.0\n");
+            eprintln!("Checks the published .crate against this tree, the release");
+            eprintln!("binaries against SHA256SUMS.txt, and that file against its");
+            eprintln!("signature. Asks the network.");
+            std::process::exit(2);
+        };
+        std::process::exit(release::run(&workspace_root(), &version));
+    }
+    if mode == "sign-release" {
+        let Some(version) = std::env::args().nth(2) else {
+            eprintln!("xtask sign-release: which version?\n");
+            eprintln!("  cargo run -p xtask -- sign-release 1.9.0\n");
+            eprintln!("Downloads the release's SHA256SUMS.txt, signs it with your");
+            eprintln!("minisign key, verifies the signature against fixtures/ucal.pub,");
+            eprintln!("and attaches it. The secret key never leaves this machine.");
+            std::process::exit(2);
+        };
+        std::process::exit(release::sign(&workspace_root(), &version));
     }
     if mode == "corpus" {
         std::process::exit(run_corpus());

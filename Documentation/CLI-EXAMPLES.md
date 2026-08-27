@@ -346,6 +346,21 @@ calendars:
                 status  no anchor: complete in units, intercalation and cycles,
                         incomplete in phase. Asking for local fields is
                         UCAL-E0062 (Rule J.3).
+  uranus-d      derived — Rule K                 uranus     —
+                leap_rule  42/85 (convergent 2)
+                status  no anchor: complete in units, intercalation and cycles,
+                        incomplete in phase. Asking for local fields is
+                        UCAL-E0062 (Rule J.3).
+  neptune-d     derived — Rule K                 neptune    —
+                leap_rule  7/179 (convergent 4)
+                status  no anchor: complete in units, intercalation and cycles,
+                        incomplete in phase. Asking for local fields is
+                        UCAL-E0062 (Rule J.3).
+  pluto-d       derived — Rule K                 pluto      —
+                leap_rule  53/149 (convergent 5)
+                status  no anchor: complete in units, intercalation and cycles,
+                        incomplete in phase. Asking for local fields is
+                        UCAL-E0062 (Rule J.3).
   earth-civil   legacy — declared tables (§8.6)  —          —
                 leap_rule  97/400 (NOT a convergent — declared, not derived)
                 arbitrary  4
@@ -454,6 +469,174 @@ calendars:
 One instant, several local calendars. Each derived rendering carries its anchor
 revision (Rule J.5) and the width of the window that revision implies (Rule
 J.2); each legacy one is labelled as declared table data (§8.6).
+```
+
+## `ucal cal validate --all`
+
+The precision probe over every calendar this project ships. Fifteen calendars rest on nineteen distinct published figures and fourteen of those decide their leap rule outright — which is Rule K working, not a defect. The sharp part is the sharing: a satellite's year is its primary's orbit, so Jupiter's 4332.589 d decides five leap rules at once.
+
+```
+ucal cal validate --all
+───────────────────────
+calendars  15
+figures:
+  parameters_probed   24
+  parameters_derived  6
+  distinct_figures    19
+  distinct_sensitive  14
+  distinct_stable     5
+intercalation:
+  calendar     rule     solar_day
+  ───────────  ───────  ────────────────────────────────
+  earth-d      31/128   86400 s decides it
+               orbital_period  31556925.216 s has a digit to spare
+  mars-d       45/76    88775.244 s has a digit to spare
+               orbital_period  686.9726 d (86400 s) decides it
+  titan-d      88/117   derived — no last digit to move
+               orbital_period  10759.2058 d (86400 s) decides it
+  luna-d       31/84    29.53 d (86400 s) decides it
+               orbital_period  365.256 d (86400 s) decides it
+  mercury-d    1/2      15201360 s has a digit to spare
+               orbital_period  87.969 d (86400 s) has a digit to spare
+  venus-d      135/146  10087200 s has a digit to spare
+               orbital_period  224.701 d (86400 s) decides it
+  jupiter-d    68/81    35733.24 s decides it
+               orbital_period  4332.589 d (86400 s) decides it
+  io-d         58/59    derived — no last digit to move
+               orbital_period  4332.589 d (86400 s) decides it
+  europa-d     1/24     derived — no last digit to move
+               orbital_period  4332.589 d (86400 s) decides it
+  ganymede-d   149/261  derived — no last digit to move
+               orbital_period  4332.589 d (86400 s) decides it
+  callisto-d   17/28    derived — no last digit to move
+               orbital_period  4332.589 d (86400 s) decides it
+  enceladus-d  28/151   derived — no last digit to move
+               orbital_period  10759.2058 d (86400 s) decides it
+  uranus-d     42/85    17.24 h (3600 s) decides it
+               orbital_period  30685.4 d (86400 s) decides it
+  neptune-d    7/179    16.11 h (3600 s) decides it
+               orbital_period  60189.0 d (86400 s) decides it
+  pluto-d      53/149   153.2820 h (3600 s) decides it
+               orbital_period  90560 d (86400 s) decides it
+cycles:
+  calendar     grouped_by
+  ───────────  ──────────
+  earth-d      moon
+               terms_surviving  7
+  mars-d       —
+               terms_surviving  no grouping satellite declared, though the body
+                                has one
+  titan-d      —
+               terms_surviving  no satellite at all
+  luna-d       —
+               terms_surviving  no satellite at all
+  mercury-d    —
+               terms_surviving  no satellite at all
+  venus-d      —
+               terms_surviving  no satellite at all
+  jupiter-d    —
+               terms_surviving  no satellite at all
+  io-d         —
+               terms_surviving  no satellite at all
+  europa-d     —
+               terms_surviving  no satellite at all
+  ganymede-d   —
+               terms_surviving  no satellite at all
+  callisto-d   —
+               terms_surviving  no satellite at all
+  enceladus-d  —
+               terms_surviving  no satellite at all
+  uranus-d     —
+               terms_surviving  no satellite at all
+  neptune-d    —
+               terms_surviving  no satellite at all
+  pluto-d      —
+               terms_surviving  no satellite at all
+carried_by_more_than_one:
+  figure
+  ──────────────────────
+  4332.589 d (86400 s)
+                          calendars resting on it  5 calendars: jupiter-d,
+                                                   io-d, europa-d, ganymede-d,
+                                                   callisto-d
+  10759.2058 d (86400 s)
+                          calendars resting on it  2 calendars: titan-d,
+                                                   enceladus-d
+
+**Sensitive is a measurement, not a verdict.** A leap rule is a convergent of a
+continued fraction, and continued fractions are violently sensitive to their
+inputs — so most published figures deciding their own rule is Rule K working.
+What it means for an author is that quoting a source to one digit fewer
+declares a different calendar.
+
+**The probe is not comparable between bodies.** One unit in the last place is a
+second for Earth's 86400 s and a millisecond for Mars's 88775.244 s, so
+`sensitive` means `at the precision this source published`, not `to the same
+tolerance`. Earth's solar day is exact by definition and has no last digit to
+be wrong in; it is reported sensitive because a second either way does change
+the rule.
+
+**A satellite's year is its primary's orbit.** So the figures above are shared,
+and a revision to one moves every calendar under it — which is a thing to know
+before revising one.
+
+**Fourteen of the fifteen have no cycle**, because they declare no grouping
+satellite. §15.3 forbids a fallback structure, so that is the answer and not a
+gap — and it is listed per calendar rather than summarised, because a section
+reporting one of fifteen without saying so is the shape V1 Finding 1 caught
+fourteen times in this tree.
+
+**`cycles` counts terms, not rules.** A leap rule is chosen by a drift bound,
+so `which rule` is a decision that can survive a nudge; nothing selects a
+cycle, and the deepest convergent is the ratio itself — which any nudge
+changes. What carries information is how far the continued fraction agrees,
+because terms that agree are candidate cycle rules that agree.
+```
+
+## `ucal cal validate Documentation/examples/europa.hjson`
+
+Two questions with separate answers: does the file load, and does a calendar follow from it? The `precision:` rows measure the caveat this project has carried since 0.2.0 — a rounded parameter is a different calendar — by moving each published figure's last digit and re-deriving.
+
+```
+ucal cal validate
+─────────────────
+source  Documentation/examples/europa.hjson
+kind    body file (§15.1)
+checks:
+  loads            ok — strict HJSON, every key known (§15.1), and every
+                   parameter carries a value, a unit, an epoch, a validity
+                   window and a citation (Rule C)
+  id               `europa` — which derives `europa-d`, and a calendar of that
+                   id already ships. This file is valid; a command naming
+                   `europa-d` will get the compiled-in one
+  primary          `jupiter`
+  rotation_period  measured: 3.551181 d (86400 s) — NASA Planetary Fact Sheets
+                   (Williams, D. R.), Jovian satellite fact sheet; the original
+                   document is available in the Internet Archive
+  solar_day        derived (Z1.1), so no figure of its own is stated for it —
+                   derived as 1 / (1/P_rotation - 1/P_orbital_period) from the
+                   two published figures cited in this file; no source
+                   publishes a solar day for a tidally locked moon
+  orbital_period   measured: 4332.589 d (86400 s) — NASA Planetary Fact Sheets
+                   (Williams, D. R.), Jupiter fact sheet; the original document
+                   is available in the Internet Archive
+  intercalation    1/24 at convergent 2, 1219 whole days per year
+  cycles           none — no grouping satellite, so this calendar has years and
+                   days and no cycle. §15.3 forbids a fallback structure, which
+                   makes that the answer and not a gap
+  precision:
+    orbital_period  sensitive — one unit in the last published place derives a
+                    different rule. 4332.589 d (86400 s) gives 1/24; 4332.590 d
+                    (86400 s) → 5/119; 4332.588 d (86400 s) → 7/169. This is
+                    the standing caveat measured, not a verdict: a figure that
+                    is exact by definition has no last digit to be wrong in,
+                    and a figure that was rounded to reach this precision
+                    declares a calendar the unrounded one would not
+
+A file that loads is not a file that is right. Every check above is on
+*internal* consistency — that the parameters are present, cited and mutually
+coherent. Whether the published figures are the ones this body actually has is
+a question about the sources, and nothing in this program can answer it.
 ```
 
 ## `ucal events show recombination`
@@ -721,6 +904,25 @@ features:
   u512
   std
   civil
+  body
+  events
+  cosmo
+  tui
+clock:
+  granularity        1 ns — this program reads the clock to nine decimal places
+  granularity_ticks  18548584399861000000000000000000000
+  finest_tier        T-2 — the finest rung a nanosecond can fill
+  rendering_floor    T-12 — where `ucal now` renders by default, 10 rungs below
+                     what the clock can fill. A rung is 5^5, so those digits
+                     are the conversion's and not the instrument's
+  accuracy           not measurable here. §8.4 makes operation offline, so
+                     there is no reference to compare against, and a rate error
+                     estimated from a short baseline reports quantisation as
+                     drift. This is resolution
+  in_a_difference    a constant offset cancels between two readings and a rate
+                     error does not; quantisation bounds each reading and so
+                     bounds their difference twice over. The frame term `ucal
+                     datum` declares cancels too
 datum_provenance:
   present  true
   note     present; absence would be UCAL-E0013 (Rule Q.4)
@@ -869,7 +1071,7 @@ A targeting computer: canopy brackets, a reticle round the beat, the flicker rid
 
 ## `ucal wallclock --once --at 8070205189123984864657505252035637180530466139316558837890625 --gagarin --locale ru --height 24`
 
-A Vostok instrument panel: an enamelled plate with bezelled gauges set into it, engraved labels, and a red lamp. Cyrillic chrome; the tier names follow --locale, which is why this example passes one.
+A Vostok instrument panel: an enamelled plate with bezelled gauges set into it, engraved labels, and a red lamp. Everything Cyrillic here comes from --locale ru, including the chrome: through 1.8.0 the plates were hardcoded Russian and this theme was the one place that could override the flag.
 
 ```
  ВРЕМЯ ВСЕЛЕННОЙ · UC1
@@ -990,5 +1192,5 @@ q to quit
 A rejection: an Appendix E code, an exit status, and — since 1.2.0 — what a good input would have looked like.
 
 ```
-UCAL-E0001: malformed timestamp (expected a decimal tick count like 8070205189123984864657505252035637180530466139316558837890625, a UC1 text form like `UC1 0031·0687·...`, or a 52-character UCID. `ucal now` prints one of each; `ucal tour` shows what to do with them)
+UCAL-E0001: malformed timestamp (expected a decimal tick count like 8070205189123984864657505252035637180530466139316558837890625, a UC1 text form like `UC1 0031·0687·...`, a 52-character UCID, or `-` to read instants from stdin on the commands that take a single one. `ucal now` prints one of each; `ucal tour` shows what to do with them)
 ```

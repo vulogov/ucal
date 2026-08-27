@@ -24,6 +24,7 @@ pub mod wallclock;
 #[cfg(feature = "body")]
 pub mod body_file;
 pub mod emit;
+pub mod clock;
 pub mod style;
 pub mod table;
 
@@ -77,9 +78,55 @@ pub fn parse_instant(s: &str) -> Result<(Instant<UC1>, Precision), TimeError> {
             .ok_or(TimeError::with_context(Code::E0001, "tick count out of range"))?;
         return Ok((Instant::<UC1>::from_ticks(t)?, Precision::Tick));
     }
+    // G10 — an event id gets its own answer too. The catalogue's ids are
+    // lowercase words and cannot be confused with any accepted form, and
+    // `ucal between recombination now` reported *malformed timestamp* about a
+    // name this program knows perfectly well.
+    //
+    // It is a refusal and not a conversion, because **an event is an interval**.
+    // `recombination` is a window hundreds of thousands of years wide; silently
+    // taking one end of it would be the substitution Rule U refuses, and taking
+    // the midpoint would be a rendering choice presented as a measurement.
+    // `ucal wallclock --since` accepts an event id and applies a width check
+    // before it does — that is the one place the conversion is honest, and the
+    // message says so.
+    //
+    // The message is a literal rather than the id interpolated into one: the
+    // interning `leak` that would make an owned string `&'static str` lives in
+    // `body_file`, which is gated behind `body`, and this arm is gated behind
+    // `events`. A build with `events` and without `body` is one of the
+    // twenty-two the features workflow compiles, and it caught this — the fifth
+    // feature-gating miss that workflow has found by building a combination
+    // nobody would type.
+    #[cfg(feature = "events")]
+    if events::by_id(s).is_ok() {
+        return Err(TimeError::with_context(
+            Code::E0023,
+            "that is an event id, and an event is an interval rather than an instant. \
+             `ucal events show <id>` prints its window and what it was published as; \
+             `ucal wallclock --since <id>` will count from it when the window is \
+             narrower than the finest hand on the face, which is the one place \
+             collapsing an interval to a point is honest",
+        ));
+    }
+    // G3 — `-` gets its own answer. F2 added stdin and left this message
+    // listing three accepted forms out of four, so the diagnostic a caller hits
+    // *while getting the syntax wrong* was missing a quarter of the syntax. A
+    // bare `-` here means the caller tried to stream into a command that does
+    // not read stdin, and saying "malformed timestamp" about it is true and
+    // useless.
+    if s == "-" {
+        return Err(TimeError::with_context(
+            Code::E0001,
+            "`-` reads instants from stdin, and this command does not take it. The \
+             commands that do are the ones taking exactly one instant: `to-civil`, \
+             `explain`, `show` and `cal show`. With `--json` they emit JSON Lines, one \
+             record per input line",
+        ));
+    }
     Err(TimeError::with_context(
         Code::E0001,
-        "expected a decimal tick count like 8070205189123984864657505252035637180530466139316558837890625, a UC1 text form like `UC1 0031\u{00b7}0687\u{00b7}...`, or a 52-character UCID. `ucal now` prints one of each; `ucal tour` shows what to do with them",
+        "expected a decimal tick count like 8070205189123984864657505252035637180530466139316558837890625, a UC1 text form like `UC1 0031\u{00b7}0687\u{00b7}...`, a 52-character UCID, or `-` to read instants from stdin on the commands that take a single one. `ucal now` prints one of each; `ucal tour` shows what to do with them",
     ))
 }
 
@@ -337,27 +384,41 @@ pub fn cmd_datum() -> CmdResult {
 /// `ucal doctor` — profile, backend, domain ceiling, leap table, features,
 /// provenance presence (§19.3).
 pub fn cmd_doctor() -> CmdResult {
+    cmd_doctor_inner(None)
+}
+
+/// `ucal doctor --clock` — the same report, plus what the clocks on this
+/// machine actually do.
+///
+/// Separate because the measurement is **sampled**, so it varies by machine and
+/// by run, and `doctor`'s ordinary output is compared against a committed
+/// example byte for byte. A diagnostic that could not be reproduced would fail
+/// `check-docs` on every machine but the one that generated it.
+#[cfg(feature = "std")]
+pub fn cmd_doctor_measuring() -> CmdResult {
+    cmd_doctor_inner(Some(clock::measured()?))
+}
+
+fn cmd_doctor_inner(measured: Option<Vec<(String, Value)>>) -> CmdResult {
     let backend = if cfg!(feature = "bigint") {
         "bigint (num-bigint, heap; Instant is not Copy)"
     } else {
         "u512 (bnum, stack, const-constructible; Instant is Copy)"
     };
-    let features: Vec<&str> = {
-        let mut f = Vec::new();
-        if cfg!(feature = "u512") {
-            f.push("u512");
-        }
-        if cfg!(feature = "bigint") {
-            f.push("bigint");
-        }
-        if cfg!(feature = "std") {
-            f.push("std");
-        }
-        if cfg!(feature = "civil") {
-            f.push("civil");
-        }
-        f
-    };
+    // G12 — every optional feature this binary can have, not the four somebody
+    // stopped at. `doctor` exists to say what is in the build, and it reported
+    // `u512, std, civil` for a binary built with `--features full`: `body`,
+    // `events`, `cosmo` and `tui` were compiled in and unlisted, so four of the
+    // seven commands a reader could run were invisible to the command whose job
+    // is to enumerate them.
+    //
+    // Held to the full list by a test, since the failure mode is a feature added
+    // and this function not revisited — which is exactly what happened.
+    let features: Vec<&str> = ALL_FEATURES
+        .iter()
+        .filter(|(_, on)| *on)
+        .map(|(name, _)| *name)
+        .collect();
 
     let provenance_present = UC1::datum_provenance().is_ok();
     let domain_max = <Ticks as TickInt>::domain_max();
@@ -370,6 +431,9 @@ pub fn cmd_doctor() -> CmdResult {
         .field("domain_max_ticks", Value::number(domain_max.to_dec_string()))
         .field("domain_bits", Value::number(ucal_core::DOMAIN_BITS.to_string()))
         .field("features", Value::list(features))
+        // The one quantity this program measures itself, with the same
+        // accounting every other measured quantity in it carries.
+        .field("clock", Value::Section(clock::facts()?))
         .field(
             "datum_provenance",
             Value::Section(vec![
@@ -429,6 +493,10 @@ pub fn cmd_doctor() -> CmdResult {
             ),
         ]),
     );
+
+    if let Some(m) = measured {
+        doc = doc.field("clock_measured", Value::Section(m));
+    }
 
     Ok(doc.note("No network access is performed by any command (§8.4)."))
 }
@@ -1207,6 +1275,13 @@ pub fn cmd_to_civil(
     Ok(doc)
 }
 
+/// The current instant, through the **session clock**.
+///
+/// One process, one clock: a reading never goes backwards past an earlier one,
+/// however the system clock is disciplined underneath. See [`clock::Session`]
+/// for the rule and for what it deliberately does not claim. [`wall_instant`]
+/// is the raw reading.
+///
 /// The system clock as a `UC1` instant, through the bundled leap table.
 ///
 /// Extracted so `ucal wallclock` reads *now* by the same route `ucal now` does.
@@ -1215,6 +1290,23 @@ pub fn cmd_to_civil(
 /// one quantity §8.4 says cannot be computed and must be looked up.
 #[cfg(feature = "civil")]
 pub fn now_instant() -> Result<Instant<UC1>, TimeError> {
+    clock::session_now()
+}
+
+/// The system clock, read straight, with nothing between.
+///
+/// [`now_instant`] goes through the session clock so that two readings in one
+/// process cannot go backwards past each other. This is the reading that clock
+/// is built from, and the one `doctor --clock` samples: a session clock that
+/// measured itself would be measuring its own output.
+///
+/// Gated the same way [`now_instant`] is. Splitting the two dropped the
+/// attribute, and `--no-default-features --features u512,std` — one of the
+/// twenty-two the features workflow builds — caught it: converting a clock
+/// reading needs `ucal-civil`, because Unix time is a UTC *label* and turning
+/// one into an instant is a leap-table lookup (§8.4).
+#[cfg(feature = "civil")]
+pub fn wall_instant() -> Result<Instant<UC1>, TimeError> {
     use std::time::{SystemTime, UNIX_EPOCH};
     let d = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -1261,6 +1353,13 @@ pub fn cmd_now(precision: Tier, form: Form) -> CmdResult {
     if let Ok(r) = codec::render(&t, &fmt) {
         doc = doc.field("rendered", Value::form(r));
     }
+    // `precision` keeps its name and its value: it is a path in `ucal-json/1`
+    // and removing or repurposing one is a breaking change. What it has never
+    // meant is *how precisely this instant is known* — `--precision` is
+    // documented as "tier to render to" — and the same field name carries the
+    // other meaning in `ucal explain`, where `tick (exact)` is a real statement
+    // about a value the caller typed. So the reading it invites is answered
+    // beside it rather than left to be inferred.
     Ok(doc
         .field("precision", Value::text(precision.to_string()))
         .field(
@@ -1273,6 +1372,15 @@ pub fn cmd_now(precision: Tier, form: Form) -> CmdResult {
                 ),
                 ("network".into(), Value::text("none (§8.4)")),
             ]),
+        )
+        .field("clock", Value::Section(clock::facts()?))
+        .note(
+            "**`precision` is the tier this was rendered to, not how well the instant \
+             is known.** The two are far apart: `clock.finest_tier` is what a reading \
+             of the system clock can fill, and the default rendering is ten rungs \
+             below it — a rung being 5^5, those digits come from the conversion and \
+             not from the instrument. `ucal doctor --clock` measures what this \
+             machine's clocks actually do.",
         ))
 }
 
@@ -1507,6 +1615,37 @@ pub fn cmd_cal_list() -> CmdResult {
 /// labelled.
 #[cfg(all(feature = "body", feature = "civil"))]
 pub fn cmd_show(input: &str, calendars: &[String]) -> CmdResult {
+    cmd_show_inner(input, calendars, None)
+}
+
+/// F1 — the multi-calendar view, with one calendar coming from §15.1 files.
+///
+/// This is where the loaders stopped being useful. `cal derive --anchor --at`
+/// could already produce a date from a pair of files; what it could not do is
+/// put that calendar **beside** the shipped ones, which is the comparison the
+/// whole exercise is for. A body that does not ship is now a row in the same
+/// table as Earth and Mars.
+///
+/// `cal show` deliberately did *not* grow the same flags. `cal derive` already
+/// prints that view from the same code, and two spellings of one question is
+/// how they come to disagree.
+#[cfg(all(feature = "body", feature = "civil"))]
+pub fn cmd_show_with_file(
+    input: &str,
+    calendars: &[String],
+    body_path: &str,
+    anchor_path: &str,
+) -> CmdResult {
+    let extra = calendar_from_files(body_path, anchor_path)?;
+    cmd_show_inner(input, calendars, Some(extra))
+}
+
+#[cfg(all(feature = "body", feature = "civil"))]
+fn cmd_show_inner(
+    input: &str,
+    calendars: &[String],
+    extra: Option<ucal_body::calendar::BodyCalendar>,
+) -> CmdResult {
     let (t, _) = parse_instant(input)?;
     let mut rows: Vec<(String, Value)> = Vec::new();
     let mut produced = 0usize;
@@ -1568,6 +1707,33 @@ pub fn cmd_show(input: &str, calendars: &[String]) -> CmdResult {
         rows.push((id.clone(), entry));
     }
 
+    // The file-defined calendar, rendered by the same arm the shipped ones use.
+    if let Some(c) = extra {
+        let id = ucal_core::qualified::CalendarIdentity::id(&c).to_string();
+        let r = c.render(&t)?;
+        let f = c.fields(&t)?;
+        produced += 1;
+        rows.push((
+            id,
+            Value::Section(vec![
+                ("rendered".into(), Value::text(r.to_string())),
+                ("kind".into(), Value::text("derived (Rule K), from files")),
+                (
+                    "anchor_revision".into(),
+                    Value::number(f.anchor_revision.to_string()),
+                ),
+                (
+                    "window_ticks".into(),
+                    Value::number(f.window.width().ticks().to_dec_string()),
+                ),
+                (
+                    "source".into(),
+                    Value::text("§15.1 body and anchor files, loaded at run time"),
+                ),
+            ]),
+        ));
+    }
+
     // Every requested calendar failed, so nothing was produced and the process
     // must say so. It exited 0 until 0.9.0 — a script asking for a calendar that
     // does not exist got a success and a table of dashes.
@@ -1600,11 +1766,55 @@ pub fn cmd_show(input: &str, calendars: &[String]) -> CmdResult {
         ))
 }
 
+/// F1 — a calendar built from §15.1 files rather than from the registry.
+///
+/// `cal derive --anchor --at` could produce a date from a body file and an
+/// anchor file, and then that calendar was stranded: `cal show` and `show` knew
+/// only the compiled-in registry, so the one thing the loaders exist for — using
+/// a body this program does not ship — stopped at a single command.
+///
+/// The calendar id is derived from the body's, as `<body>-d`, and the anchor
+/// file must name it. Same check `cal derive` makes, same reason: two files that
+/// each load, pair up, and quietly produce a date for one body using another
+/// body's phase is the borrowing Rule J forbids.
+#[cfg(feature = "body")]
+pub fn calendar_from_files(
+    body_path: &str,
+    anchor_path: &str,
+) -> Result<ucal_body::calendar::BodyCalendar, TimeError> {
+    let body = body_file::load(std::path::Path::new(body_path))?;
+    let anchor = anchor_file::load(std::path::Path::new(anchor_path))?;
+    let id: &'static str = body_file::leak(format!("{}-d", body.id()));
+    if anchor.calendar_id() != id {
+        return Err(TimeError::with_context(
+            Code::E0062,
+            body_file::leak(format!(
+                "the anchor file names calendar `{}`, and this body file derives `{id}`",
+                anchor.calendar_id()
+            )),
+        ));
+    }
+    let satellite = body.satellites().first().map(|s| s.id());
+    ucal_body::calendar::BodyCalendar::build(
+        id,
+        body,
+        anchor,
+        satellite,
+        ucal_body::DriftBound::DEFAULT,
+        32,
+    )
+}
+
 /// `ucal cal show <id> <T>` — one calendar's derivation, in full.
 #[cfg(feature = "body")]
 pub fn cmd_cal_show(id: &str, input: &str) -> CmdResult {
-    let (t, _) = parse_instant(input)?;
     let c = bodycal::by_id(id)?;
+    cal_show_of(&c, id, input)
+}
+
+#[cfg(feature = "body")]
+fn cal_show_of(c: &ucal_body::calendar::BodyCalendar, id: &str, input: &str) -> CmdResult {
+    let (t, _) = parse_instant(input)?;
     let f = c.fields(&t)?;
     let rule = c.leap_rule();
 
@@ -2470,6 +2680,208 @@ pub fn cmd_wallclock_themes() -> Doc {
         )
 }
 
+/// F6 — instants at a tier interval, as plain lines.
+///
+/// `seq` for time. The output is one decimal tick count per line and **not** a
+/// `Doc`, which is the one place this program breaks its own habit, for the same
+/// reason `completions` does: a generator's output is an input to something
+/// else. The something else is [`cmd_to_civil`] and its siblings reading `-`,
+/// added in the same release:
+///
+/// ```text
+///   ucal seq <FROM> <TO> --step T1 | ucal to-civil -
+/// ```
+///
+/// # The count is bounded, and refuses rather than hangs
+///
+/// A tier interval can be very small and a span very large: stepping `T-12` —
+/// one tick — across a single second is 1.8 x 10^43 lines. There is no useful
+/// behaviour there, and a program that starts printing and never stops is worse
+/// than one that says why. So the step count is computed **first**, and a run
+/// that would exceed the cap is refused with the number it would have produced.
+#[cfg(feature = "body")]
+pub fn cmd_seq(from: &str, to: &str, step: Tier, max: u64) -> Result<Vec<String>, TimeError> {
+    cmd_seq_by(from, to, &Stride::tier(step), max)
+}
+
+/// What `seq` counts in (G6).
+///
+/// A tier, or **a body's own solar day or year**. F6 shipped `seq` stepping by
+/// tiers only, which left it unable to express the one walk this project is
+/// actually for — *give me every sunrise on Mars between these two instants*.
+/// F1 and F9 had just made that body's day nameable and `seq` could not reach
+/// it.
+///
+/// The stride is exact in both cases. A tier is `5^(60+5k)` ticks by
+/// construction; a body's day is a `Measured` converted to ticks by Rule Y.2,
+/// which rejects rather than rounds. Neither is a float and neither is
+/// approximated here.
+#[cfg(feature = "body")]
+#[derive(Clone, Debug)]
+pub struct Stride {
+    /// The interval, in ticks.
+    ticks: Ticks,
+    /// How to name it in a message.
+    label: String,
+}
+
+#[cfg(feature = "body")]
+impl Stride {
+    /// The interval, in ticks.
+    pub fn ticks(&self) -> &Ticks {
+        &self.ticks
+    }
+
+    /// How this stride names itself in a message.
+    pub fn label(&self) -> &str {
+        &self.label
+    }
+
+    /// A tier of the ladder.
+    pub fn tier(t: Tier) -> Stride {
+        Stride {
+            ticks: t.ticks(),
+            label: t.to_string(),
+        }
+    }
+
+    /// A calendar's own solar day, or its year.
+    ///
+    /// **A local unit is not a tier and this does not pretend otherwise.** Rule
+    /// A.5 refuses to substitute one body's units for another's; what this does
+    /// is count in the unit the caller named, and say which one it was.
+    ///
+    /// The parameter is read at its epoch rather than at the walk's start.
+    /// [`H1`] Finding 2 records that this project evaluates one parameter at an
+    /// instant and freezes two others, and adding a third convention here would
+    /// deepen the inconsistency it names — so this takes the frozen one, which
+    /// is what `derive_leap_rule` and `derive_cycles` already use.
+    ///
+    /// [`H1`]: https://github.com/vulogov/ucal/blob/main/Documentation/Proposals/H1-when-does-a-calendar-hold.md
+    pub fn calendar(spec: &str) -> Result<Stride, TimeError> {
+        let (id, want_year) = match spec.strip_suffix("-year") {
+            Some(rest) => (rest, true),
+            None => (spec, false),
+        };
+        // `registered()` and not `calendar::by_id`: the latter builds a
+        // calendar, which needs an anchor, and thirteen of the fifteen have
+        // none. Stepping by a body's day does not need a phase — it is a
+        // duration, not a date — so refusing `europa-d` here for want of an
+        // anchor would refuse it for a reason that does not apply.
+        let body = ucal_body::calendar::registered()
+            .into_iter()
+            .find(|(cid, _, _)| *cid == id)
+            .map(|(_, b, _)| b)
+            .or_else(|| ucal_body::data::by_id(id))
+            .ok_or(TimeError::with_context(
+                Code::E0016,
+                "no such calendar or body; `ucal cal list` names every one, and \
+                 `<id>-year` steps by that body's year instead of its day",
+            ))?;
+        let param = if want_year {
+            body.orbital_period()
+        } else {
+            body.solar_day()
+        };
+        // A stride must be a whole number of ticks. A solar day is a rational
+        // and is almost never one, so the remainder is the honest place to stop:
+        // truncating it would make every step short by a little and the walk
+        // wrong by a lot.
+        let v = param.value_at_epoch();
+        if !v.is_integer() {
+            return Err(TimeError::with_context(
+                Code::E0043,
+                body_file::leak(format!(
+                    "`{spec}` is {} ticks, which is not a whole number of them, and a \
+                     stride must be. Truncating would make every step short and the walk \
+                     wrong by the accumulated remainder; §6.3's tiers are exact by \
+                     construction, which is why --step takes one",
+                    v.to_ratio_string()
+                )),
+            ));
+        }
+        Ok(Stride {
+            ticks: v.floor(),
+            label: format!(
+                "one {} of `{}`",
+                if want_year { "year" } else { "solar day" },
+                body.id()
+            ),
+        })
+    }
+}
+
+/// `seq`, counting in whatever [`Stride`] was asked for.
+#[cfg(feature = "body")]
+pub fn cmd_seq_by(
+    from: &str,
+    to: &str,
+    step: &Stride,
+    max: u64,
+) -> Result<Vec<String>, TimeError> {
+    let step_label = &step.label;
+    let (a, _) = parse_instant(from)?;
+    let (b, _) = parse_instant(to)?;
+    if a.ticks() > b.ticks() {
+        return Err(TimeError::with_context(
+            Code::E0018,
+            "the second instant is earlier than the first; `seq` counts forwards",
+        ));
+    }
+    let span = b.ticks().try_sub(a.ticks()).ok_or_else(|| {
+        TimeError::with_context(Code::E0021, "the span between those instants exceeds the domain")
+    })?;
+    let stride = step.ticks.clone();
+    if stride.is_zero_ticks() {
+        return Err(TimeError::with_context(
+            Code::E0018,
+            "a stride of zero would never reach the end",
+        ));
+    }
+    let (count, _) = span.quot_rem(&stride);
+
+    // How many lines this would be, as a number the message can name. A count
+    // that does not fit in a u64 is by definition past the cap.
+    let n: u64 = count.to_dec_string().parse().unwrap_or(u64::MAX);
+    if n >= max {
+        return Err(TimeError::with_context(
+            Code::E0018,
+            body_file::leak(format!(
+                "that is {} steps of {step_label}, and the limit is {max}. Ask for a \
+                 coarser --step, a shorter span, or raise --max deliberately",
+                if n == u64::MAX { "more than 2^64".to_string() } else { n.to_string() }
+            )),
+        ));
+    }
+
+    let mut out = Vec::with_capacity(n as usize + 1);
+    let mut cur = a.ticks().clone();
+    for _ in 0..=n {
+        out.push(cur.to_dec_string());
+        match cur.try_add(&stride) {
+            Some(next) => cur = next,
+            None => break,
+        }
+    }
+    Ok(out)
+}
+
+/// Every optional feature this binary can be built with, and whether it is.
+///
+/// One list, so `doctor` and the test that holds it complete cannot disagree.
+/// The mutually exclusive backends are both here: exactly one is ever on, and
+/// `ucal-core`'s `compile_error!` guarantees it.
+pub const ALL_FEATURES: &[(&str, bool)] = &[
+    ("u512", cfg!(feature = "u512")),
+    ("bigint", cfg!(feature = "bigint")),
+    ("std", cfg!(feature = "std")),
+    ("civil", cfg!(feature = "civil")),
+    ("body", cfg!(feature = "body")),
+    ("events", cfg!(feature = "events")),
+    ("cosmo", cfg!(feature = "cosmo")),
+    ("tui", cfg!(feature = "tui")),
+];
+
 /// `ucal tour` — the first five minutes.
 #[allow(clippy::doc_markdown)]
 pub fn cmd_tour() -> CmdResult {
@@ -2828,4 +3240,1062 @@ pub fn cmd_cal_derive_with(path: &str, anchor: Option<&str>, at: Option<&str>) -
          `&'static str`, so a runtime loader must either leak or change a published type. \
          This one leaks, bounded by a process that exits.",
     ))
+}
+
+/// G8 — a clock face as a document.
+///
+/// # Why a full-screen clock has a `--json`
+///
+/// `--json` is a global flag and `wallclock` was the one command that took it
+/// and drew a face anyway — accepted, and silently ignored. That alone is the
+/// defect G2 catalogued; what makes it worth more than a refusal is that a face
+/// **is** structured data. Hands with tier indices and positions, dials with
+/// local fields, an odometer with its drums: every one of those is a value the
+/// text renderer already has and throws away into glyphs.
+///
+/// # What it buys
+///
+/// A wall clock becomes scriptable — `--once --json` is a reading of the tier
+/// ladder at an instant, in the form every other command emits. And the
+/// wall-clock tests can assert on structure rather than on characters in a
+/// `TestBackend` buffer, which is how a layout change comes to look like a
+/// behaviour change.
+///
+/// **Only with `--once`.** A live clock redraws twenty times a second and a
+/// stream of JSON at that rate is not a document; `--json` without `--once` is
+/// refused rather than quietly producing one frame or an endless stream.
+#[cfg(feature = "tui")]
+pub fn cmd_wallclock_json(face: &wallclock::Face, theme: &str) -> CmdResult {
+    let hands: Vec<(String, Value)> = face
+        .hands
+        .iter()
+        .map(|h| {
+            (
+                h.tier.to_string(),
+                Value::Section(vec![
+                    // The index is not localised and the name is (Rule N), so
+                    // both are emitted: the index is what a reader compares
+                    // across two machines set to different languages.
+                    ("index".into(), Value::number(h.tier.index().to_string())),
+                    ("name".into(), Value::text(h.name.clone())),
+                    ("position".into(), Value::number(h.position.to_string())),
+                    ("per_mille".into(), Value::number(h.per_mille().to_string())),
+                ]),
+            )
+        })
+        .collect();
+
+    let dials: Vec<(String, Value)> = face
+        .dials
+        .iter()
+        .map(|d| {
+            (
+                d.calendar.clone(),
+                Value::Section(vec![
+                    ("year".into(), Value::number(d.year.clone())),
+                    ("day".into(), Value::number(d.day.clone())),
+                    (
+                        "through_day_percent".into(),
+                        Value::number(d.through_day.to_string()),
+                    ),
+                    (
+                        "anchor_revision".into(),
+                        Value::number(d.revision.to_string()),
+                    ),
+                ]),
+            )
+        })
+        .collect();
+
+    let mut doc = Doc::new()
+        .title("ucal wallclock")
+        .field("theme", Value::text(theme))
+        .field("ticks", Value::number(face.at.ticks().to_dec_string()))
+        .field("human", Value::Form(face.human.clone()))
+        .field("hero", Value::text(face.hero.to_string()))
+        // Keyed by tier and by calendar id: data, not schema. `between`'s
+        // `on_the_ladder.*` is the same shape and the same container.
+        .field(
+            "hands",
+            Value::Rows {
+                key: "tier".into(),
+                value: None,
+                rows: hands,
+            },
+        );
+
+    if !dials.is_empty() {
+        doc = doc.field(
+            "dials",
+            Value::Rows {
+                key: "calendar".into(),
+                value: None,
+                rows: dials,
+            },
+        );
+    }
+    if let Some(o) = &face.since {
+        let drums: Vec<(String, Value)> = o
+            .drums
+            .iter()
+            .map(|d| {
+                (
+                    d.tier.to_string(),
+                    Value::number(d.position.to_string()),
+                )
+            })
+            .collect();
+        doc = doc.field(
+            "since",
+            Value::Section(vec![
+                ("origin".into(), Value::text(o.origin.clone())),
+                ("counting_down".into(), Value::Bool(o.counting_down)),
+                (
+                    "drums".into(),
+                    Value::Rows {
+                        key: "tier".into(),
+                        value: Some("stops".into()),
+                        rows: drums,
+                    },
+                ),
+            ]),
+        );
+    }
+
+    Ok(doc.note(
+        "A face, as data. The `position` of each hand is out of 3125, because every \
+         tier is 5^5 of the one below; `per_mille` is that position as thousandths, \
+         which is what the bars are drawn from. No Earth unit appears here as a unit \
+         (Rule A.5) — the tier indices are the ladder and the dials are local \
+         calendars, each labelled with the body whose day it counts.",
+    ))
+}
+
+/// F3 — resolve `ucal wallclock --since <ORIGIN>` to an instant and a label.
+///
+/// An instant is taken as given. **An event id is looked up and may be
+/// refused**, which is Z2's kill criterion for this feature and the only
+/// interesting part of it:
+///
+/// > **Stop if:** the window of the chosen origin exceeds the resolution of the
+/// > display [...] Then it should refuse and say why, rather than render a
+/// > number whose last twelve digits are decoration — the same judgement
+/// > `UCAL-E0023` already makes for comparisons.
+///
+/// The face's finest hand is `T-1`, so that is the resolution. An event whose
+/// window is wider is refused: `holocene` is uncertain by about two centuries,
+/// and an odometer ticking 66 000 times a second against it would be theatre.
+/// `ucal events show` already prints that number the honest way, which is
+/// statically and with its window beside it.
+///
+/// `bridge-epoch` is the exception the proposal predicted — exact by definition,
+/// zero window, and the one origin for which "time since" is a real reading.
+#[cfg(feature = "tui")]
+pub fn wallclock_origin(origin: &str) -> Result<(Instant<UC1>, String), TimeError> {
+    // An instant first: the argument is documented as one, and an id that
+    // happens to parse as a tick count does not exist.
+    if let Ok((t, _)) = parse_instant(origin) {
+        return Ok((t, origin.to_string()));
+    }
+
+    #[cfg(not(feature = "events"))]
+    {
+        Err(TimeError::with_context(
+            Code::E0018,
+            "--since takes an instant. Event ids need this binary built with the \
+             `events` feature",
+        ))
+    }
+    #[cfg(feature = "events")]
+    {
+        let e = events::by_id(origin)?;
+        let finest = Tier::new(-1)?;
+        if e.uncertainty().ticks() > &finest.ticks() {
+            return Err(TimeError::with_context(
+                Code::E0023,
+                "this event's window is wider than the finest hand on the face, so an \
+                 odometer counting from it would tick 66 000 times a second against a \
+                 figure uncertain by very much more. `ucal events show <id>` prints the \
+                 elapsed span with its window beside it, which is the honest way to \
+                 present it. `bridge-epoch` is exact by definition and is accepted here",
+            ));
+        }
+        Ok((
+            Instant::from_ticks(e.window.lo().ticks().clone())?,
+            format!("{} ({})", e.label, e.id),
+        ))
+    }
+}
+
+/// F4 — check a §15.1 file and say what follows from it.
+///
+/// # Why `cal derive` was not already this
+///
+/// The only way to test a file was to run `cal derive` and see whether it
+/// errored, and that conflates two different answers. A file can be perfectly
+/// well-formed and still have `derive` fail — a body whose year is a whole
+/// number of its solar days gets `UCAL-E0060`, which is a fact about the body
+/// and not a defect in the file. An author reading a red exit code cannot tell
+/// which of the two they have.
+///
+/// So this separates them. **Does the file load** is one question, **does a
+/// calendar follow from it** is another, and both are reported whatever the
+/// other says.
+///
+/// # The check nothing else performs
+///
+/// Every release note this project has published carries the same caveat:
+///
+/// > A rounded parameter is a different calendar.
+///
+/// It has been true and unmeasurable. Here it is measured: for each *measured*
+/// parameter feeding the intercalation, the last published digit is moved by one
+/// in each direction and the leap rule re-derived. If the rule survives both, the
+/// file's precision is sufficient for the calendar it declares; if it does not,
+/// the author is shown the rules their neighbours would have derived.
+///
+/// This is the check that would have caught the documented Europa example, which
+/// stated a solar day wrong in the third decimal and derived `202/279` where the
+/// body derives `1/24`.
+#[cfg(feature = "body")]
+pub fn cmd_cal_validate(path: &str, anchor_path: Option<&str>) -> CmdResult {
+    // G5 — a shipped calendar is a thing to validate too.
+    //
+    // The command shipped able to check only a file somebody else wrote, which
+    // put the project's own fifteen calendars outside the one check built to
+    // measure how fragile a calendar's parameters are. They rest on the same
+    // published figures, quoted under the same Rule C, and are exactly as
+    // subject to the answer.
+    //
+    // A path wins over an id, because a caller who names a file that exists
+    // means that file. `earth-d` is not a legal filename anyone would collide
+    // with by accident, and if they did, the file is what they get.
+    let p = std::path::Path::new(path);
+    if !p.exists() {
+        if let Ok(cal) = ucal_body::calendar::by_id(path) {
+            return validate_body(Source::Shipped(path), cal.body(), anchor_path);
+        }
+        if let Some(body) = ucal_body::data::by_id(path) {
+            return validate_body(Source::Shipped(path), &body, anchor_path);
+        }
+    }
+    // A body file first, because that is what most files are and what the
+    // positional argument is documented to take. An anchor file fed here parses
+    // as neither — `deny_unknown_fields` sees `calendar`, `phase` and
+    // `determination` and rejects the lot — so rather than report a confusing
+    // `UCAL-E0012` about a file that is perfectly valid, try the other loader
+    // and say which kind it actually is.
+    match body_file::load(p) {
+        Ok(body) => validate_body(Source::File(path), &body, anchor_path),
+        Err(body_err) => match anchor_file::load(p) {
+            Ok(anchor) => validate_anchor(path, &anchor, anchor_path),
+            // Both failed. The body error is the one to report: this argument is
+            // documented as a body file, and the anchor loader's complaint about
+            // a malformed body file would be noise.
+            Err(_) => Err(body_err),
+        },
+    }
+}
+
+/// One `(name, verdict)` row of the report.
+#[cfg(feature = "body")]
+fn check(name: &str, verdict: impl Into<String>) -> (String, Value) {
+    (name.to_string(), Value::text(verdict.into()))
+}
+
+/// G5 — the precision probe over every calendar this project ships.
+///
+/// # Why this had to exist
+///
+/// F4 built a probe for the caveat every release note has carried since 0.2.0 —
+/// *a rounded parameter is a different calendar* — and pointed it only at files
+/// somebody else wrote. This project's own fifteen calendars quote published
+/// figures under the same Rule C and are exactly as subject to the answer, and
+/// nothing asked them.
+///
+/// # What it found
+///
+/// **Fifteen calendars rest on twenty distinct published figures, and fifteen of
+/// those twenty are one-digit-critical.** That is not a defect: a leap rule is a
+/// convergent of a continued fraction and continued fractions are violently
+/// sensitive to their inputs, which `CLI.md` has said in words since 1.4.0.
+/// This is that sentence measured.
+///
+/// **The sharp part is the sharing.** A satellite's year is its primary's orbit,
+/// so one figure — Jupiter's `4332.589 d` — decides the intercalation of *five*
+/// shipped calendars, and one revision to it moves all five at once. Saturn's
+/// `10759.2058 d` carries three. A count of sensitive *parameters* hides that;
+/// this reports distinct figures and who depends on each.
+#[cfg(feature = "body")]
+pub fn cmd_cal_validate_all() -> CmdResult {
+    use std::collections::BTreeMap;
+
+    let mut rows: Vec<(String, Value)> = Vec::new();
+    // figure -> the calendars whose intercalation it decides.
+    let mut shared: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    // figure -> whether its last digit decides the rule. Keyed by figure and not
+    // by parameter, because the first version of this counted parameter slots
+    // and reported nineteen sensitive out of nineteen distinct — five of them
+    // one figure, counted five times.
+    let mut is_sensitive: BTreeMap<String, bool> = BTreeMap::new();
+    let mut probed = 0usize;
+    let mut derived = 0usize;
+    let mut cycles: Vec<(String, Value)> = Vec::new();
+
+    let cals = ucal_body::calendar::registered();
+    for (id, body, _) in &cals {
+        let solar = body.solar_day().value_at_epoch();
+        let year = body.orbital_period().value_at_epoch();
+        let Ok(baseline) = ucal_body::derive_leap_rule(
+            solar,
+            year,
+            ucal_body::DriftBound::DEFAULT,
+            32,
+        ) else {
+            rows.push(check(id, "no leap rule follows from this body"));
+            continue;
+        };
+
+        let mut parts: Vec<(String, Value)> = Vec::new();
+        for (what, param) in [
+            ("solar_day", body.solar_day()),
+            ("orbital_period", body.orbital_period()),
+        ] {
+            let Some(m) = param.as_measured() else {
+                derived += 1;
+                parts.push((
+                    what.to_string(),
+                    Value::text("derived — no last digit to move"),
+                ));
+                continue;
+            };
+            probed += 1;
+            shared
+                .entry(m.verbatim())
+                .or_default()
+                .push((*id).to_string());
+            let verdict = probe_last_digit(m, what, solar, year, &baseline);
+            let sens = verdict.starts_with("sensitive");
+            parts.push((
+                what.to_string(),
+                Value::text(format!(
+                    "{} {}",
+                    m.verbatim(),
+                    if sens { "decides it" } else { "has a digit to spare" }
+                )),
+            ));
+            // A figure shared by several calendars is probed once per calendar
+            // and can come out differently each time — the same Jovian year
+            // decides Europa's rule and Io's independently. Sensitive anywhere
+            // is sensitive: it is a property of the pairing, and the figure is
+            // the thing a revision would touch.
+            let e = is_sensitive.entry(m.verbatim()).or_insert(false);
+            *e = *e || sens;
+        }
+        let mut fields = vec![(
+            "rule".to_string(),
+            Value::text(format!(
+                "{}/{}",
+                baseline.chosen.value.numer().to_dec_string(),
+                baseline.chosen.value.denom().to_dec_string()
+            )),
+        )];
+        fields.extend(parts);
+        rows.push(((*id).to_string(), Value::Section(fields)));
+
+        // G4 — how deep the cycle survives its own last published digit. Every
+        // calendar appears, including the fourteen with no cycle: a section
+        // listing one of fifteen without saying so is the shape V1 Finding 1
+        // caught fourteen times in this tree.
+        //
+        // The grouping satellite is the one this *calendar declares*, which for
+        // `mars-d` is none — despite Mars having two moons. Reading
+        // `satellites().first()` here reported a cycle `ucal cal show mars-d`
+        // says the calendar does not have.
+        let grouping = Source::Shipped(id).grouping(body);
+        match grouping.and_then(|g| probe_satellite(body, Some(g))) {
+            None => cycles.push((
+                (*id).to_string(),
+                Value::Section(vec![
+                    ("grouped_by".into(), Value::text("—")),
+                    (
+                        "terms_surviving".into(),
+                        Value::text(if body.satellites().is_empty() {
+                            "no satellite at all"
+                        } else {
+                            "no grouping satellite declared, though the body has one"
+                        }),
+                    ),
+                ]),
+            )),
+            Some((_, verdict)) => {
+                let sat = grouping.unwrap_or("—");
+                cycles.push((
+                    (*id).to_string(),
+                    Value::Section(vec![
+                        ("grouped_by".into(), Value::text(sat)),
+                        (
+                            "terms_surviving".into(),
+                            Value::text(if verdict.contains("stable") {
+                                "the whole expansion".to_string()
+                            } else {
+                                verdict
+                                    .split("agrees for ")
+                                    .nth(1)
+                                    .and_then(|t| t.split(' ').next())
+                                    .unwrap_or("?")
+                                    .to_string()
+                            }),
+                        ),
+                    ]),
+                ));
+            }
+        }
+    }
+
+    // The figures more than one calendar rests on. This is the finding the
+    // per-body view cannot show: the count of sensitive *parameters* triple-counts
+    // a figure three bodies share.
+    let mut carried: Vec<(String, Value)> = shared
+        .iter()
+        .filter(|(_, who)| who.len() > 1)
+        .map(|(fig, who)| {
+            (
+                fig.clone(),
+                Value::text(format!(
+                    "{} calendars: {}",
+                    who.len(),
+                    who.join(", ")
+                )),
+            )
+        })
+        .collect();
+    carried.sort_by_key(|(_, v)| match v {
+        Value::Text(t) => std::cmp::Reverse(t.len()),
+        _ => std::cmp::Reverse(0),
+    });
+
+    Ok(Doc::new()
+        .title("ucal cal validate --all")
+        .field("calendars", Value::number(cals.len().to_string()))
+        .field(
+            "figures",
+            Value::Section(vec![
+                (
+                    "parameters_probed".into(),
+                    Value::number(probed.to_string()),
+                ),
+                (
+                    "parameters_derived".into(),
+                    Value::number(derived.to_string()),
+                ),
+                ("distinct_figures".into(), Value::number(shared.len().to_string())),
+                (
+                    "distinct_sensitive".into(),
+                    Value::number(
+                        is_sensitive.values().filter(|v| **v).count().to_string(),
+                    ),
+                ),
+                (
+                    "distinct_stable".into(),
+                    Value::number(
+                        is_sensitive.values().filter(|v| !**v).count().to_string(),
+                    ),
+                ),
+            ]),
+        )
+        // `Rows` and not `Section`: these are keyed by *data* — a calendar id,
+        // a published figure — and `ucal-json/1` distinguishes the two. A data
+        // key emitted as a schema key puts every calendar id into the schema,
+        // and `4332.589 d (86400 s)` even carries dots, which the surface file's
+        // dotted paths cannot represent at all. The json-surface check caught it.
+        .field(
+            "intercalation",
+            Value::Rows {
+                key: "calendar".into(),
+                value: None,
+                rows,
+            },
+        )
+        .field(
+            "cycles",
+            Value::Rows {
+                key: "calendar".into(),
+                value: None,
+                rows: cycles,
+            },
+        )
+        .field(
+            "carried_by_more_than_one",
+            Value::Rows {
+                key: "figure".into(),
+                value: Some("calendars resting on it".into()),
+                rows: carried,
+            },
+        )
+        .note(
+            "**Sensitive is a measurement, not a verdict.** A leap rule is a convergent of \
+             a continued fraction, and continued fractions are violently sensitive to their \
+             inputs — so most published figures deciding their own rule is Rule K working. \
+             What it means for an author is that quoting a source to one digit fewer \
+             declares a different calendar.",
+        )
+        .note(
+            "**The probe is not comparable between bodies.** One unit in the last place is \
+             a second for Earth's 86400 s and a millisecond for Mars's 88775.244 s, so \
+             `sensitive` means `at the precision this source published`, not `to the same \
+             tolerance`. Earth's solar day is exact by definition and has no last digit to \
+             be wrong in; it is reported sensitive because a second either way does change \
+             the rule.",
+        )
+        .note(
+            "**A satellite's year is its primary's orbit.** So the figures above are shared, \
+             and a revision to one moves every calendar under it — which is a thing to know \
+             before revising one.",
+        )
+        .note(
+            "**Fourteen of the fifteen have no cycle**, because they declare no grouping \
+             satellite. §15.3 forbids a fallback structure, so that is the answer and not \
+             a gap — and it is listed per calendar rather than summarised, because a \
+             section reporting one of fifteen without saying so is the shape V1 Finding 1 \
+             caught fourteen times in this tree.",
+        )
+        .note(
+            "**`cycles` counts terms, not rules.** A leap rule is chosen by a drift bound, \
+             so `which rule` is a decision that can survive a nudge; nothing selects a \
+             cycle, and the deepest convergent is the ratio itself — which any nudge \
+             changes. What carries information is how far the continued fraction agrees, \
+             because terms that agree are candidate cycle rules that agree.",
+        ))
+}
+
+/// G4 — the same question, on the figure that decides a calendar's **cycle**.
+///
+/// The probe shipped covering `solar_day` and `orbital_period`, which feed the
+/// intercalation, and nothing else. A calendar's *cycles* come from a different
+/// figure — the grouping satellite's own orbital period — so a body whose cycle
+/// was one digit from a different cycle passed with no comment, in the feature
+/// built to measure exactly that.
+///
+/// # Why this reports a depth and not a rule
+///
+/// The first version of this compared the *chosen* cycle the way the
+/// intercalation probe compares the chosen leap rule, and it was worthless: a
+/// leap rule is selected by a drift bound, so "which rule" is a decision that
+/// can survive a nudge, while `derive_cycles` selects nothing and the program
+/// displays the **deepest** convergent — which is the ratio itself to within its
+/// own precision. Moving any digit changes it, always, so the check could only
+/// ever print `sensitive` and would have told an author nothing.
+///
+/// What carries information is **where the continued fraction diverges**, which
+/// is the quantity `CLI.md` has used to explain this since 1.4.0:
+///
+/// > the continued fraction diverges at the fifth term: `[1, 3, 35, 1, 1, 1, 5,
+/// > 1]` becomes `[1, 3, 35, 1, 106, 6, 3, 1]`
+///
+/// Terms that agree are convergents that agree, so the depth is exactly how much
+/// of the cycle structure survives the last published digit being wrong.
+#[cfg(feature = "body")]
+fn probe_satellite(
+    body: &ucal_body::Body,
+    grouping: Option<&str>,
+) -> Option<(String, String)> {
+    use ucal_body::param::{Measured, RatedParam};
+
+    let sat = body.satellite(grouping?)?;
+    let m = sat.orbital_period().as_measured()?;
+
+    let expansion = |b: &ucal_body::Body| -> Option<Vec<u64>> {
+        let c = ucal_body::derive_cycles(b, Some(sat.id()), 32).ok()?;
+        Some(c.first()?.continued_fraction.clone())
+    };
+    let base = expansion(body)?;
+
+    // Rebuilt rather than substituted: `Body::with_satellite` appends, so
+    // attaching a second satellite of the same id would leave `derive_cycles`
+    // looking the *original* up and reporting a stability it never tested.
+    let rebuilt = |sat_period: RatedParam| -> ucal_body::Body {
+        let b = ucal_body::Body::new(
+            body.id(),
+            body.rotation_period().clone(),
+            body.solar_day().clone(),
+            body.orbital_period().clone(),
+        )
+        .with_satellite(ucal_body::Satellite::new(
+            sat.id(),
+            sat_period,
+            sat.is_retrograde(),
+        ));
+        match body.primary() {
+            Some(p) => b.orbiting(p),
+            None => b,
+        }
+    };
+
+    let mut shallowest: Option<usize> = None;
+    let mut example = String::new();
+    for delta in [1i128, -1] {
+        let Some(mantissa) = m.mantissa.checked_add_signed(delta) else {
+            continue;
+        };
+        if mantissa == 0 {
+            continue;
+        }
+        let moved = Measured::new(mantissa, m.decimals, m.unit, m.citation);
+        let Ok(param) = RatedParam::new(
+            moved,
+            sat.orbital_period().epoch().clone(),
+            sat.orbital_period().valid().clone(),
+        ) else {
+            continue;
+        };
+        let Some(other) = expansion(&rebuilt(param)) else {
+            continue;
+        };
+        let agree = base
+            .iter()
+            .zip(other.iter())
+            .take_while(|(a, b)| a == b)
+            .count();
+        if agree < base.len().min(other.len()) || base.len() != other.len() {
+            if shallowest.is_none_or(|s| agree < s) {
+                shallowest = Some(agree);
+                // Both expansions to one term past the divergence, which is
+                // the form `CLI.md` uses: the shared prefix, then the term
+                // where they part company.
+                let show = |v: &[u64]| {
+                    let n = (agree + 1).min(v.len());
+                    let mut t = format!("{:?}", &v[..n]);
+                    if v.len() > n {
+                        t.pop();
+                        t.push_str(", …]");
+                    }
+                    t
+                };
+                example = format!(
+                    "{}: {} becomes {}",
+                    moved.verbatim(),
+                    show(&base),
+                    show(&other)
+                );
+            }
+        }
+    }
+
+    let verdict = match shallowest {
+        None => format!(
+            "stable — one unit in the last published place, either way, leaves the whole \
+             continued fraction unchanged, so every candidate cycle rule survives it. \
+             {} terms",
+            base.len()
+        ),
+        Some(depth) => format!(
+            "diverges at term {}: the expansion agrees for {depth} term(s), so the first \
+             {depth} candidate cycle rules survive the last published digit being wrong \
+             and nothing deeper does. {example}. The intercalation caveat, on the figure \
+             that decides the cycle — which nothing probed until 1.9.0",
+            depth + 1
+        ),
+    };
+    // A fixed key. The first version returned `moon.orbital_period`, which is a
+    // field name that varies with the input — the thing the comment three
+    // screens up warns against, made three screens later. The satellite is named
+    // in the value, where a varying name belongs.
+    Some((
+        "grouping_period".to_string(),
+        format!("`{}` — {verdict}", sat.id()),
+    ))
+}
+
+/// Where the body being checked came from (G5).
+///
+/// The checks are the same either way and a few of their *sentences* are not: a
+/// compiled-in calendar has no file to be well-formed, no id to collide with
+/// itself, and no author to tell that their file is valid. One check list with
+/// two vocabularies, rather than two check lists that can come to disagree.
+#[cfg(feature = "body")]
+enum Source<'a> {
+    /// A §15.1 file at this path.
+    File(&'a str),
+    /// A calendar this project ships, by id.
+    Shipped(&'a str),
+}
+
+#[cfg(feature = "body")]
+impl Source<'_> {
+    fn is_file(&self) -> bool {
+        matches!(self, Source::File(_))
+    }
+    fn name(&self) -> &str {
+        match self {
+            Source::File(p) | Source::Shipped(p) => p,
+        }
+    }
+
+    /// Which satellite groups this calendar's cycle — **as declared**, not as
+    /// listed.
+    ///
+    /// The two differ and it matters. D-A5 makes the grouping satellite the
+    /// *calendar's* declaration rather than a property of the body, because
+    /// "month-like" is an Earth predicate and no bracket over periods can pick
+    /// one honestly. A §15.1 file has nowhere to declare it, so a file gets the
+    /// first satellite it lists; a shipped calendar declares it in
+    /// `calendar::registered`, and `mars-d` declares **none** despite Mars
+    /// having two moons.
+    ///
+    /// The first version of this check read `body.satellites().first()` for both
+    /// and so reported `mars-d` as *grouped by phobos, 1 term survives* while
+    /// `ucal cal show mars-d` said *no grouping satellite*. One calendar, two
+    /// answers, because a declaration existed and this code went round it.
+    fn grouping(&self, body: &ucal_body::Body) -> Option<&'static str> {
+        match self {
+            Source::File(_) => body.satellites().first().map(|s| s.id()),
+            Source::Shipped(id) => ucal_body::calendar::registered()
+                .into_iter()
+                .find(|(cid, _, _)| cid == id || cid.trim_end_matches("-d") == *id)
+                .and_then(|(_, _, g)| g),
+        }
+    }
+}
+
+/// The body half of [`cmd_cal_validate`] — a file, or a shipped calendar.
+#[cfg(feature = "body")]
+fn validate_body(
+    source: Source<'_>,
+    body: &ucal_body::Body,
+    anchor_path: Option<&str>,
+) -> CmdResult {
+    let from_file = source.is_file();
+    let grouping = source.grouping(body);
+    let mut checks: Vec<(String, Value)> = Vec::new();
+
+    checks.push(check(
+        "loads",
+        if from_file {
+            "ok — strict HJSON, every key known (§15.1), and every parameter carries a \
+             value, a unit, an epoch, a validity window and a citation (Rule C)"
+        } else {
+            "compiled in — there is no file to be well-formed. The parameters are \
+             `Measured` constants, so Rule C's obligations were met at the type level and \
+             every figure carries its citation. Everything below is the same check a file gets"
+        },
+    ));
+
+    let id: String = format!("{}-d", body.id());
+    let collides = ucal_body::calendar::registered()
+        .iter()
+        .any(|(rid, _, _)| *rid == id);
+    checks.push(check(
+        "id",
+        match (from_file, collides) {
+            (true, true) => format!(
+                "`{}` — which derives `{id}`, and a calendar of that id already ships. This \
+                 file is valid; a command naming `{id}` will get the compiled-in one",
+                body.id()
+            ),
+            (true, false) => format!("`{}` — which derives the calendar `{id}`", body.id()),
+            (false, _) => format!("`{}` — the body behind the calendar `{id}`", body.id()),
+        },
+    ));
+
+    checks.push(check(
+        "primary",
+        match body.primary() {
+            Some(p) => format!("`{p}`"),
+            None => "none — nothing is named that this body orbits, which is legal and means \
+                the year is stated rather than inherited"
+                .to_string(),
+        },
+    ));
+
+    for (what, param) in [
+        ("rotation_period", body.rotation_period()),
+        ("solar_day", body.solar_day()),
+        ("orbital_period", body.orbital_period()),
+    ] {
+        checks.push(check(
+            what,
+            match param.as_measured() {
+                Some(m) => format!("measured: {} — {}", m.verbatim(), param.citation().source),
+                None => format!(
+                    "derived (Z1.1), so no figure of its own is stated for it — {}",
+                    param.citation().source
+                ),
+            },
+        ));
+    }
+
+    // Does a calendar follow? A separate question from whether the file loads,
+    // and the reason this command exists.
+    let solar = body.solar_day().value_at_epoch();
+    let year = body.orbital_period().value_at_epoch();
+    // The same pre-check `cal derive` makes, and for the same reason: a year
+    // that is a whole number of solar days reaches `derive_leap_rule` as
+    // `UCAL-E0061` — *no convergent meets the drift bound* — advising a wider
+    // bound or a greater depth, neither of which can help. Reporting that here
+    // would be reporting the wrong thing in the command whose whole purpose is
+    // to say which of the two an author has.
+    let whole_year = year.div(solar).map(|r| r.is_integer()).unwrap_or(false);
+    let rule = ucal_body::derive_leap_rule(solar, year, ucal_body::DriftBound::DEFAULT, 32);
+    if whole_year {
+        checks.push(check(
+            "intercalation",
+            "none follows — this body's year is a whole number of its solar days, so there is \
+             no fractional day to distribute and Rule K has nothing to derive. That is a fact \
+             about this body, not a defect in what declares it",
+        ));
+    } else {
+        match &rule {
+            Ok(r) => checks.push(check(
+                "intercalation",
+                format!(
+                    "{}/{} at convergent {}, {} whole days per year",
+                    r.chosen.value.numer().to_dec_string(),
+                    r.chosen.value.denom().to_dec_string(),
+                    r.depth,
+                    r.whole_days.numer().to_dec_string()
+                ),
+            )),
+            Err(e) => checks.push(check(
+                "intercalation",
+                format!(
+                    "none follows — {}. A fact about this body, not a defect in what declares it",
+                    e.context.unwrap_or("no rule meets the drift bound")
+                ),
+            )),
+        }
+    }
+
+    checks.push(check(
+        "cycles",
+        match grouping.and_then(|g| body.satellite(g)) {
+            Some(sat) => format!(
+                "grouped by `{}`{}",
+                sat.id(),
+                if from_file {
+                    ", the first satellite listed — a file has nowhere to declare one (D-A5)"
+                } else {
+                    ", as this calendar declares (D-A5)"
+                }
+            ),
+            None => "none — no grouping satellite, so this calendar has years and days and \
+                     no cycle. §15.3 forbids a fallback structure, which makes that the \
+                     answer and not a gap"
+                .to_string(),
+        },
+    ));
+
+    // The precision probe. Nested under one key rather than flattened into
+    // `precision:solar_day` and friends: the parameters probed depend on which
+    // of them the file states as measured, and a field name that varies with
+    // the input is a field name the manual cannot document.
+    if let Ok(baseline) = &rule {
+        let mut probes: Vec<(String, Value)> = [
+            ("solar_day", body.solar_day()),
+            ("orbital_period", body.orbital_period()),
+        ]
+        .into_iter()
+        .filter_map(|(what, param)| {
+            let m = param.as_measured()?;
+            Some((
+                what.to_string(),
+                Value::text(probe_last_digit(m, what, solar, year, baseline)),
+            ))
+        })
+        .collect();
+        // G4 — and the figure that decides the cycle, which this probe did not
+        // reach when it shipped.
+        if let Some((name, verdict)) = probe_satellite(body, grouping) {
+            probes.push((name, Value::text(verdict)));
+        }
+        if !probes.is_empty() {
+            checks.push(("precision".to_string(), Value::Section(probes)));
+        }
+    }
+
+    if let Some(a) = anchor_path {
+        let anchor = anchor_file::load(std::path::Path::new(a))?;
+        checks.push(check(
+            "anchor:names",
+            if anchor.calendar_id() == id {
+                format!("`{}`, which is the calendar this body derives", anchor.calendar_id())
+            } else {
+                format!(
+                    "`{}`, and this body derives `{id}` — the two files are not a pair",
+                    anchor.calendar_id()
+                )
+            },
+        ));
+        checks.push(check(
+            "anchor:evaluable",
+            match anchor.check_evaluable(body) {
+                Ok(()) => format!(
+                    "ok — the phase `{}` is definable from the parameters this body file states",
+                    anchor.phase().label()
+                ),
+                Err(e) => format!(
+                    "no — {}",
+                    e.context
+                        .unwrap_or("this phase needs a parameter the body file does not state")
+                ),
+            },
+        ));
+    }
+
+    Ok(Doc::new()
+        .title("ucal cal validate")
+        .field("source", Value::text(source.name()))
+        .field(
+            "kind",
+            Value::text(if from_file {
+                "body file (§15.1)"
+            } else {
+                "a calendar this project ships (ucal-body::data)"
+            }),
+        )
+        .field(
+            "checks",
+            Value::Section(checks),
+        )
+        .note(if from_file {
+            "A file that loads is not a file that is right. Every check above is on \
+             *internal* consistency — that the parameters are present, cited and mutually \
+             coherent. Whether the published figures are the ones this body actually has is \
+             a question about the sources, and nothing in this program can answer it."
+        } else {
+            "Shipping a calendar is not evidence that it is right. Every check above is on \
+             *internal* consistency, and this project's own data is subject to the same \
+             answer as anybody's — which is why it is checked by the same code, and why this \
+             command has taken a calendar id since 1.9.0."
+        }))
+}
+
+/// Move the last published digit by one, each way, and re-derive.
+///
+/// The `Measured` carries its figure as a mantissa and a decimal count rather
+/// than as a parsed number, precisely so that `9.9250` is four decimals and not
+/// three — which makes one unit in the last place exactly `mantissa ± 1` and the
+/// probe exact rather than approximate.
+#[cfg(feature = "body")]
+fn probe_last_digit(
+    m: &ucal_body::param::Measured,
+    what: &str,
+    solar: &Ratio,
+    year: &Ratio,
+    baseline: &ucal_body::LeapRule,
+) -> String {
+    use ucal_body::param::Measured;
+
+    let want = |r: &ucal_body::LeapRule| {
+        format!(
+            "{}/{}",
+            r.chosen.value.numer().to_dec_string(),
+            r.chosen.value.denom().to_dec_string()
+        )
+    };
+    let base = want(baseline);
+
+    let mut neighbours: Vec<String> = Vec::new();
+    for delta in [1i128, -1] {
+        let Some(mantissa) = m.mantissa.checked_add_signed(delta) else {
+            continue;
+        };
+        if mantissa == 0 {
+            continue;
+        }
+        let Ok(t) = Measured::new(mantissa, m.decimals, m.unit, m.citation).ticks() else {
+            continue;
+        };
+        let derived = if what == "solar_day" {
+            ucal_body::derive_leap_rule(&t, year, ucal_body::DriftBound::DEFAULT, 32)
+        } else {
+            ucal_body::derive_leap_rule(solar, &t, ucal_body::DriftBound::DEFAULT, 32)
+        };
+        let got = match &derived {
+            Ok(r) => want(r),
+            Err(_) => "no rule at all".to_string(),
+        };
+        if got != base {
+            neighbours.push(format!(
+                "{} → {got}",
+                Measured::new(mantissa, m.decimals, m.unit, m.citation).verbatim()
+            ));
+        }
+    }
+
+    if neighbours.is_empty() {
+        format!(
+            "stable — one unit in the last published place, either way, still derives {base}. \
+             This figure is stated precisely enough for the calendar it declares"
+        )
+    } else {
+        format!(
+            "sensitive — one unit in the last published place derives a different rule. {} \
+             gives {base}; {}. This is the standing caveat measured, not a verdict: a figure \
+             that is exact by definition has no last digit to be wrong in, and a figure that \
+             was rounded to reach this precision declares a calendar the unrounded one would \
+             not",
+            m.verbatim(),
+            neighbours.join("; ")
+        )
+    }
+}
+
+/// The anchor-file half of [`cmd_cal_validate`].
+#[cfg(feature = "body")]
+fn validate_anchor(
+    path: &str,
+    anchor: &ucal_body::anchor::Anchor,
+    anchor_path: Option<&str>,
+) -> CmdResult {
+    let mut checks: Vec<(String, Value)> = vec![
+        check(
+            "loads",
+            "ok — strict HJSON, and every obligation `Anchor::new` puts on a compiled-in \
+                anchor is met: the phase is a physical event of the body (Rule J.1), the window \
+                contains the anchor's own tick (Rule J.2), and the determination states a \
+                method, a citation and what dominates the uncertainty",
+        ),
+        check("calendar", format!("`{}`", anchor.calendar_id())),
+        check("phase", anchor.phase().label()),
+        check("revision", format!(
+            "{} — anchors version independently of body files, because parameters change with \
+                better measurement and anchors with re-determination",
+            anchor.revision()
+        )),
+        check("method", anchor.method().method),
+        check("uncertainty", anchor.method().uncertainty_note),
+        check(
+            "window",
+            format!(
+                "± {} ticks about the stated instant",
+                anchor.uncertainty().ticks().to_dec_string()
+            ),
+        ),
+        check("citation", anchor.citation().source),
+    ];
+
+    if anchor_path.is_some() {
+        checks.push(check(
+            "--anchor",
+            "ignored — the positional file is itself an anchor, so there is no body file here \
+                for it to be paired against",
+        ));
+    }
+
+    Ok(Doc::new()
+        .title("ucal cal validate")
+        .field("file", Value::text(path))
+        .field("kind", Value::text("anchor file (§15.1)"))
+        .field(
+            "checks",
+            Value::Section(checks),
+        )
+        .note(
+            "An anchor is an observation and cannot be checked against anything but its \
+                source. What is checked here is that it is *shaped* like one — a phase that is \
+                an event of its own body, a window that contains its own estimate, and a \
+                determination that says how it was made. To check it against the body it belongs \
+                to, pass the body file as the positional argument and this file to --anchor.",
+        ))
 }

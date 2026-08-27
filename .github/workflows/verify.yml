@@ -45,7 +45,7 @@ jobs:
       # block listed the command, which is the same shape as the defect 1.6.0 is
       # about: a mechanism that exists and is not wired to anything.
       - name: the wall clock
-        run: cargo test -p ucal --release --features tui
+        run: cargo test -p ucal --release --features full
 
       # Rule W: the two backends must agree byte for byte. Nothing checks that
       # at runtime -- backend.rs refuses to compile both at once -- so this job
@@ -171,7 +171,7 @@ jobs:
       #
       # in every run since the check was written, which is precisely the silent
       # skip its own comment in xtask/src/main.rs warns is how a stale file
-      # survives. `--features tui` because two of the examples are wall-clock
+      # survives. `--features full` because two of the examples are wall-clock
       # frames.
       - name: the binary the documentation is generated from
         run: cargo build --release --locked -p ucal --features full
