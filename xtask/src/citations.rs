@@ -223,6 +223,59 @@ pub fn check(root: &Path) -> Result<usize, Vec<Dangling>> {
 
 #[cfg(test)]
 mod tests {
+    /// **`1.10.0` is newer than `1.9.0`.**
+    ///
+    /// A lexicographic sort of release-notes filenames puts `1.10.0.md` between
+    /// `1.1.0.md` and `1.2.0.md`, so the "newest" file was `1.9.0.md` and
+    /// `check_ci_covers_the_procedure` began reading the *previous* release's
+    /// verification block while reporting success.
+    ///
+    /// Latent since 1.0.0 and impossible to reach until a two-digit minor
+    /// existed. The defect corpus caught it on 1.10.0's first commit: the
+    /// mutation edits the current cycle's notes, and a check reading the last
+    /// cycle's notes cannot see it.
+    #[test]
+    fn release_notes_sort_by_version_and_not_by_filename() {
+        use std::path::PathBuf;
+        let mut files: Vec<PathBuf> = [
+            "1.0.0.md", "1.1.0.md", "1.2.0.md", "1.9.0.md", "1.10.0.md", "0.8.0.md",
+        ]
+        .iter()
+        .map(PathBuf::from)
+        .collect();
+        files.sort_by_key(|p| version_of(p));
+        let names: Vec<&str> = files
+            .iter()
+            .filter_map(|p| p.file_name().and_then(|n| n.to_str()))
+            .collect();
+        assert_eq!(
+            names.last(),
+            Some(&"1.10.0.md"),
+            "the newest release notes were picked lexicographically"
+        );
+        // Total and numeric throughout, not merely right at the end.
+        assert_eq!(
+            names,
+            vec!["0.8.0.md", "1.0.0.md", "1.1.0.md", "1.2.0.md", "1.9.0.md", "1.10.0.md"]
+        );
+    }
+
+    /// An unparseable name sorts first, so a stray file cannot become "the
+    /// newest" and quietly redirect the check to itself.
+    #[test]
+    fn a_stray_file_cannot_become_the_newest() {
+        use std::path::PathBuf;
+        let mut files: Vec<PathBuf> = ["1.9.0.md", "NOTES.md", "1.10.0.md"]
+            .iter()
+            .map(PathBuf::from)
+            .collect();
+        files.sort_by_key(|p| version_of(p));
+        assert_eq!(
+            files.last().and_then(|p| p.file_name()).and_then(|n| n.to_str()),
+            Some("1.10.0.md")
+        );
+    }
+
     use super::*;
 
     #[test]
@@ -411,6 +464,23 @@ fn kebab(camel: &str) -> String {
 ///
 /// Compares the *commands*, normalised for line continuations and whitespace —
 /// not the surrounding YAML, which is free to differ.
+/// A release-notes filename as a comparable version.
+///
+/// `1.10.0.md` is *after* `1.9.0.md`, which only numeric comparison gets right.
+/// Anything unparseable sorts first, so a stray file cannot become "the newest"
+/// and quietly redirect a check to itself.
+fn version_of(p: &Path) -> (u64, u64, u64) {
+    let Some(stem) = p.file_stem().and_then(|s| s.to_str()) else {
+        return (0, 0, 0);
+    };
+    let mut it = stem.split('.').map(|n| n.parse::<u64>().unwrap_or(0));
+    (
+        it.next().unwrap_or(0),
+        it.next().unwrap_or(0),
+        it.next().unwrap_or(0),
+    )
+}
+
 pub fn check_ci_covers_the_procedure(root: &Path) -> Result<usize, Vec<String>> {
     let wf = root.join(".github/workflows/verify.yml");
     let Ok(workflow) = std::fs::read_to_string(&wf) else {
@@ -429,7 +499,13 @@ pub fn check_ci_covers_the_procedure(root: &Path) -> Result<usize, Vec<String>> 
                 .is_some_and(|n| n.ends_with(".md") && n != "README.md")
         })
         .collect();
-    files.sort();
+    // **By version, not by filename.** A lexicographic sort puts `1.10.0.md`
+    // between `1.1.0.md` and `1.2.0.md`, so `.last()` returned `1.9.0.md` the
+    // moment a two-digit minor existed — and this check began reading the
+    // *previous* release's procedure while reporting success. Latent since
+    // 1.0.0; the defect corpus caught it on 1.10.0's first commit, which is the
+    // first version where the two orders disagree.
+    files.sort_by_key(|p| version_of(p));
     let Some(newest) = files.last().map(|p| p.as_path()) else {
         return Err(alloc_vec("no release-notes file to read a procedure from".into()));
     };
