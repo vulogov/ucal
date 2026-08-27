@@ -223,57 +223,74 @@ pub fn check(root: &Path) -> Result<usize, Vec<Dangling>> {
 
 #[cfg(test)]
 mod tests {
-    /// **`1.10.0` is newer than `1.9.0`.**
+    /// **The check reads the notes for the version being built.**
     ///
-    /// A lexicographic sort of release-notes filenames puts `1.10.0.md` between
-    /// `1.1.0.md` and `1.2.0.md`, so the "newest" file was `1.9.0.md` and
-    /// `check_ci_covers_the_procedure` began reading the *previous* release's
-    /// verification block while reporting success.
+    /// It used to read "the newest release-notes file", picked by sorting
+    /// filenames — which put `1.10.0.md` between `1.1.0.md` and `1.2.0.md`, so
+    /// the newest was `1.9.0.md` and the check compared CI against the
+    /// *previous* release's procedure while reporting success. Latent since
+    /// 1.0.0 and unreachable until a two-digit minor existed; the defect corpus
+    /// caught it on 1.10.0's first commit.
     ///
-    /// Latent since 1.0.0 and impossible to reach until a two-digit minor
-    /// existed. The defect corpus caught it on 1.10.0's first commit: the
-    /// mutation edits the current cycle's notes, and a check reading the last
-    /// cycle's notes cannot see it.
+    /// Sorting numerically would have fixed that one bug and left the guess in
+    /// place. Deriving the version removes the guess.
     #[test]
-    fn release_notes_sort_by_version_and_not_by_filename() {
-        use std::path::PathBuf;
-        let mut files: Vec<PathBuf> = [
-            "1.0.0.md", "1.1.0.md", "1.2.0.md", "1.9.0.md", "1.10.0.md", "0.8.0.md",
-        ]
-        .iter()
-        .map(PathBuf::from)
-        .collect();
-        files.sort_by_key(|p| version_of(p));
-        let names: Vec<&str> = files
-            .iter()
-            .filter_map(|p| p.file_name().and_then(|n| n.to_str()))
-            .collect();
-        assert_eq!(
-            names.last(),
-            Some(&"1.10.0.md"),
-            "the newest release notes were picked lexicographically"
+    fn the_procedure_check_reads_the_current_version_s_notes() {
+        let v = super::workspace_version(&crate::workspace_root())
+            .expect("a workspace version");
+        let notes = crate::workspace_root()
+            .join("Documentation/Release_Notes")
+            .join(format!("{v}.md"));
+        assert!(
+            notes.exists(),
+            "the workspace is at {v} and {} does not exist",
+            notes.display()
         );
-        // Total and numeric throughout, not merely right at the end.
-        assert_eq!(
-            names,
-            vec!["0.8.0.md", "1.0.0.md", "1.1.0.md", "1.2.0.md", "1.9.0.md", "1.10.0.md"]
-        );
+        // And that is the file whose block CI is held to.
+        assert!(super::check_ci_covers_the_procedure(&crate::workspace_root()).is_ok());
     }
 
-    /// An unparseable name sorts first, so a stray file cannot become "the
-    /// newest" and quietly redirect the check to itself.
+    /// **A version bumped without its notes is an error, not a fallback.**
+    ///
+    /// The sort could not catch this: with no `1.11.0.md` it would silently read
+    /// `1.10.0.md` and pass. This is the adjacent failure that removing the
+    /// guess closes.
     #[test]
-    fn a_stray_file_cannot_become_the_newest() {
-        use std::path::PathBuf;
-        let mut files: Vec<PathBuf> = ["1.9.0.md", "NOTES.md", "1.10.0.md"]
-            .iter()
-            .map(PathBuf::from)
-            .collect();
-        files.sort_by_key(|p| version_of(p));
-        assert_eq!(
-            files.last().and_then(|p| p.file_name()).and_then(|n| n.to_str()),
-            Some("1.10.0.md")
+    fn a_missing_notes_file_for_the_current_version_is_refused() {
+        let dir = std::env::temp_dir().join("ucal-procedure-no-notes");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("Documentation/Release_Notes")).expect("mkdir");
+        std::fs::create_dir_all(dir.join(".github/workflows")).expect("mkdir");
+        std::fs::write(dir.join(".github/workflows/verify.yml"), "jobs:\n").expect("write");
+        std::fs::write(
+            dir.join("Cargo.toml"),
+            "[workspace.package]\nversion = \"9.9.9\"\n",
+        )
+        .expect("write");
+        // A notes file for some *other* version, which the old sort would have
+        // happily read instead.
+        std::fs::write(
+            dir.join("Documentation/Release_Notes/1.0.0.md"),
+            "## Verification\n\n```\ncargo test --workspace --release\n```\n",
+        )
+        .expect("write");
+
+        let e = super::check_ci_covers_the_procedure(&dir)
+            .expect_err("a version with no notes must not fall back to another's");
+        // Specific to the message the explicit check produces. Asserting only
+        // that *some* error came back passed even with that check disabled —
+        // `read_to_string` fails too, and its message names the path, which
+        // contains the version. A test that cannot tell the two apart is not
+        // testing the branch it claims to.
+        assert!(
+            e.iter().any(|m| m.contains("a cycle's notes")),
+            "expected the missing-notes diagnostic, got: {e:?}"
         );
+        assert!(
+            e.iter().any(|m| m.contains("9.9.9")),
+            "the message should name the version: {e:?}"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     use super::*;
@@ -462,53 +479,70 @@ fn kebab(camel: &str) -> String {
 /// comment, because a step quietly dropped from CI is invisible exactly when it
 /// matters.
 ///
-/// Compares the *commands*, normalised for line continuations and whitespace —
-/// not the surrounding YAML, which is free to differ.
-/// A release-notes filename as a comparable version.
+/// The workspace version, from `[workspace.package]`.
 ///
-/// `1.10.0.md` is *after* `1.9.0.md`, which only numeric comparison gets right.
-/// Anything unparseable sorts first, so a stray file cannot become "the newest"
-/// and quietly redirect a check to itself.
-fn version_of(p: &Path) -> (u64, u64, u64) {
-    let Some(stem) = p.file_stem().and_then(|s| s.to_str()) else {
-        return (0, 0, 0);
-    };
-    let mut it = stem.split('.').map(|n| n.parse::<u64>().unwrap_or(0));
-    (
-        it.next().unwrap_or(0),
-        it.next().unwrap_or(0),
-        it.next().unwrap_or(0),
-    )
+/// The release-notes file to check is the one for **the version being built**.
+/// Deriving it removes the guess entirely — see
+/// [`check_ci_covers_the_procedure`] for what the guess cost.
+fn workspace_version(root: &Path) -> Option<String> {
+    let s = std::fs::read_to_string(root.join("Cargo.toml")).ok()?;
+    let mut inside = false;
+    for line in s.lines() {
+        let l = line.trim();
+        if l.starts_with('[') {
+            inside = l == "[workspace.package]";
+            continue;
+        }
+        if inside && !l.starts_with('#') {
+            if let Some(rest) = l.strip_prefix("version") {
+                let rest = rest.trim_start().strip_prefix('=')?.trim_start();
+                let rest = rest.strip_prefix('"')?;
+                return rest.split('"').next().map(str::to_string);
+            }
+        }
+    }
+    None
 }
 
+/// The CI workflow must run every command the release procedure lists.
+///
+/// `Documentation/Release_Notes/<version>.md` prints a verification block and
+/// `.github/workflows/verify.yml` runs it. The workflow says in a comment that
+/// the two are the same list; this is what makes that a fact rather than a
+/// comment, because a step quietly dropped from CI is invisible exactly when it
+/// matters.
+///
+/// Compares the *commands*, normalised for line continuations and whitespace —
+/// not the surrounding YAML, which is free to differ.
 pub fn check_ci_covers_the_procedure(root: &Path) -> Result<usize, Vec<String>> {
     let wf = root.join(".github/workflows/verify.yml");
     let Ok(workflow) = std::fs::read_to_string(&wf) else {
         return Err(alloc_vec(format!("{} is missing", wf.display())));
     };
-    // The newest release-notes file that has a verification block.
-    let dir = root.join("Documentation/Release_Notes");
-    let Ok(entries) = std::fs::read_dir(&dir) else {
-        return Err(alloc_vec("Documentation/Release_Notes is unreadable".into()));
+    // **The notes for the version being built**, not "the newest file".
+    //
+    // The first version of this sorted filenames and took the last, which put
+    // `1.10.0.md` between `1.1.0.md` and `1.2.0.md` — so it read the *previous*
+    // release's procedure and reported success. Sorting numerically would have
+    // fixed that one bug and left the guess in place; deriving the version
+    // removes the guess, and catches the adjacent failure the sort could not:
+    // a version bumped and its notes never written.
+    let Some(version) = workspace_version(root) else {
+        return Err(alloc_vec(
+            "cannot read the workspace version from Cargo.toml".into(),
+        ));
     };
-    let mut files: Vec<std::path::PathBuf> = entries
-        .filter_map(|e| e.ok().map(|e| e.path()))
-        .filter(|p| {
-            p.file_name()
-                .and_then(|n| n.to_str())
-                .is_some_and(|n| n.ends_with(".md") && n != "README.md")
-        })
-        .collect();
-    // **By version, not by filename.** A lexicographic sort puts `1.10.0.md`
-    // between `1.1.0.md` and `1.2.0.md`, so `.last()` returned `1.9.0.md` the
-    // moment a two-digit minor existed — and this check began reading the
-    // *previous* release's procedure while reporting success. Latent since
-    // 1.0.0; the defect corpus caught it on 1.10.0's first commit, which is the
-    // first version where the two orders disagree.
-    files.sort_by_key(|p| version_of(p));
-    let Some(newest) = files.last().map(|p| p.as_path()) else {
-        return Err(alloc_vec("no release-notes file to read a procedure from".into()));
-    };
+    let newest = root
+        .join("Documentation/Release_Notes")
+        .join(format!("{version}.md"));
+    if !newest.exists() {
+        return Err(alloc_vec(format!(
+            "the workspace is at {version} and {} does not exist; a cycle's notes \
+             are created when it opens",
+            newest.display()
+        )));
+    }
+    let newest = newest.as_path();
     let Ok(notes) = std::fs::read_to_string(newest) else {
         return Err(alloc_vec(format!("cannot read {}", newest.display())));
     };
