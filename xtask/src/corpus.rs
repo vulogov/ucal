@@ -203,8 +203,14 @@ pub const MUTATIONS: &[Mutation] = &[
         check: "lint:codes-have-raisers",
         what: "a diagnostic code declared and raised nowhere",
         file: "crates/ucal-core/src/error.rs",
-        find: "    E0018,\n}",
-        replace: "    E0018,\n\n    /// Injected by the defect corpus.\n    E0019,\n}",
+        // Anchored on the *last* declared variant, and injecting a number
+        // nothing uses. The first version anchored on `E0018,` and injected
+        // `E0019` — which N4 then made a real code with three raisers, so the
+        // anchor vanished and the injection would have been a duplicate. A
+        // mutation naming the next free number is a mutation that expires the
+        // moment somebody takes it.
+        find: "    E0019,\n}",
+        replace: "    E0019,\n\n    /// Injected by the defect corpus.\n    E0090,\n}",
     },
     Mutation {
         check: "lint:public-type-is-classified",

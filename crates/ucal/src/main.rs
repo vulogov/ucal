@@ -805,7 +805,7 @@ fn main() {
             // Handled before dispatch, like `seq`: it emits a file, not a
             // document. This arm exists because a `match` must be exhaustive.
             CalCommand::Export { .. } => Err(ucal_core::TimeError::with_context(
-                ucal_core::Code::E0001,
+                ucal_core::Code::E0019,
                 "internal: `cal export` is handled before dispatch",
             )),
             CalCommand::Validate { file, all, anchor } => {
@@ -851,7 +851,7 @@ fn main() {
         // `unreachable!()`, because this crate carries no panicking construct.
         #[cfg(feature = "body")]
         Command::Seq { .. } => Err(ucal_core::TimeError::with_context(
-            ucal_core::Code::E0001,
+            ucal_core::Code::E0019,
             "internal: `seq` is handled before dispatch and should not have reached it",
         )),
         Command::Tour => ucal::cmd_tour(),
@@ -911,7 +911,7 @@ fn main() {
         // an exit code instead of an abort.
         Command::Completions { .. } | Command::Man { .. } => {
             Err(ucal_core::TimeError::with_context(
-                ucal_core::Code::E0001,
+                ucal_core::Code::E0019,
                 "internal: this command is handled before dispatch and should \
                  not have reached it",
             ))
