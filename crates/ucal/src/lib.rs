@@ -1275,6 +1275,13 @@ pub fn cmd_to_civil(
     Ok(doc)
 }
 
+/// The current instant, through the **session clock**.
+///
+/// One process, one clock: a reading never goes backwards past an earlier one,
+/// however the system clock is disciplined underneath. See [`clock::Session`]
+/// for the rule and for what it deliberately does not claim. [`wall_instant`]
+/// is the raw reading.
+///
 /// The system clock as a `UC1` instant, through the bundled leap table.
 ///
 /// Extracted so `ucal wallclock` reads *now* by the same route `ucal now` does.
@@ -1283,6 +1290,23 @@ pub fn cmd_to_civil(
 /// one quantity §8.4 says cannot be computed and must be looked up.
 #[cfg(feature = "civil")]
 pub fn now_instant() -> Result<Instant<UC1>, TimeError> {
+    clock::session_now()
+}
+
+/// The system clock, read straight, with nothing between.
+///
+/// [`now_instant`] goes through the session clock so that two readings in one
+/// process cannot go backwards past each other. This is the reading that clock
+/// is built from, and the one `doctor --clock` samples: a session clock that
+/// measured itself would be measuring its own output.
+///
+/// Gated the same way [`now_instant`] is. Splitting the two dropped the
+/// attribute, and `--no-default-features --features u512,std` — one of the
+/// twenty-two the features workflow builds — caught it: converting a clock
+/// reading needs `ucal-civil`, because Unix time is a UTC *label* and turning
+/// one into an instant is a leap-table lookup (§8.4).
+#[cfg(feature = "civil")]
+pub fn wall_instant() -> Result<Instant<UC1>, TimeError> {
     use std::time::{SystemTime, UNIX_EPOCH};
     let d = SystemTime::now()
         .duration_since(UNIX_EPOCH)

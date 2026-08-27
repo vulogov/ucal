@@ -1604,8 +1604,38 @@ lands between `T-5` and `T-6`. `T-12` is about `10²⁴` times finer than that.
 
 **Interpolating between wall ticks with the monotonic clock is real and buys
 almost nothing.** `--clock` reports it: 1000 ns to 41 ns is a factor of 24, and a
-rung is 3125, so it is **0.008 of a rung** and the finest fillable tier does not
-move.
+rung is 3125, so it is **24/3125 of a rung** and the finest fillable tier does
+not move.
+
+### One process, one clock
+
+Every reading comes from a **session clock**, and it exists for monotonicity
+rather than precision — interpolation being worth the fraction of a rung above.
+
+The system clock is disciplined by something outside this process and can step
+*backwards*: NTP correcting a large offset, a VM resuming, an operator setting
+the date. A one-shot command never notices. `ucal wallclock` reads the clock
+twenty times a second for as long as it is left running, and a backward step
+there is a face that goes back in time.
+
+The rule is:
+
+```
+reading = max(wall_now, anchor + monotonic_elapsed)
+```
+
+- Ordinarily the two agree within the clock's quantum and either wins.
+- A **backward step** loses to the monotonic branch, which keeps advancing at the
+  oscillator's rate rather than freezing until the wall clock catches up.
+- A **forward step** wins, because a forward jump is a correction arriving, and
+  refusing it would prefer this process's opinion of the time to the system's.
+
+So a reading never goes backwards and the clock still tracks the system forwards.
+Neither property is a claim about accuracy, and a session reading lands on
+exactly the same rung a raw one does. Over a long run the two branches diverge by
+the rate difference between the oscillator and whatever disciplines the wall
+clock; `max` bounds the result by whichever is ahead, and that bound is the
+honest statement of what a session clock costs.
 
 **`features[]` names every optional feature this crate has**, and did not until
 1.9.0: it listed four and the crate had eight, so a binary built with

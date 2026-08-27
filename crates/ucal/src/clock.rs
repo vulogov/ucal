@@ -42,7 +42,7 @@
 
 use crate::emit::Value;
 use ucal_core::backend::TickInt;
-use ucal_core::{Profile, Ticks, Tier, TimeError, UC1};
+use ucal_core::{Instant, Profile, Ticks, Tier, TimeError, UC1};
 
 /// Decimal places [`now_instant`](crate::now_instant) reads the clock to.
 ///
@@ -77,6 +77,144 @@ pub fn finest_tier_for(q: &Ticks) -> Option<Tier> {
             .ok()
             .filter(|t| &t.ticks() >= q)
     })
+}
+
+/// One process, one clock.
+///
+/// # What this is for, which is not precision
+///
+/// Interpolating between wall-clock ticks with the monotonic clock is worth
+/// `24/3125` of a rung on the machine these notes were written on — [`measured`]
+/// prints that, and it is nothing. **This exists for monotonicity.**
+///
+/// The system clock is disciplined by something outside this process. It can
+/// step *backwards*: NTP correcting a large offset, a VM resuming, an operator
+/// setting the date. A one-shot command never notices; `ucal wallclock` reads
+/// the clock twenty times a second for as long as it is left running, and a
+/// backward step there is a face that goes back in time.
+///
+/// # The rule
+///
+/// ```text
+/// reading = max(wall_now, anchor + monotonic_elapsed)
+/// ```
+///
+/// - **Ordinarily** the two agree to within the clock's quantum and either wins.
+/// - **A backward step** loses to the monotonic branch, which keeps advancing at
+///   the oscillator's rate rather than freezing until the wall clock catches up.
+/// - **A forward step** wins, because a forward jump is a correction arriving and
+///   refusing it would be preferring this process's opinion to the system's.
+///
+/// So a reading never goes backwards, and the clock still tracks the system
+/// forwards. Those are the two properties; neither is a claim about accuracy.
+///
+/// # What it does not do
+///
+/// It does not make a reading finer, more accurate, or traceable to anything.
+/// Over a long run the monotonic branch and the wall branch diverge by the rate
+/// difference between the oscillator and whatever disciplines the wall clock —
+/// `max` bounds the result by whichever is ahead, and that bound is the honest
+/// statement of what a session clock costs.
+#[derive(Clone, Debug)]
+pub struct Session {
+    /// The wall reading this session was anchored at.
+    anchor: Ticks,
+    /// The largest reading handed out so far.
+    last: Ticks,
+}
+
+impl Session {
+    /// Anchor a session at a wall reading.
+    pub fn anchored_at(wall: &Instant<UC1>) -> Session {
+        Session {
+            anchor: wall.ticks().clone(),
+            last: wall.ticks().clone(),
+        }
+    }
+
+    /// The next reading, given the wall clock now and monotonic elapsed since
+    /// the anchor.
+    ///
+    /// Pure: no clock is read here, which is what lets a test drive a wall clock
+    /// backwards and check that the answer does not follow it.
+    pub fn reading(
+        &mut self,
+        wall_now: &Instant<UC1>,
+        monotonic_elapsed: &Ticks,
+    ) -> Result<Instant<UC1>, TimeError> {
+        let projected = self
+            .anchor
+            .try_add(monotonic_elapsed)
+            .ok_or_else(|| TimeError::new(ucal_core::Code::E0021))?;
+        // The largest of the three. `last` is belt and braces: the first two
+        // cannot go backwards on their own, and a caller handing back a smaller
+        // elapsed would make them, and this type sells monotonicity.
+        let mut best = wall_now.ticks().clone();
+        if projected > best {
+            best = projected;
+        }
+        if self.last > best {
+            best = self.last.clone();
+        }
+        self.last = best.clone();
+        Instant::from_ticks(best)
+    }
+
+    /// How far the wall clock has moved away from this session's projection.
+    ///
+    /// Signed by a word rather than a number, because a tick count is unsigned
+    /// (Rule B) — the same shape `SignedWindow` and the odometer take.
+    pub fn divergence(&self, wall_now: &Instant<UC1>, monotonic_elapsed: &Ticks) -> (Ticks, bool) {
+        let projected = match self.anchor.try_add(monotonic_elapsed) {
+            Some(p) => p,
+            None => return (<Ticks as TickInt>::zero(), false),
+        };
+        let w = wall_now.ticks();
+        if w >= &projected {
+            (w.try_sub(&projected).unwrap_or_else(<Ticks as TickInt>::zero), true)
+        } else {
+            (projected.try_sub(w).unwrap_or_else(<Ticks as TickInt>::zero), false)
+        }
+    }
+}
+
+/// The process-wide session, anchored on first use.
+///
+/// `Option`, and anchored inside [`session_now`] rather than in `get_or_init`:
+/// anchoring needs a clock reading, reading a clock can fail, and `OnceLock`'s
+/// initialiser cannot return a `Result`. The first draft filled the gap with an
+/// `.expect()` and the `no-panic-in-cli` lint refused it — §19.5 says a failure
+/// in this crate leaves through a code and an exit status.
+#[cfg(all(feature = "std", feature = "civil"))]
+type SessionState = std::sync::Mutex<Option<(Session, std::time::Instant)>>;
+
+#[cfg(all(feature = "std", feature = "civil"))]
+fn session() -> &'static SessionState {
+    use std::sync::{Mutex, OnceLock};
+    static S: OnceLock<SessionState> = OnceLock::new();
+    S.get_or_init(|| Mutex::new(None))
+}
+
+/// The session clock's reading, for [`crate::now_instant`].
+#[cfg(all(feature = "std", feature = "civil"))]
+pub fn session_now() -> Result<Instant<UC1>, TimeError> {
+    let wall = crate::wall_instant()?;
+    // A poisoned lock means another thread panicked holding it. The state is a
+    // pair of tick counts and cannot be torn, so taking the inner value is
+    // correct rather than merely convenient — the same judgement
+    // `body_file::leak` makes about its intern pool.
+    let mut g = match session().lock() {
+        Ok(g) => g,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    // Anchored on first use rather than at start-up: a command that never asks
+    // the time should not read a clock, and most of them do not.
+    let (sess, base) = g.get_or_insert_with(|| {
+        (Session::anchored_at(&wall), std::time::Instant::now())
+    });
+    let elapsed = ticks_in_nanos(base.elapsed().as_nanos())
+        .ok_or_else(|| TimeError::new(ucal_core::Code::E0021))?;
+    sess.reading(&wall, &elapsed)
 }
 
 /// The structural facts: true on every machine, and needing no sample.
@@ -308,6 +446,131 @@ mod tests {
             assert_eq!(x.0, y.0);
             assert_eq!(x.1.rendered_text(), y.1.rendered_text());
         }
+    }
+
+    // ---- the session clock ---------------------------------------------
+
+    fn at(secs: u64) -> Instant<UC1> {
+        let t = ticks_in_nanos(u128::from(secs) * 1_000_000_000).expect("in range");
+        Instant::from_ticks(t).expect("in the domain")
+    }
+
+    fn ns(n: u128) -> Ticks {
+        ticks_in_nanos(n).expect("in range")
+    }
+
+    /// Ordinarily the two branches agree and the reading tracks the wall clock.
+    #[test]
+    fn a_quiet_session_follows_the_wall_clock() {
+        let mut s = Session::anchored_at(&at(100));
+        let r = s
+            .reading(&at(105), &ns(5_000_000_000))
+            .expect("a reading");
+        assert_eq!(r.ticks().to_dec_string(), at(105).ticks().to_dec_string());
+    }
+
+    /// **The reason this type exists.** A wall clock that steps backwards does
+    /// not take the reading with it.
+    ///
+    /// `ucal wallclock` reads the clock twenty times a second for as long as it
+    /// is left running, and NTP correcting a large offset, a VM resuming, or an
+    /// operator setting the date all step it backwards. A face that goes back in
+    /// time is the failure this prevents.
+    #[test]
+    fn a_backward_step_does_not_move_the_reading_back() {
+        let mut s = Session::anchored_at(&at(100));
+        let before = s
+            .reading(&at(110), &ns(10_000_000_000))
+            .expect("a reading");
+        // The wall clock jumps back five seconds; monotonic keeps counting.
+        let after = s
+            .reading(&at(105), &ns(11_000_000_000))
+            .expect("a reading");
+        assert!(
+            after.ticks() >= before.ticks(),
+            "the reading went backwards: {} then {}",
+            before.ticks().to_dec_string(),
+            after.ticks().to_dec_string()
+        );
+        // And it kept advancing rather than freezing until the wall caught up.
+        assert!(
+            after.ticks() > before.ticks(),
+            "the reading stalled instead of advancing at the oscillator's rate"
+        );
+    }
+
+    /// A forward step is a correction arriving, and is accepted.
+    ///
+    /// Refusing it would be preferring this process's opinion of the time to the
+    /// system's, which is not a trade a clock gets to make on its reader's
+    /// behalf.
+    #[test]
+    fn a_forward_step_is_accepted() {
+        let mut s = Session::anchored_at(&at(100));
+        s.reading(&at(101), &ns(1_000_000_000)).expect("a reading");
+        let jumped = s
+            .reading(&at(160), &ns(2_000_000_000))
+            .expect("a reading");
+        assert_eq!(
+            jumped.ticks().to_dec_string(),
+            at(160).ticks().to_dec_string(),
+            "a forward correction was refused"
+        );
+    }
+
+    /// Monotone over a walk that steps backwards repeatedly.
+    ///
+    /// One backward step is a case; a clock being dragged around is the
+    /// condition, and the guarantee is over the whole sequence.
+    #[test]
+    fn the_sequence_is_monotone_however_the_wall_clock_behaves() {
+        let mut s = Session::anchored_at(&at(1_000));
+        let mut prev = at(1_000).ticks().clone();
+        // A wall clock that lurches: forward, back, back further, forward again.
+        let walk = [1_001u64, 1_002, 999, 1_000, 990, 1_010, 1_005];
+        for (i, w) in walk.iter().enumerate() {
+            let elapsed = ns((i as u128 + 1) * 1_000_000_000);
+            let r = s.reading(&at(*w), &elapsed).expect("a reading");
+            assert!(
+                r.ticks() >= &prev,
+                "step {i} went backwards: {} then {}",
+                prev.to_dec_string(),
+                r.ticks().to_dec_string()
+            );
+            prev = r.ticks().clone();
+        }
+    }
+
+    /// Divergence is reported as a magnitude and a direction, never a negative.
+    ///
+    /// A tick count is unsigned by Rule B, so the sign is a word beside the
+    /// number — the same shape `SignedWindow` and the wall clock's odometer take.
+    #[test]
+    fn divergence_carries_its_direction_separately() {
+        let s = Session::anchored_at(&at(100));
+        let (ahead, wall_ahead) = s.divergence(&at(105), &ns(4_000_000_000));
+        assert!(wall_ahead, "the wall clock is ahead of the projection");
+        assert_eq!(ahead.to_dec_string(), ns(1_000_000_000).to_dec_string());
+
+        let (behind, wall_ahead) = s.divergence(&at(103), &ns(4_000_000_000));
+        assert!(!wall_ahead, "the wall clock is behind the projection");
+        assert_eq!(behind.to_dec_string(), ns(1_000_000_000).to_dec_string());
+    }
+
+    /// **It does not claim to be finer.** A session reading lands on the same
+    /// rung a raw one does.
+    ///
+    /// The whole point of the accounting above is that interpolation is worth
+    /// `24/3125` of a rung, so a type built for monotonicity must not be read as
+    /// having bought precision.
+    #[test]
+    fn a_session_reading_is_no_finer_than_a_raw_one() {
+        let q = ticks_in_nanos(1_000).expect("in range");
+        let raw = finest_tier_for(&q).expect("a tier");
+        // Anchoring and projecting changes nothing about what a quantum fills.
+        let mut s = Session::anchored_at(&at(100));
+        let _ = s.reading(&at(100), &ns(0)).expect("a reading");
+        assert_eq!(finest_tier_for(&q).expect("a tier").index(), raw.index());
     }
 
     /// And the measurement returns something on a machine that has a clock.
