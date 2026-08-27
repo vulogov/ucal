@@ -540,8 +540,36 @@ sequence of days to count. A body whose year is a whole number of its solar days
 is told that too — it needs no intercalation, which is an answer and not a
 failure to find one.
 
+**`grouping_satellite` says which satellite makes the cycle.** D-A5 makes that
+the *calendar's* declaration and not a property of the body, because
+"month-like" is an Earth predicate and no bracket over orbital periods can pick
+one honestly. A shipped calendar declares it — `mars-d` declares **none**,
+although Mars has Phobos and Deimos.
+
+Until 1.10.0 a file had nowhere to say either thing. It got the first satellite
+it listed, so the choice was made by line order and declining was impossible:
+
+```hjson
+satellites: [
+  { id: phobos
+    orbital_period: { ... } }
+  { id: deimos
+    orbital_period: { ... } }
+]
+grouping_satellite: none
+```
+
+- **Absent** — the first satellite listed, which is what a file has always got,
+  so no existing file changes meaning.
+- **A satellite's id** — that one. A name the file does not list is
+  `UCAL-E0064`, not a silent fallback to something else.
+- **The word `none`** — this calendar has no cycle. `mars-d` is in exactly that
+  state, and a file could not express it.
+
 **One key per line.** HJSON runs an unquoted string to the end of the line, so
-`citation: NASA fact sheet` must be alone on its line.
+`citation: NASA fact sheet` must be alone on its line — and
+`{ value: 1.5, unit: d, citation: c }` makes the citation *`c }`* and then the
+required keys are missing.
 
 **The last digit you write chooses the intercalation.** A leap rule is a
 continued fraction and continued fractions are violently sensitive to their
@@ -585,6 +613,13 @@ ucal cal derive mars.hjson          # 45/76, the same rule mars-d has
 from [`europa.hjson`](examples/europa.hjson) and edited — which is how that
 example came to cite NASA for a solar day NASA does not publish, wrong in the
 third decimal, deriving `202/279` where the body derives `1/24`.
+
+**It carries the cycle declaration too.** An exported file always states
+`grouping_satellite:` when the body has satellites, because omitting it means
+*the first listed* — which is line order deciding a calendar. Without that the
+round trip preserved the leap rule and lost the cycle: Mars has Phobos and Deimos
+and `mars-d` groups by neither, so a file that merely listed them would have
+grouped by Phobos.
 
 **A derived parameter exports as `derived:`, never as its own result.** Six
 shipped calendars compute their solar day from two published figures; writing

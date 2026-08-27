@@ -1147,3 +1147,150 @@ fn every_shipped_calendar_id_validates() {
             .unwrap_or_else(|e| panic!("`cal validate {id}` failed: {e}"));
     }
 }
+
+// ---- N1: a file declares which satellite groups its calendar -----------
+
+/// A body with two satellites, so the choice between them is a real one.
+///
+/// Written out rather than patched together from `GOOD_EUROPA`: the first draft
+/// built it by chained `replace` calls and left a stray key, which the strict
+/// loader rejected with `UCAL-E0012` — a fixture failing for a reason that had
+/// nothing to do with what it was testing.
+///
+/// One key per line, for a reason worth recording: **HJSON's unquoted strings
+/// run to the end of the line**, so `citation: c, valid_years: 10000 }` makes
+/// the citation *`c, valid_years: 10000 }`* and then the required key is
+/// missing. The second draft failed that way.
+const TWO_MOONS: &str = r#"
+id: twinmoon
+primary: sun
+rotation_period: {
+  value: 1.0
+  unit: d
+  citation: c
+  valid_years: 10000
+}
+solar_day: {
+  value: 1.002
+  unit: d
+  citation: c
+  valid_years: 10000
+}
+orbital_period: {
+  value: 400.5
+  unit: d
+  citation: c
+  valid_years: 10000
+}
+satellites: [
+  {
+    id: inner
+    orbital_period: {
+value: 1.5
+unit: d
+citation: c
+valid_years: 10000
+}
+  }
+  {
+    id: outer
+    orbital_period: {
+value: 30.5
+unit: d
+citation: c
+valid_years: 10000
+}
+  }
+]
+GROUPING
+"#;
+
+/// **A file can now decline a cycle**, which `mars-d` does and no file could.
+///
+/// D-A5 makes the grouping satellite the calendar's declaration, not the body's,
+/// because "month-like" is an Earth predicate. A shipped calendar declares it;
+/// a file got the first satellite it listed, so the choice was made by line
+/// order and declining was impossible. Mars has Phobos and Deimos and `mars-d`
+/// groups by neither.
+#[test]
+fn a_file_can_declare_that_it_has_no_cycle() {
+    let (_d, p) = tmp(
+        "grouping-none",
+        &TWO_MOONS.replace("GROUPING", "grouping_satellite: none"),
+    );
+    let doc = ucal::cmd_cal_derive(p.to_str().expect("utf-8")).expect("derives");
+    assert!(
+        verdict_of(&doc, "cycles").contains("none"),
+        "a declared `none` did not suppress the cycle: {}",
+        verdict_of(&doc, "cycles")
+    );
+}
+
+/// And it can name one that is not the first listed.
+#[test]
+fn a_file_can_name_a_satellite_other_than_the_first() {
+    let (_d, p) = tmp(
+        "grouping-named",
+        &TWO_MOONS.replace("GROUPING", "grouping_satellite: outer"),
+    );
+    let doc = ucal::cmd_cal_derive(p.to_str().expect("utf-8")).expect("derives");
+    let c = verdict_of(&doc, "cycles");
+    assert!(c.contains("outer"), "the named satellite did not group it: {c}");
+
+    // And without the key it is the first listed, which is the old behaviour.
+    let (_d2, p2) = tmp("grouping-default", &TWO_MOONS.replace("GROUPING", ""));
+    let doc2 = ucal::cmd_cal_derive(p2.to_str().expect("utf-8")).expect("derives");
+    assert!(
+        verdict_of(&doc2, "cycles").contains("inner"),
+        "omitting the key changed its meaning: {}",
+        verdict_of(&doc2, "cycles")
+    );
+}
+
+/// A name the file does not list is refused, not silently ignored.
+#[test]
+fn an_unlisted_grouping_satellite_is_refused() {
+    let bad = TWO_MOONS.replace("GROUPING", "grouping_satellite: nosuchmoon");
+    let (_d, p) = tmp("grouping-unknown", &bad);
+    let e = ucal::body_file::load(&p).expect_err("no such satellite");
+    assert_eq!(e.code, Code::E0064);
+    assert!(e.to_string().contains("does not list"), "{e}");
+}
+
+/// **Omitting the key keeps the old meaning**, so no existing file changes.
+#[test]
+fn an_absent_declaration_still_means_the_first_listed() {
+    use ucal::body_file::Grouping;
+    let (_d, p) = tmp("grouping-absent", &TWO_MOONS.replace("GROUPING", ""));
+    let (_body, g) = ucal::body_file::load_with_grouping(&p).expect("loads");
+    assert_eq!(g, Grouping::FirstListed);
+}
+
+/// **N2's round trip preserves the cycle, not only the leap rule.**
+///
+/// Without N1 an exported `mars` listed two satellites and no declaration, so
+/// reading it back grouped by Phobos — while `mars-d` groups by neither. The
+/// rule matched and the calendar did not.
+#[test]
+fn the_round_trip_preserves_the_cycle_declaration() {
+    for (id, _, want) in ucal_body::calendar::registered() {
+        let text = ucal::cmd_cal_export(id).unwrap_or_else(|e| panic!("{id}: {e}"));
+        let (_d, p) = tmp(&format!("cycle-rt-{id}"), &text);
+        let (body, g) =
+            ucal::body_file::load_with_grouping(&p).unwrap_or_else(|e| panic!("{id}: {e}"));
+        assert_eq!(
+            g.resolve(&body),
+            want,
+            "{id}: the exported file declares a different cycle"
+        );
+    }
+}
+
+/// One field of a `Doc`, by name, as rendered text.
+fn verdict_of(doc: &ucal::emit::Doc, name: &str) -> String {
+    doc.fields()
+        .iter()
+        .find(|(k, _)| k == name)
+        .map(|(_, v)| v.rendered_text())
+        .unwrap_or_else(|| panic!("no field `{name}`"))
+}

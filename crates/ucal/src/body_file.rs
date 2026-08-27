@@ -190,6 +190,24 @@ struct BodyFile {
     orbital_period: ParamFile,
     #[serde(default)]
     satellites: Vec<SatelliteFile>,
+    /// Which satellite groups this calendar's cycle (N1).
+    ///
+    /// D-A5 makes the grouping satellite the **calendar's declaration** rather
+    /// than a property of the body, because "month-like" is an Earth predicate
+    /// and no bracket over orbital periods can pick one honestly. A shipped
+    /// calendar declares it in `calendar::registered` — `mars-d` declares
+    /// **none**, although Mars has Phobos and Deimos.
+    ///
+    /// A file had nowhere to say either thing. It got the first satellite it
+    /// listed, so the choice was made by line order and declining was
+    /// impossible. Two spellings of one decision, and only one of them was
+    /// writable.
+    ///
+    /// Absent keeps the old behaviour, which is the first listed. `none`
+    /// declares that the calendar has no cycle, which is what `mars-d` does and
+    /// what a file could not express at all.
+    #[serde(default)]
+    grouping_satellite: Option<String>,
 }
 
 /// `&'static str` from an owned one, **interned**.
@@ -383,10 +401,46 @@ impl ParamFile {
     }
 }
 
+/// Which satellite groups a file-declared calendar's cycle (N1).
+///
+/// Kept **beside** the `Body` rather than inside it, because D-A5 makes the
+/// choice the *calendar's* declaration and not a property of the body. Putting
+/// it on `Body` would contradict the delta that introduced it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Grouping {
+    /// The file said nothing, so the first satellite it lists — which is what a
+    /// file has always got, and stays the default so no existing file changes
+    /// meaning.
+    FirstListed,
+    /// The file named one.
+    Named(&'static str),
+    /// The file declared that this calendar has no cycle.
+    ///
+    /// `mars-d` is in exactly this state and a file could not express it: Mars
+    /// has two satellites and the calendar declares neither.
+    Nothing,
+}
+
+impl Grouping {
+    /// The satellite id to group by, given the body the file declared.
+    pub fn resolve(&self, body: &Body) -> Option<&'static str> {
+        match self {
+            Grouping::FirstListed => body.satellites().first().map(|s| s.id()),
+            Grouping::Named(id) => Some(id),
+            Grouping::Nothing => None,
+        }
+    }
+}
+
 /// Read a body file and build the `Body` it declares.
 ///
 /// Strict: an unknown key is `UCAL-E0012`, as §15.1 requires.
 pub fn load(path: &std::path::Path) -> Result<Body> {
+    load_with_grouping(path).map(|(b, _)| b)
+}
+
+/// The same, and the cycle declaration beside it (N1).
+pub fn load_with_grouping(path: &std::path::Path) -> Result<(Body, Grouping)> {
     let text = std::fs::read_to_string(path).map_err(|e| {
         TimeError::with_context(
             Code::E0017,
@@ -405,7 +459,8 @@ pub fn load(path: &std::path::Path) -> Result<Body> {
             TimeError::with_context(
                 Code::E0012,
                 "unknown key in the body file; the accepted keys are id, primary, \
-                 rotation_period, solar_day, orbital_period and satellites",
+                 rotation_period, solar_day, orbital_period, satellites and \
+                 grouping_satellite",
             )
         } else if msg.contains("missing field") {
             TimeError::with_context(
@@ -441,5 +496,23 @@ pub fn load(path: &std::path::Path) -> Result<Body> {
             s.retrograde,
         ));
     }
-    Ok(body)
+
+    // N1 — the cycle declaration. `none` is a word rather than an omission,
+    // because an omission already means something: the first listed.
+    let grouping = match file.grouping_satellite.as_deref() {
+        None => Grouping::FirstListed,
+        Some("none") => Grouping::Nothing,
+        Some(name) => {
+            if body.satellite(name).is_none() {
+                return Err(TimeError::with_context(
+                    Code::E0064,
+                    "`grouping_satellite` names a satellite this file does not list. \
+                     Use `none` to declare that the calendar has no cycle, or omit \
+                     the key to group by the first satellite listed",
+                ));
+            }
+            Grouping::Named(leak(name.to_string()))
+        }
+    };
+    Ok((body, grouping))
 }

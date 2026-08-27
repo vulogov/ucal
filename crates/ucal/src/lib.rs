@@ -1784,7 +1784,7 @@ pub fn calendar_from_files(
     body_path: &str,
     anchor_path: &str,
 ) -> Result<ucal_body::calendar::BodyCalendar, TimeError> {
-    let body = body_file::load(std::path::Path::new(body_path))?;
+    let (body, grouping) = body_file::load_with_grouping(std::path::Path::new(body_path))?;
     let anchor = anchor_file::load(std::path::Path::new(anchor_path))?;
     let id: &'static str = body_file::leak(format!("{}-d", body.id()));
     if anchor.calendar_id() != id {
@@ -1796,7 +1796,7 @@ pub fn calendar_from_files(
             )),
         ));
     }
-    let satellite = body.satellites().first().map(|s| s.id());
+    let satellite = grouping.resolve(&body);
     ucal_body::calendar::BodyCalendar::build(
         id,
         body,
@@ -3060,7 +3060,7 @@ pub fn cmd_cal_derive(path: &str) -> CmdResult {
 /// forbids and what `X1.3` named as this feature's kill criterion.
 #[cfg(feature = "body")]
 pub fn cmd_cal_derive_with(path: &str, anchor: Option<&str>, at: Option<&str>) -> CmdResult {
-    let body = body_file::load(std::path::Path::new(path))?;
+    let (body, grouping) = body_file::load_with_grouping(std::path::Path::new(path))?;
 
     let solar = body.solar_day().value_at_epoch();
     let year = body.orbital_period().value_at_epoch();
@@ -3121,10 +3121,12 @@ pub fn cmd_cal_derive_with(path: &str, anchor: Option<&str>, at: Option<&str>) -
     //
     // The grouping satellite is the *calendar's* declaration, not the body's —
     // D-A5 made cycles declared per body rather than admitted by a global
-    // bracket, because "month-like" is an Earth predicate. A file that lists
-    // satellites gets the first as the grouping one; a file that lists none
-    // gets no cycle, which is the correct output and not a gap.
-    let grouping = body.satellites().first().map(|s| s.id());
+    // bracket, because "month-like" is an Earth predicate.
+    //
+    // N1 gave a file somewhere to say it. Before that it got the first satellite
+    // it listed and could not decline, so the choice was made by line order and
+    // `mars-d`'s answer — two satellites and no cycle — was inexpressible.
+    let grouping = grouping.resolve(&body);
     let cycles = ucal_body::derive_cycles(&body, grouping, 32)?;
     doc = doc.field(
         "cycles",
@@ -3497,8 +3499,8 @@ pub fn cmd_cal_validate(path: &str, anchor_path: Option<&str>) -> CmdResult {
     // `determination` and rejects the lot — so rather than report a confusing
     // `UCAL-E0012` about a file that is perfectly valid, try the other loader
     // and say which kind it actually is.
-    match body_file::load(p) {
-        Ok(body) => validate_body(Source::File(path), &body, anchor_path),
+    match body_file::load_with_grouping(p) {
+        Ok((body, g)) => validate_body(Source::File(path, g), &body, anchor_path),
         Err(body_err) => match anchor_file::load(p) {
             Ok(anchor) => validate_anchor(path, &anchor, anchor_path),
             // Both failed. The body error is the one to report: this argument is
@@ -3525,16 +3527,16 @@ fn check(name: &str, verdict: impl Into<String>) -> (String, Value) {
 pub fn cmd_cal_export(id: &str) -> Result<String, TimeError> {
     // A calendar id first, then a bare body id: `mars-d` and `mars` both name
     // the same parameters, and `cal list` prints the first.
-    let body = ucal_body::calendar::registered()
+    let found = ucal_body::calendar::registered()
         .into_iter()
         .find(|(cid, _, _)| *cid == id)
-        .map(|(_, b, _)| b)
-        .or_else(|| ucal_body::data::by_id(id))
+        .map(|(_, b, g)| (b, g))
+        .or_else(|| ucal_body::data::by_id(id).map(|b| (b, None)))
         .ok_or(TimeError::with_context(
             Code::E0016,
             "no such calendar or body; `ucal cal list` names every one",
         ))?;
-    body_export::body_file(&body)
+    body_export::body_file(&found.0, found.1)
 }
 
 /// G5 — the precision probe over every calendar this project ships.
@@ -3949,8 +3951,12 @@ fn probe_satellite(
 /// two vocabularies, rather than two check lists that can come to disagree.
 #[cfg(feature = "body")]
 enum Source<'a> {
-    /// A §15.1 file at this path.
-    File(&'a str),
+    /// A §15.1 file at this path, and what it declared about its cycle.
+    ///
+    /// The declaration travels with the source because only the loader has seen
+    /// the file, and `Body` deliberately does not carry it — D-A5 makes the
+    /// grouping satellite the *calendar's* choice, not the body's.
+    File(&'a str, body_file::Grouping),
     /// A calendar this project ships, by id.
     Shipped(&'a str),
 }
@@ -3958,11 +3964,11 @@ enum Source<'a> {
 #[cfg(feature = "body")]
 impl Source<'_> {
     fn is_file(&self) -> bool {
-        matches!(self, Source::File(_))
+        matches!(self, Source::File(..))
     }
     fn name(&self) -> &str {
         match self {
-            Source::File(p) | Source::Shipped(p) => p,
+            Source::File(p, _) | Source::Shipped(p) => p,
         }
     }
 
@@ -3983,7 +3989,9 @@ impl Source<'_> {
     /// answers, because a declaration existed and this code went round it.
     fn grouping(&self, body: &ucal_body::Body) -> Option<&'static str> {
         match self {
-            Source::File(_) => body.satellites().first().map(|s| s.id()),
+            // N1 — the file's own declaration. This used to hardcode "the first
+            // satellite listed", which is now merely the default.
+            Source::File(_, g) => g.resolve(body),
             Source::Shipped(id) => ucal_body::calendar::registered()
                 .into_iter()
                 .find(|(cid, _, _)| cid == id || cid.trim_end_matches("-d") == *id)

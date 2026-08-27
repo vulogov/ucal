@@ -177,7 +177,12 @@ fn satellite_block(s: &Satellite) -> Result<String, TimeError> {
 }
 
 /// Write a body as the §15.1 file that declares it.
-pub fn body_file(body: &Body) -> Result<String, TimeError> {
+///
+/// `grouping` is the calendar's cycle declaration, which is **not** part of the
+/// body (D-A5). Without it the round trip preserved the leap rule and lost the
+/// cycle: `mars` has two satellites and `mars-d` groups by neither, and a file
+/// that only listed them would have grouped by Phobos.
+pub fn body_file(body: &Body, grouping: Option<&str>) -> Result<String, TimeError> {
     let mut out = String::new();
     out.push_str(&format!(
         "# {} — a §15.1 body file, written by `ucal cal export {}`.\n\
@@ -206,6 +211,18 @@ pub fn body_file(body: &Body) -> Result<String, TimeError> {
             out.push_str(&satellite_block(s)?);
         }
         out.push_str("]\n");
+
+        // N1 — always written when there are satellites, never left implicit.
+        // Omitting it means *the first listed*, which is a decision made by line
+        // order; an exported file states the decision the calendar actually
+        // made, including that it made none.
+        out.push_str("# Which satellite groups this calendar's cycle (D-A5).\n");
+        out.push_str("# Omitting this key means the first listed, which is line\n");
+        out.push_str("# order deciding a calendar.\n");
+        out.push_str(&format!(
+            "grouping_satellite: {}\n",
+            grouping.unwrap_or("none")
+        ));
     }
     Ok(out)
 }
