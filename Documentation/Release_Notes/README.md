@@ -12,7 +12,7 @@ knows only what it did.
 
 | version | date | state |
 |---|---|---|
-| [1.10.0](1.10.0.md) | — | **unreleased** — a requirement with no wire |
+| [1.10.0](1.10.0.md) | 2026-08-28 | released — a requirement with no wire |
 | [1.9.0](1.9.0.md) | 2026-08-27 | released — the artefact, not the repository |
 | [1.8.0](1.8.0.md) | 2026-08-24 | released — the frozen four, measured |
 | [1.7.0](1.7.0.md) | 2026-08-22 | released — does each check catch what it exists for |
