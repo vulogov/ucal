@@ -84,6 +84,10 @@ fn examples() -> Vec<Example> {
             why: "One instant in several calendars at once, each labelled derived or legacy.",
         },
         Example {
+            args: &["cal", "from", "mars-d", "82-83"],
+            why: "The inverse of `cal show`, and the thing the fifteen derived calendars did not have while Earth's legacy ones had it from 0.1.0. The answer is a window and would be wrong not to be: a local day is a span, and the anchor's uncertainty propagates into it (Rule J.2).",
+        },
+        Example {
             args: &["cal", "validate", "--all"],
             why: "The precision probe over every calendar this project ships. Fifteen calendars rest on nineteen distinct published figures and fourteen of those decide their leap rule outright — which is Rule K working, not a defect. The sharp part is the sharing: a satellite's year is its primary's orbit, so Jupiter's 4332.589 d decides five leap rules at once.",
         },

@@ -198,6 +198,29 @@ pub enum Code {
     /// See D-A24 for the survey. Appended for the same reason as
     /// [`Code::E0014`].
     E0018,
+    /// An internal invariant was violated: a path the program handles earlier
+    /// was reached anyway.
+    ///
+    /// **Not a caller's fault, and the code says so.** The three sites are
+    /// `match` arms for commands dispatched by an early return — `seq`,
+    /// `cal export`, `completions`/`man`. They exist because a `match` must be
+    /// exhaustive, and reaching one means the early return was deleted, not that
+    /// anybody typed anything wrong.
+    ///
+    /// They raised [`Code::E0001`], *malformed timestamp*, which sent a reader
+    /// to look at a timestamp that was fine. That is the inversion D-A24 exists
+    /// to correct, in the entry that catalogued it.
+    ///
+    /// **D-A24 predicted this one.** It found the condition at a single site,
+    /// declined to give it a code — *"a code with one raiser is what D-A20
+    /// warned about"* — and named the trigger: *"if a second site of any of them
+    /// appears, that is the trigger to give it a code."* `seq` added the second
+    /// in 1.9.0 and `cal export` the third in 1.10.0.
+    ///
+    /// Appended for the same reason as [`Code::E0014`] and [`Code::E0018`]:
+    /// inserting a variant mid-enum shifts the discriminants of every one after
+    /// it, which `cargo semver-checks` reports as a breaking change.
+    E0019,
 }
 
 impl Code {
@@ -220,6 +243,7 @@ impl Code {
             Code::E0016 => "UCAL-E0016",
             Code::E0017 => "UCAL-E0017",
             Code::E0018 => "UCAL-E0018",
+            Code::E0019 => "UCAL-E0019",
             Code::E0020 => "UCAL-E0020",
             Code::E0021 => "UCAL-E0021",
             Code::E0022 => "UCAL-E0022",
@@ -265,6 +289,7 @@ impl Code {
             Code::E0016 => "no such entry in a declared catalogue",
             Code::E0017 => "data file cannot be read or is not well-formed",
             Code::E0018 => "value not accepted for this option or field",
+            Code::E0019 => "internal invariant violated; this is a defect in ucal",
             Code::E0020 => "result precedes the datum",
             Code::E0021 => "result exceeds DOMAIN",
             Code::E0022 => "window inversion, lo > hi",
@@ -315,6 +340,11 @@ impl Code {
             // Exit 2: the caller gave something that is not a thing. Same as
             // E0001's family, which is where these conditions used to live.
             Code::E0018 => 2,
+            // Not 2. Exit 2 says *the caller asked for something wrong*, and
+            // this says the opposite — nothing the caller did could produce it.
+            // §19.5's 9 is the build-disagrees-with-itself status, which is the
+            // nearest true thing: the program is not in the state it declares.
+            Code::E0019 => 9,
             Code::E0025 | Code::E0015 => 9,
         }
     }

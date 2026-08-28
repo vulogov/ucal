@@ -95,6 +95,8 @@ pub struct Chrome {
     pub until: &'static str,
     /// What the big readout is, when it is not the tier that moves.
     pub hero_is_slow: &'static str,
+    /// A dial reading outside a parameter's validity window (M1).
+    pub outside_window: &'static str,
     /// The label of a second calendar's anchor revision.
     pub anchor_revision_label: &'static str,
     /// That an anchor is an observation, printed after its revision.
@@ -125,6 +127,7 @@ const EN: Chrome = Chrome {
     since: "SINCE",
     until: "UNTIL",
     hero_is_slow: "a calendar display: this hand does not move while you watch",
+    outside_window: "UCAL-W0003 — outside a parameter's validity window",
     anchor_revision_label: "anchor revision",
     anchor_revision: "an anchor is an observation and is versioned (Rule J)",
 };
@@ -153,6 +156,7 @@ const RU: Chrome = Chrome {
     since: "ПРОШЛО ОТ",
     until: "ОСТАЛОСЬ ДО",
     hero_is_slow: "календарь, а не часы: эта стрелка не движется, пока вы смотрите",
+    outside_window: "UCAL-W0003 — вне окна применимости параметра",
     anchor_revision_label: "версия опорной точки",
     anchor_revision: "это наблюдение, а наблюдения версионируются (правило J)",
 };
@@ -200,6 +204,7 @@ mod tests {
             ("since", c.since),
             ("until", c.until),
             ("hero_is_slow", c.hero_is_slow),
+            ("outside_window", c.outside_window),
             ("anchor_revision_label", c.anchor_revision_label),
             ("anchor_revision", c.anchor_revision),
         ]

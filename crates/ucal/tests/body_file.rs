@@ -1044,3 +1044,367 @@ fn the_survey_accounts_for_every_calendar_s_month() {
         .count();
     assert_eq!(with, 1, "only earth-d declares a grouping satellite");
 }
+
+// ---- N2: a shipped calendar, exported and read back ---------------------
+
+/// **Every shipped calendar survives a round trip through §15.1.**
+///
+/// The claim that a file can express exactly what a compiled-in body expresses
+/// was checked by hand-written fixtures: somebody typed Mars's parameters into a
+/// string literal and asserted `45/76` came back. That tests the fixture as much
+/// as the loader, and only for the bodies somebody bothered to type.
+///
+/// Exported, it is a property over all fifteen — and it holds for the derived
+/// solar days too, because those export as `derived:` rather than as a rounding
+/// of their own result. 1.9.0 measured what that rounding would cost: Europa's
+/// rule moves through five values across the first six decimals of its solar
+/// day, and `europa-d` is in this loop.
+#[test]
+fn every_shipped_calendar_round_trips_through_a_file() {
+    let mut checked = 0usize;
+    for (id, body, _) in ucal_body::calendar::registered() {
+        let text = ucal::cmd_cal_export(id).unwrap_or_else(|e| panic!("{id}: {e}"));
+        let (_d, p) = tmp(&format!("roundtrip-{id}"), &text);
+
+        // What the compiled-in body derives.
+        let want = ucal_body::derive_leap_rule(
+            body.solar_day().value_at_epoch(),
+            body.orbital_period().value_at_epoch(),
+            ucal_body::DriftBound::DEFAULT,
+            32,
+        )
+        .unwrap_or_else(|e| panic!("{id} derives nothing: {e}"));
+
+        // What the exported file derives, through the real loader.
+        let loaded = ucal::body_file::load(&p).unwrap_or_else(|e| panic!("{id}: {e}"));
+        let got = ucal_body::derive_leap_rule(
+            loaded.solar_day().value_at_epoch(),
+            loaded.orbital_period().value_at_epoch(),
+            ucal_body::DriftBound::DEFAULT,
+            32,
+        )
+        .unwrap_or_else(|e| panic!("{id} from file derives nothing: {e}"));
+
+        assert_eq!(
+            want.chosen.value.numer().to_dec_string(),
+            got.chosen.value.numer().to_dec_string(),
+            "{id}: the exported file derives a different rule"
+        );
+        assert_eq!(
+            want.chosen.value.denom().to_dec_string(),
+            got.chosen.value.denom().to_dec_string(),
+            "{id}: the exported file derives a different rule"
+        );
+        checked += 1;
+    }
+    // A floor. A loop over an empty registry would pass having compared nothing,
+    // which is the shape the 1.6.0 audit found fourteen times.
+    assert_eq!(checked, 15, "expected every shipped calendar");
+}
+
+/// The exported file passes the validator, and is a *file* to it.
+#[test]
+fn an_exported_file_validates_as_a_file() {
+    let text = ucal::cmd_cal_export("mars-d").expect("exports");
+    let (_d, p) = tmp("export-validates", &text);
+    let doc = ucal::cmd_cal_validate(p.to_str().expect("utf-8"), None).expect("a report");
+    assert!(verdict(&doc, "loads").starts_with("ok"), "{}", verdict(&doc, "loads"));
+    assert!(verdict(&doc, "intercalation").starts_with("45/76"));
+}
+
+/// **A derived parameter exports as `derived:`, never as its own result.**
+///
+/// Writing the computed solar day down would be writing down a rounding, which
+/// is the exact defect the documented Europa example carried — a solar day no
+/// source publishes, wrong in the third decimal.
+#[test]
+fn a_derived_parameter_does_not_export_as_a_decimal() {
+    let text = ucal::cmd_cal_export("europa-d").expect("exports");
+    assert!(
+        text.contains("derived: synodic"),
+        "europa's solar day was flattened into a number:\n{text}"
+    );
+    // And the block for it carries no `value:` at all.
+    let solar = text
+        .split("solar_day: {")
+        .nth(1)
+        .and_then(|s| s.split('}').next())
+        .expect("a solar_day block");
+    assert!(!solar.contains("value:"), "{solar}");
+}
+
+/// **G5's lookup reached two of fifteen calendars.**
+///
+/// `cal validate <id>` resolved a body through `calendar::by_id`, which *builds*
+/// a calendar and so needs an anchor — and thirteen of the fifteen have none. So
+/// it reported *no such body file* about a calendar `cal list` prints. The same
+/// defect and the same fix as `Stride::calendar` in G6, which was corrected there
+/// and not carried here.
+#[test]
+fn every_shipped_calendar_id_validates() {
+    for (id, _, _) in ucal_body::calendar::registered() {
+        ucal::cmd_cal_validate(id, None)
+            .unwrap_or_else(|e| panic!("`cal validate {id}` failed: {e}"));
+    }
+}
+
+// ---- N1: a file declares which satellite groups its calendar -----------
+
+/// A body with two satellites, so the choice between them is a real one.
+///
+/// Written out rather than patched together from `GOOD_EUROPA`: the first draft
+/// built it by chained `replace` calls and left a stray key, which the strict
+/// loader rejected with `UCAL-E0012` — a fixture failing for a reason that had
+/// nothing to do with what it was testing.
+///
+/// One key per line, for a reason worth recording: **HJSON's unquoted strings
+/// run to the end of the line**, so `citation: c, valid_years: 10000 }` makes
+/// the citation *`c, valid_years: 10000 }`* and then the required key is
+/// missing. The second draft failed that way.
+const TWO_MOONS: &str = r#"
+id: twinmoon
+primary: sun
+rotation_period: {
+  value: 1.0
+  unit: d
+  citation: c
+  valid_years: 10000
+}
+solar_day: {
+  value: 1.002
+  unit: d
+  citation: c
+  valid_years: 10000
+}
+orbital_period: {
+  value: 400.5
+  unit: d
+  citation: c
+  valid_years: 10000
+}
+satellites: [
+  {
+    id: inner
+    orbital_period: {
+value: 1.5
+unit: d
+citation: c
+valid_years: 10000
+}
+  }
+  {
+    id: outer
+    orbital_period: {
+value: 30.5
+unit: d
+citation: c
+valid_years: 10000
+}
+  }
+]
+GROUPING
+"#;
+
+/// **A file can now decline a cycle**, which `mars-d` does and no file could.
+///
+/// D-A5 makes the grouping satellite the calendar's declaration, not the body's,
+/// because "month-like" is an Earth predicate. A shipped calendar declares it;
+/// a file got the first satellite it listed, so the choice was made by line
+/// order and declining was impossible. Mars has Phobos and Deimos and `mars-d`
+/// groups by neither.
+#[test]
+fn a_file_can_declare_that_it_has_no_cycle() {
+    let (_d, p) = tmp(
+        "grouping-none",
+        &TWO_MOONS.replace("GROUPING", "grouping_satellite: none"),
+    );
+    let doc = ucal::cmd_cal_derive(p.to_str().expect("utf-8")).expect("derives");
+    assert!(
+        verdict_of(&doc, "cycles").contains("none"),
+        "a declared `none` did not suppress the cycle: {}",
+        verdict_of(&doc, "cycles")
+    );
+}
+
+/// And it can name one that is not the first listed.
+#[test]
+fn a_file_can_name_a_satellite_other_than_the_first() {
+    let (_d, p) = tmp(
+        "grouping-named",
+        &TWO_MOONS.replace("GROUPING", "grouping_satellite: outer"),
+    );
+    let doc = ucal::cmd_cal_derive(p.to_str().expect("utf-8")).expect("derives");
+    let c = verdict_of(&doc, "cycles");
+    assert!(c.contains("outer"), "the named satellite did not group it: {c}");
+
+    // And without the key it is the first listed, which is the old behaviour.
+    let (_d2, p2) = tmp("grouping-default", &TWO_MOONS.replace("GROUPING", ""));
+    let doc2 = ucal::cmd_cal_derive(p2.to_str().expect("utf-8")).expect("derives");
+    assert!(
+        verdict_of(&doc2, "cycles").contains("inner"),
+        "omitting the key changed its meaning: {}",
+        verdict_of(&doc2, "cycles")
+    );
+}
+
+/// A name the file does not list is refused, not silently ignored.
+#[test]
+fn an_unlisted_grouping_satellite_is_refused() {
+    let bad = TWO_MOONS.replace("GROUPING", "grouping_satellite: nosuchmoon");
+    let (_d, p) = tmp("grouping-unknown", &bad);
+    let e = ucal::body_file::load(&p).expect_err("no such satellite");
+    assert_eq!(e.code, Code::E0064);
+    assert!(e.to_string().contains("does not list"), "{e}");
+}
+
+/// **Omitting the key keeps the old meaning**, so no existing file changes.
+#[test]
+fn an_absent_declaration_still_means_the_first_listed() {
+    use ucal::body_file::Grouping;
+    let (_d, p) = tmp("grouping-absent", &TWO_MOONS.replace("GROUPING", ""));
+    let (_body, g) = ucal::body_file::load_with_grouping(&p).expect("loads");
+    assert_eq!(g, Grouping::FirstListed);
+}
+
+/// **N2's round trip preserves the cycle, not only the leap rule.**
+///
+/// Without N1 an exported `mars` listed two satellites and no declaration, so
+/// reading it back grouped by Phobos — while `mars-d` groups by neither. The
+/// rule matched and the calendar did not.
+#[test]
+fn the_round_trip_preserves_the_cycle_declaration() {
+    for (id, _, want) in ucal_body::calendar::registered() {
+        let text = ucal::cmd_cal_export(id).unwrap_or_else(|e| panic!("{id}: {e}"));
+        let (_d, p) = tmp(&format!("cycle-rt-{id}"), &text);
+        let (body, g) =
+            ucal::body_file::load_with_grouping(&p).unwrap_or_else(|e| panic!("{id}: {e}"));
+        assert_eq!(
+            g.resolve(&body),
+            want,
+            "{id}: the exported file declares a different cycle"
+        );
+    }
+}
+
+/// One field of a `Doc`, by name, as rendered text.
+fn verdict_of(doc: &ucal::emit::Doc, name: &str) -> String {
+    doc.fields()
+        .iter()
+        .find(|(k, _)| k == name)
+        .map(|(_, v)| v.rendered_text())
+        .unwrap_or_else(|| panic!("no field `{name}`"))
+}
+
+// ---- M1/M2/M3 -----------------------------------------------------------
+
+/// An ordinary instant, well inside every shipped window.
+const NOW_ISH: &str = "8070205189123984864657505252035637180530466139316558837890625";
+
+/// Fifty thousand Julian years after J2000 — five times Earth's declared
+/// validity window.
+fn far_outside() -> String {
+    use ucal_core::backend::TickInt;
+    let j2000 = "8070205173569972963515184424835637180530466139316558837890625";
+    let sec = ucal::clock::ticks_in_nanos(1_000_000_000).expect("a second");
+    let mut t = <ucal_core::Ticks as TickInt>::from_dec_str(j2000).expect("a tick count");
+    let span = sec
+        .try_mul(&<ucal_core::Ticks as TickInt>::from_u64(50_000 * 31_557_600))
+        .expect("in range");
+    t = t.try_add(&span).expect("in range");
+    t.to_dec_string()
+}
+
+/// **M1 — `UCAL-W0003` reaches a reader.**
+///
+/// Rule C, quoted at the top of `param.rs`: a parameter evaluated outside its
+/// validity window *"MUST warn (`UCAL-W0003`) and MUST NOT silently
+/// extrapolate"*. The warning was produced correctly by `RatedParam::evaluate`
+/// and bound to `_` by its one production caller, so it occurred zero times in
+/// any output this program could emit — a requirement with no wire, and the
+/// first of that shape found here where the spec says MUST.
+#[test]
+fn a_parameter_outside_its_window_warns() {
+    let far = far_outside();
+    let doc = ucal::cmd_cal_show("earth-d", &far).expect("a date");
+    let text = doc.to_text();
+    assert!(
+        text.contains("UCAL-W0003"),
+        "no warning fifty thousand years out:\n{text}"
+    );
+}
+
+/// **And an ordinary date stays quiet**, which is the half that makes the other
+/// half worth having.
+///
+/// M1's stop condition was that surfacing this must not make the common case
+/// noisy. Every shipped calendar's window is ±10 000 Julian years.
+#[test]
+fn an_ordinary_date_carries_no_warning() {
+    let doc = ucal::cmd_cal_show("earth-d", NOW_ISH).expect("a date");
+    assert!(
+        !doc.to_text().contains("UCAL-W0003"),
+        "an ordinary date warned"
+    );
+}
+
+/// The warning is on the fields, so every command that renders them can say it.
+#[test]
+fn the_warning_travels_on_the_fields() {
+    let cal = ucal_body::calendar::by_id("earth-d").expect("earth-d is anchored");
+    let (near, _) = ucal::parse_instant(NOW_ISH).expect("an instant");
+    let (far, _) = ucal::parse_instant(&far_outside()).expect("an instant");
+    assert!(cal.fields(&near).expect("fields").warning.is_none());
+    assert_eq!(
+        cal.fields(&far).expect("fields").warning,
+        Some(ucal_core::Warning::W0003)
+    );
+}
+
+/// **M2 — one convention for when a parameter is read.**
+///
+/// The solar day was evaluated at the instant while the leap rule and the cycles
+/// were frozen at the epoch, so walking far enough forward used a day the leap
+/// rule was not derived from. All three are the epoch's now.
+///
+/// No shipped parameter declares a rate, so this changes no number today — which
+/// is why the test is that the value used is the epoch's, rather than a
+/// comparison of two dates that would agree either way.
+#[test]
+fn every_parameter_is_read_at_the_epoch() {
+    let cal = ucal_body::calendar::by_id("earth-d").expect("earth-d is anchored");
+    let body = cal.body();
+    // The day the fields are computed from is the epoch's value, and the leap
+    // rule was built from the same one.
+    let at_epoch = body.solar_day().value_at_epoch();
+    let (v, _) = body
+        .solar_day()
+        .evaluate(body.solar_day().epoch())
+        .expect("evaluates at its own epoch");
+    assert_eq!(
+        v.cmp_exact(at_epoch),
+        core::cmp::Ordering::Equal,
+        "the epoch value and the value at the epoch must agree"
+    );
+}
+
+/// **M3 — obliquity is reported rather than invisible.**
+///
+/// Declared for ten bodies, cited, and read by nothing but two tests. A seasonal
+/// overlay cannot be built from it: the stored angle gives a season's amplitude
+/// and not its phase, placing an equinox needs the orientation of the spin axis
+/// which is not stored, and a phase is empirical besides (Rule J.3).
+///
+/// So it is surfaced with the reason attached, which is the outcome M3's stop
+/// condition prescribed.
+#[test]
+fn obliquity_is_reported_with_the_reason_it_is_unused() {
+    let doc = ucal::cmd_cal_validate("earth-d", None).expect("a report");
+    let v = verdict(&doc, "obliquity");
+    assert!(v.starts_with("23.4393"), "{v}");
+    assert!(v.contains("Carried and not consumed"), "{v}");
+
+    // A body without one says so rather than omitting the row.
+    let (_d, p) = tmp("no-obliquity", &GOOD);
+    let f = ucal::cmd_cal_validate(p.to_str().expect("utf-8"), None).expect("a report");
+    assert!(verdict(&f, "obliquity").contains("none declared"));
+}

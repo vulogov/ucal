@@ -917,6 +917,7 @@ const CLOSED_VOCABULARIES: &[(&str, &str)] = &[
     ("ColorChoice", "auto, always, never — the universal triple"),
     ("Frame", "already #[non_exhaustive]; listed so the pair with Rule F is visible"),
     ("Layout", "a wall-clock layout is drawing code in this crate, not a value a caller supplies"),
+    ("Grouping", "§15.1's three expressible states: the key absent, a satellite named, or `none`. A fourth needs new syntax, and every consumer should be made to decide"),
 ];
 
 /// The two operations that can discard information in this tree.

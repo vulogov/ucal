@@ -540,8 +540,36 @@ sequence of days to count. A body whose year is a whole number of its solar days
 is told that too — it needs no intercalation, which is an answer and not a
 failure to find one.
 
+**`grouping_satellite` says which satellite makes the cycle.** D-A5 makes that
+the *calendar's* declaration and not a property of the body, because
+"month-like" is an Earth predicate and no bracket over orbital periods can pick
+one honestly. A shipped calendar declares it — `mars-d` declares **none**,
+although Mars has Phobos and Deimos.
+
+Until 1.10.0 a file had nowhere to say either thing. It got the first satellite
+it listed, so the choice was made by line order and declining was impossible:
+
+```hjson
+satellites: [
+  { id: phobos
+    orbital_period: { ... } }
+  { id: deimos
+    orbital_period: { ... } }
+]
+grouping_satellite: none
+```
+
+- **Absent** — the first satellite listed, which is what a file has always got,
+  so no existing file changes meaning.
+- **A satellite's id** — that one. A name the file does not list is
+  `UCAL-E0064`, not a silent fallback to something else.
+- **The word `none`** — this calendar has no cycle. `mars-d` is in exactly that
+  state, and a file could not express it.
+
 **One key per line.** HJSON runs an unquoted string to the end of the line, so
-`citation: NASA fact sheet` must be alone on its line.
+`citation: NASA fact sheet` must be alone on its line — and
+`{ value: 1.5, unit: d, citation: c }` makes the citation *`c }`* and then the
+required keys are missing.
 
 **The last digit you write chooses the intercalation.** A leap rule is a
 continued fraction and continued fractions are violently sensitive to their
@@ -564,6 +592,115 @@ string in the data model is a `&'static str`, so a runtime loader must either
 leak or change a published type, and the second is a breaking change. This one
 leaks, bounded by a process that exits — which is safe in a binary and would not
 be in a library.
+
+### `cal from`
+
+```
+ucal cal from <ID> <YEAR-DAY[.FRACTION]>
+```
+
+**The inverse of [`cal show`](#cal-show).** Earth's legacy calendars have gone
+both ways since 0.1.0 — `to-civil` and `from-civil`. The fifteen derived
+calendars went one way, while §15.4 says *"Earth's entry has no special code
+path, no extra fields, and no compile-time distinction from Mars's"*. That held
+inside the library and not at the surface a reader touches.
+
+```
+$ ucal cal show mars-d <INSTANT>
+  year  82
+  day   83
+
+$ ucal cal from mars-d 82-83
+window:
+  lo           8070205189123256952903759537926801463523316507316558837890625
+  hi           8070205189124903645106880591489885463523316507316558837890625
+```
+
+It accepts the form `cal show` prints — `82-83`, `0082-083`, or
+`0082-083.442043` — so the two commands read each other's output and the round
+trip is something a person can run rather than only a test.
+
+**The answer is a window, and would be wrong not to be.** Two reasons, either
+sufficient on its own:
+
+- **A local day is a span.** *Year 82, day 83* names a Martian day, not a moment.
+  With a fraction it names a moment inside that day; without one it is the whole
+  day.
+- **The anchor carries uncertainty**, and it propagates (Rule J.2). `cal show`
+  already reports `day_is_ambiguous` when the anchor's window straddles a local
+  day boundary; going the other way, that same uncertainty *is* the width. So
+  even an exact local moment is an interval in absolute time — the fraction
+  narrows the window to the anchor's own width and no further.
+
+**The endpoints are taken outward**, never inward. A local day boundary almost
+never lands on a tick boundary, so `lo` is floored and `hi` is raised; narrowing
+them to fit would be narrowing by assumption, which GE-3 forbids, and Rule R
+makes rendering the only place information may be lost. This is not rendering.
+A test asserts that consecutive local days leave no gap.
+
+**No search.** D-A21 fixed the placement — `days_before_year(y) = y × whole +
+floor(y × p / q)` — so the inverse evaluates it rather than hunting for it. The
+forward direction corrects an estimate in a loop; this one needs no estimate.
+
+| field | meaning |
+|---|---|
+| `calendar` | The calendar asked for. |
+| `local` | The local date, as it was given. |
+| `window` | `lo`, `hi` and `width_ticks` — the interval of absolute time this local date names. |
+| `lo_human` | The low end as a `UC1` text form, so the answer is readable without a second command. |
+| `anchor_revision` | Which determination produced it. An anchor is an observation (Rule J.5). |
+
+| refusal | why |
+|---|---|
+| year 0 | local years are 1-based from the anchor; year 1 is the year that began there |
+| day 0 | days of the local year are 1-based too |
+| a day past the year's end | refused, not rolled forward — the length of a local year is set by the leap rule and varies between them |
+| a fraction of 1 or more | a fraction *through* a day lies in `[0, 1)`; 1 is the next day |
+| a calendar with no anchor | `UCAL-E0062`, the same as the forward direction. Thirteen of fifteen are in this state (Rule J.3) |
+
+### `cal export`
+
+```
+ucal cal export <ID>
+```
+
+Write a shipped calendar out as the §15.1 body file that declares it — HJSON on
+stdout, because a generator's output is an input to something else, here
+`cal validate` and `cal derive`.
+
+```
+ucal cal export mars > mars.hjson
+ucal cal validate mars.hjson
+ucal cal derive mars.hjson          # 45/76, the same rule mars-d has
+```
+
+**A template that is correct by construction.** Before this, an author started
+from [`europa.hjson`](examples/europa.hjson) and edited — which is how that
+example came to cite NASA for a solar day NASA does not publish, wrong in the
+third decimal, deriving `202/279` where the body derives `1/24`.
+
+**It carries the cycle declaration too.** An exported file always states
+`grouping_satellite:` when the body has satellites, because omitting it means
+*the first listed* — which is line order deciding a calendar. Without that the
+round trip preserved the leap rule and lost the cycle: Mars has Phobos and Deimos
+and `mars-d` groups by neither, so a file that merely listed them would have
+grouped by Phobos.
+
+**A derived parameter exports as `derived:`, never as its own result.** Six
+shipped calendars compute their solar day from two published figures; writing
+the computed value down would be writing down a rounding, and a rounded
+parameter is a different calendar. `ucal cal export europa-d` emits
+`derived: synodic` and no `value:` at all.
+
+**It refuses rather than approximating.** A validity window that is not a whole
+number of Julian years cannot be written as `valid_years`, and a unit with no
+§15.1 key cannot be written at all — both are `UCAL-E0018`/`UCAL-E0043` rather
+than a value the loader would silently misread.
+
+What it buys beyond the template is that **the round trip is a property rather
+than a fixture**. That a file can express exactly what a compiled-in body
+expresses used to be checked by hand-typed test literals, for the bodies somebody
+bothered to type. It is now checked for all fifteen, `europa-d` included.
 
 ### `cal validate`
 
@@ -606,6 +743,7 @@ first half they were outside the one check built to ask.
 | `primary` | What the file says this body orbits, or that it names nothing. |
 | `rotation_period`, `solar_day`, `orbital_period` | What the file states for each: a measured figure with its unit, or a `derived:` relation, and the citation either way. |
 | `intercalation` | The leap rule, **or the reason there is none** — which may be a fact about the body rather than a defect in the file. |
+| `obliquity` | The body's axial tilt, cited — and the reason it is carried and not consumed. |
 | `cycles` | The grouping satellite, or that there is none, which §15.3 makes an answer rather than a gap. |
 | `precision` | One row per measured parameter feeding the intercalation. See below. |
 | `grouping_period` | Inside `precision`: the satellite period that decides the cycle, where a calendar declares one. |
@@ -723,6 +861,22 @@ answers.
 `--all` lists every calendar including the fourteen without a cycle, because a
 section reporting one of fifteen without saying so is exactly the failure the
 1.6.0 audit found fourteen times.
+
+#### Obliquity is reported and not used
+
+Ten shipped bodies declare an axial tilt, cited to the IAU WGCCRE report, and
+until 1.10.0 nothing read it but two tests. It is what gives a body **seasons** —
+a subdivision of its year that needs no satellite, and so would exist for the
+fourteen calendars that have no cycle at all.
+
+**It cannot be built from what is stored, and the reason is worth stating.** The
+angle gives a season's *amplitude*. Placing an equinox needs the *phase* — the
+orientation of the spin axis, which the cited source publishes as α₀ and δ₀ and
+this project stores nowhere. And a phase is empirical under Rule J.3: determined
+and cited, never derived, which is the wall [`D5`](Proposals/D5-titan-anchor.md)
+hit for Titan and answered with *no anchor*.
+
+So the value is surfaced with that reason attached, rather than left invisible.
 
 **What is not checked, and cannot be.** Whether the published figures are the
 ones the body actually has. Every check is on internal consistency; a file that

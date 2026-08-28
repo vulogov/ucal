@@ -1253,6 +1253,26 @@ warned about when `E0012` had none, so they stay where they are with this entry
 naming them. **If a second site of any of them appears, that is the trigger to
 give it a code**, and this paragraph is the record of the decision not to.
 
+#### The trigger fired, in 1.10.0
+
+**The unreachable internal arm now has three sites**, and has `UCAL-E0019`.
+
+`seq` added the second in 1.9.0 and `cal export` the third in 1.10.0 — both
+commands dispatched by an early return, both leaving a `match` arm behind
+because a `match` must be exhaustive. All three raised `UCAL-E0001`, *malformed
+timestamp*, for a condition in which no timestamp was involved and nothing the
+caller did could have produced it: the exact inversion this delta exists to
+correct, sitting inside the entry that catalogued it.
+
+Exit **9** rather than 2. Exit 2 says the caller asked for something wrong;
+§19.5's 9 says the build disagrees with itself, which is the nearer true thing
+when a path the program handles earlier is reached anyway.
+
+The other two conditions are unchanged and stay where they are. *A build without
+a feature* still has one site. *A derivation with no answer* is still a **result**
+rather than an input defect, and folding it into a validation code would be the
+second inversion D-A23 fixed.
+
 ### The correction
 
 `UCAL-E0018`, *value not accepted for this option or field*, exit 2 — the same

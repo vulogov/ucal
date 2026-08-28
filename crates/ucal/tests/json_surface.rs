@@ -102,6 +102,9 @@ fn commands() -> Vec<(&'static str, Doc)> {
             ucal::cmd_cal_validate("earth-d", None).unwrap(),
         ));
         v.push(("cal-validate-all", ucal::cmd_cal_validate_all().unwrap()));
+        // The inverse of `cal show`, and a document like any other: its fields
+        // are part of the promise from the release that introduces them.
+        v.push(("cal-from", ucal::cmd_cal_from("mars-d", "82-83").unwrap()));
         v.push((
             "show",
             ucal::cmd_show(

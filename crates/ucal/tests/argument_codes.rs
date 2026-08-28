@@ -115,3 +115,58 @@ fn the_exit_status_did_not_move() {
     assert_eq!(Code::E0018.exit_code(), Code::E0001.exit_code());
     assert_eq!(Code::E0018.exit_code(), 2);
 }
+
+// ---- N4: the trigger D-A24 named, fired ---------------------------------
+
+/// **D-A24 predicted this code and named the condition for creating it.**
+///
+/// The entry found four conditions sharing `E0001`, gave three of them a home,
+/// and left three single-site cases where they were — because *"a code with one
+/// raiser is what D-A20 warned about when `E0012` had none"*. It then wrote the
+/// trigger down:
+///
+/// > If a second site of any of them appears, that is the trigger to give it a
+/// > code, and this paragraph is the record of the decision not to.
+///
+/// `seq` added the second site in 1.9.0 and `cal export` the third in 1.10.0.
+#[test]
+fn the_internal_invariant_has_its_own_code() {
+    assert_eq!(Code::E0019.as_str(), "UCAL-E0019");
+    // Exit 9, not 2. Exit 2 says the caller asked for something wrong, and this
+    // says the opposite: nothing a caller can type produces it.
+    assert_eq!(Code::E0019.exit_code(), 9);
+    assert_ne!(Code::E0019.exit_code(), Code::E0018.exit_code());
+    assert!(
+        Code::E0019.describe().contains("defect"),
+        "the message should say whose fault it is: {}",
+        Code::E0019.describe()
+    );
+}
+
+/// **And no unreachable arm still claims a timestamp was malformed.**
+///
+/// All three raised `E0001` for a condition in which no timestamp was involved,
+/// which is the inversion D-A24 exists to correct — sitting inside the entry
+/// that catalogued it. Scanned from the source, because the arms are unreachable
+/// by construction and cannot be exercised.
+#[test]
+fn no_internal_arm_reports_a_malformed_timestamp() {
+    let main = include_str!("../src/main.rs");
+    let mut offenders = Vec::new();
+    for (i, w) in main.lines().collect::<Vec<_>>().windows(4).enumerate() {
+        if w.iter().any(|l| l.contains("\"internal: "))
+            && w.iter().any(|l| l.contains("Code::E0001"))
+        {
+            offenders.push(i + 1);
+        }
+    }
+    assert!(
+        offenders.is_empty(),
+        "an internal-invariant arm still raises E0001 at line(s) {offenders:?}"
+    );
+
+    // And the arms exist to be checked, so a rename cannot make this vacuous —
+    // the floor the 1.6.0 audit found missing fourteen times.
+    let arms = main.matches("\"internal: ").count();
+    assert!(arms >= 3, "expected the internal arms, found {arms}");
+}

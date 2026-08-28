@@ -81,6 +81,7 @@ impl Local {
             .parse::<u32>()
             .unwrap_or(0);
         Ok(Local {
+            outside_window: f.warning.is_some(),
             calendar: id.to_string(),
             year: f.year.to_string(),
             day: f.day.to_string(),
@@ -315,6 +316,12 @@ pub struct Local {
     pub through_day: u32,
     /// Which anchor revision produced it. Anchors are observations (Rule J).
     pub revision: u32,
+    /// True when the instant fell outside a parameter's validity window (M1).
+    ///
+    /// A dial cannot print a paragraph, so the face marks the dial and the
+    /// chrome says what the mark means. Rule C requires the warning; it does not
+    /// require it to be long.
+    pub outside_window: bool,
 }
 
 impl Face {
@@ -1318,6 +1325,17 @@ impl Face {
                     self.chrome.anchor_revision_label, l.revision, self.chrome.anchor_revision
                 ),
                 Style::default().fg(theme.label),
+            ),
+            // M1 — the dial says when it is outside a window. An empty line when
+            // it is not, so the block keeps its height and the face does not
+            // reflow as the warning comes and goes.
+            Line::styled(
+                if l.outside_window {
+                    self.chrome.outside_window
+                } else {
+                    ""
+                },
+                Style::default().fg(theme.blocks[1 % theme.blocks.len()]),
             ),
         ]
     }

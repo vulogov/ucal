@@ -24,6 +24,8 @@ pub mod wallclock;
 #[cfg(feature = "body")]
 pub mod body_file;
 pub mod emit;
+#[cfg(feature = "body")]
+pub mod body_export;
 pub mod clock;
 pub mod style;
 pub mod table;
@@ -1649,6 +1651,9 @@ fn cmd_show_inner(
     let (t, _) = parse_instant(input)?;
     let mut rows: Vec<(String, Value)> = Vec::new();
     let mut produced = 0usize;
+    // M1 — one note for the table, not one per row. A reader asking for six
+    // calendars at a stale instant is told once that a window was left.
+    let mut stale: Option<ucal_core::Warning> = None;
 
     for id in calendars {
         let entry = match id.as_str() {
@@ -1684,6 +1689,7 @@ fn cmd_show_inner(
                 Ok(c) => {
                     let r = c.render(&t)?;
                     let f = c.fields(&t)?;
+                    stale = stale.or(f.warning);
                     produced += 1;
                     Value::Section(vec![
                         ("rendered".into(), Value::text(r.to_string())),
@@ -1712,6 +1718,7 @@ fn cmd_show_inner(
         let id = ucal_core::qualified::CalendarIdentity::id(&c).to_string();
         let r = c.render(&t)?;
         let f = c.fields(&t)?;
+        stale = stale.or(f.warning);
         produced += 1;
         rows.push((
             id,
@@ -1750,7 +1757,7 @@ fn cmd_show_inner(
         ));
     }
 
-    Ok(Doc::new()
+    let mut doc = Doc::new()
         .title("ucal show")
         .field("ticks", Value::number(t.ticks().to_dec_string()))
         .field(
@@ -1763,7 +1770,11 @@ fn cmd_show_inner(
              its anchor revision (Rule J.5) and the width of the window that \
              revision implies (Rule J.2); each legacy one is labelled as declared \
              table data (§8.6).",
-        ))
+        );
+    if let Some(w) = stale {
+        doc = doc.note(window_note(w));
+    }
+    Ok(doc)
 }
 
 /// F1 — a calendar built from §15.1 files rather than from the registry.
@@ -1782,7 +1793,7 @@ pub fn calendar_from_files(
     body_path: &str,
     anchor_path: &str,
 ) -> Result<ucal_body::calendar::BodyCalendar, TimeError> {
-    let body = body_file::load(std::path::Path::new(body_path))?;
+    let (body, grouping) = body_file::load_with_grouping(std::path::Path::new(body_path))?;
     let anchor = anchor_file::load(std::path::Path::new(anchor_path))?;
     let id: &'static str = body_file::leak(format!("{}-d", body.id()));
     if anchor.calendar_id() != id {
@@ -1794,7 +1805,7 @@ pub fn calendar_from_files(
             )),
         ));
     }
-    let satellite = body.satellites().first().map(|s| s.id());
+    let satellite = grouping.resolve(&body);
     ucal_body::calendar::BodyCalendar::build(
         id,
         body,
@@ -1816,6 +1827,7 @@ pub fn cmd_cal_show(id: &str, input: &str) -> CmdResult {
 fn cal_show_of(c: &ucal_body::calendar::BodyCalendar, id: &str, input: &str) -> CmdResult {
     let (t, _) = parse_instant(input)?;
     let f = c.fields(&t)?;
+    let window_warning = f.warning;
     let rule = c.leap_rule();
 
     // §15.2: the whole walk, so the choice is auditable.
@@ -1949,6 +1961,11 @@ fn cal_show_of(c: &ucal_body::calendar::BodyCalendar, id: &str, input: &str) -> 
             ]),
         },
     );
+
+    // M1 — Rule C's warning, on the command that renders the fields.
+    if let Some(w) = window_warning {
+        doc = doc.note(window_note(w));
+    }
 
     Ok(doc)
 }
@@ -3021,6 +3038,26 @@ pub fn cmd_tour() -> CmdResult {
 /// written down once, said "five of the seven", and was wrong the moment Y3
 /// added five bodies.
 #[cfg(feature = "body")]
+/// M1 — the note a set of local fields carries when a parameter was read
+/// outside its validity window.
+///
+/// A note whose text carries `UCAL-W0003`, which is how this program has always
+/// surfaced a warning: `role_of_prose` colours anything containing `UCAL-W` as
+/// one, so the channel existed and nothing was being put into it.
+#[cfg(feature = "body")]
+fn window_note(w: ucal_core::Warning) -> String {
+    format!(
+        "{}: {}. Rule C makes a parameter valid over a stated interval and \
+         forbids silent extrapolation, so this instant lies outside the window \
+         at least one of this body's figures was published for. The fields above \
+         are computed from the values at the epoch — see `ucal cal show <id>` for \
+         the windows themselves",
+        w.as_str(),
+        w.describe()
+    )
+}
+
+#[cfg(feature = "body")]
 fn anchorless_note() -> String {
     let derived = ucal_body::calendar::registered();
     let total = derived.len();
@@ -3058,7 +3095,7 @@ pub fn cmd_cal_derive(path: &str) -> CmdResult {
 /// forbids and what `X1.3` named as this feature's kill criterion.
 #[cfg(feature = "body")]
 pub fn cmd_cal_derive_with(path: &str, anchor: Option<&str>, at: Option<&str>) -> CmdResult {
-    let body = body_file::load(std::path::Path::new(path))?;
+    let (body, grouping) = body_file::load_with_grouping(std::path::Path::new(path))?;
 
     let solar = body.solar_day().value_at_epoch();
     let year = body.orbital_period().value_at_epoch();
@@ -3119,10 +3156,12 @@ pub fn cmd_cal_derive_with(path: &str, anchor: Option<&str>, at: Option<&str>) -
     //
     // The grouping satellite is the *calendar's* declaration, not the body's —
     // D-A5 made cycles declared per body rather than admitted by a global
-    // bracket, because "month-like" is an Earth predicate. A file that lists
-    // satellites gets the first as the grouping one; a file that lists none
-    // gets no cycle, which is the correct output and not a gap.
-    let grouping = body.satellites().first().map(|s| s.id());
+    // bracket, because "month-like" is an Earth predicate.
+    //
+    // N1 gave a file somewhere to say it. Before that it got the first satellite
+    // it listed and could not decline, so the choice was made by line order and
+    // `mars-d`'s answer — two satellites and no cycle — was inexpressible.
+    let grouping = grouping.resolve(&body);
     let cycles = ucal_body::derive_cycles(&body, grouping, 32)?;
     doc = doc.field(
         "cycles",
@@ -3210,6 +3249,12 @@ pub fn cmd_cal_derive_with(path: &str, anchor: Option<&str>, at: Option<&str>) -
                 Some(t) => {
                     let (t, _) = parse_instant(t)?;
                     let f = cal.fields(&t)?;
+                    // M1 — attached here rather than collected, because this is
+                    // the only branch of `cal derive` that produces fields.
+                    let doc = match f.warning {
+                        Some(w) => doc.note(window_note(w)),
+                        None => doc,
+                    };
                     doc.field(
                         "fields",
                         Value::Section(vec![
@@ -3472,10 +3517,20 @@ pub fn cmd_cal_validate(path: &str, anchor_path: Option<&str>) -> CmdResult {
     // with by accident, and if they did, the file is what they get.
     let p = std::path::Path::new(path);
     if !p.exists() {
-        if let Ok(cal) = ucal_body::calendar::by_id(path) {
-            return validate_body(Source::Shipped(path), cal.body(), anchor_path);
-        }
-        if let Some(body) = ucal_body::data::by_id(path) {
+        // `registered()` and not `calendar::by_id`: the latter *builds* a
+        // calendar, which needs an anchor, and thirteen of the fifteen have
+        // none — so `cal validate titan-d` reported *no such body file* about a
+        // calendar `cal list` prints. Validating a body needs no phase.
+        //
+        // The same defect, and the same fix, as `Stride::calendar` in G6. It was
+        // fixed there and not carried here, and only `earth-d` and `mars-d`
+        // worked for a whole release.
+        if let Some(body) = ucal_body::calendar::registered()
+            .into_iter()
+            .find(|(cid, _, _)| *cid == path)
+            .map(|(_, b, _)| b)
+            .or_else(|| ucal_body::data::by_id(path))
+        {
             return validate_body(Source::Shipped(path), &body, anchor_path);
         }
     }
@@ -3485,8 +3540,8 @@ pub fn cmd_cal_validate(path: &str, anchor_path: Option<&str>) -> CmdResult {
     // `determination` and rejects the lot — so rather than report a confusing
     // `UCAL-E0012` about a file that is perfectly valid, try the other loader
     // and say which kind it actually is.
-    match body_file::load(p) {
-        Ok(body) => validate_body(Source::File(path), &body, anchor_path),
+    match body_file::load_with_grouping(p) {
+        Ok((body, g)) => validate_body(Source::File(path, g), &body, anchor_path),
         Err(body_err) => match anchor_file::load(p) {
             Ok(anchor) => validate_anchor(path, &anchor, anchor_path),
             // Both failed. The body error is the one to report: this argument is
@@ -3501,6 +3556,124 @@ pub fn cmd_cal_validate(path: &str, anchor_path: Option<&str>) -> CmdResult {
 #[cfg(feature = "body")]
 fn check(name: &str, verdict: impl Into<String>) -> (String, Value) {
     (name.to_string(), Value::text(verdict.into()))
+}
+
+/// `ucal cal from` — a local date, back to absolute time.
+///
+/// The inverse of [`cmd_cal_show`], and the thing the fifteen derived calendars
+/// did not have while Earth's legacy ones had it from 0.1.0.
+///
+/// Accepts the form `cal show` prints — `0082-083` or `0082-083.4420` — so the
+/// two commands read each other's output, which is what makes the round trip a
+/// thing a person can run rather than only a test.
+#[cfg(feature = "body")]
+pub fn cmd_cal_from(id: &str, local: &str) -> CmdResult {
+    let cal = ucal_body::calendar::by_id(id)?;
+    let (year, day, fraction) = parse_local(local)?;
+    let w = cal.instant_of(year, day, fraction.as_ref())?;
+
+    let width = w.width();
+    let mut doc = Doc::new()
+        .title("ucal cal from")
+        .field("calendar", Value::text(id))
+        .field("local", Value::text(local))
+        .field(
+            "window",
+            Value::Section(vec![
+                ("lo".into(), Value::number(w.lo().ticks().to_dec_string())),
+                ("hi".into(), Value::number(w.hi().ticks().to_dec_string())),
+                (
+                    "width_ticks".into(),
+                    Value::number(width.ticks().to_dec_string()),
+                ),
+            ]),
+        )
+        .field(
+            "lo_human",
+            Value::form(codec::render(w.lo(), &Fmt::human()).unwrap_or_default()),
+        )
+        .field(
+            "anchor_revision",
+            Value::number(cal.anchor().revision().to_string()),
+        );
+
+    // The warning belongs here too: a local date far outside the parameters'
+    // windows converts to an instant just as readily, and Rule C does not stop
+    // applying because the arrow points the other way (M1).
+    if let Some(warn) = cal.body().outside_window(w.lo()) {
+        doc = doc.note(window_note(warn));
+    }
+
+    Ok(doc.note(
+        "**A local date is an interval, not an instant**, and for two reasons \
+         that would each be enough on their own. A local day is a span — this \
+         window is that whole day unless a fraction was given. And the anchor \
+         carries uncertainty, which propagates (Rule J.2), so it widens the \
+         answer at both ends. The endpoints are taken outward to tick \
+         boundaries, never inward: narrowing would be narrowing by assumption.",
+    ))
+}
+
+/// `YEAR-DAY` or `YEAR-DAY.FRACTION`, as `cal show` renders it.
+#[cfg(feature = "body")]
+fn parse_local(s: &str) -> Result<(i64, u32, Option<Ratio>), TimeError> {
+    let bad = || {
+        TimeError::with_context(
+            Code::E0018,
+            "a local date is `YEAR-DAY`, optionally with a fraction through the \
+             day: `82-83` or `0082-083.4420`, which is what `ucal cal show` \
+             prints. Both are 1-based and counted from the anchor",
+        )
+    };
+    let (y, rest) = s.split_once('-').ok_or_else(bad)?;
+    let year: i64 = y.trim().parse().map_err(|_| bad())?;
+    let (d, frac) = match rest.split_once('.') {
+        Some((d, f)) => (d, Some(f)),
+        None => (rest, None),
+    };
+    let day: u32 = d.trim().parse().map_err(|_| bad())?;
+    let fraction = match frac {
+        None => None,
+        Some(f) => {
+            // `0.4420` as an exact rational: the digits over a power of ten, so
+            // nothing is parsed through a float (Rule E).
+            let digits = f.trim();
+            if digits.is_empty() || !digits.bytes().all(|b| b.is_ascii_digit()) {
+                return Err(bad());
+            }
+            let numer = <Ticks as TickInt>::from_dec_str(digits).ok_or_else(bad)?;
+            let mut denom = <Ticks as TickInt>::one();
+            for _ in 0..digits.len() {
+                denom = denom
+                    .try_mul(&<Ticks as TickInt>::from_u64(10))
+                    .ok_or_else(|| TimeError::new(Code::E0021))?;
+            }
+            Some(Ratio::new(numer, denom)?)
+        }
+    };
+    Ok((year, day, fraction))
+}
+
+/// N2 — a shipped calendar, as the §15.1 file that would declare it.
+///
+/// Lines rather than a `Doc`, for the same reason `seq` and `completions` are:
+/// a generator's output is an input to something else. Here that something is
+/// `ucal cal validate` and `ucal cal derive`, and the round trip is the point —
+/// see [`body_export`] for what it replaces.
+#[cfg(feature = "body")]
+pub fn cmd_cal_export(id: &str) -> Result<String, TimeError> {
+    // A calendar id first, then a bare body id: `mars-d` and `mars` both name
+    // the same parameters, and `cal list` prints the first.
+    let found = ucal_body::calendar::registered()
+        .into_iter()
+        .find(|(cid, _, _)| *cid == id)
+        .map(|(_, b, g)| (b, g))
+        .or_else(|| ucal_body::data::by_id(id).map(|b| (b, None)))
+        .ok_or(TimeError::with_context(
+            Code::E0016,
+            "no such calendar or body; `ucal cal list` names every one",
+        ))?;
+    body_export::body_file(&found.0, found.1)
 }
 
 /// G5 — the precision probe over every calendar this project ships.
@@ -3915,8 +4088,12 @@ fn probe_satellite(
 /// two vocabularies, rather than two check lists that can come to disagree.
 #[cfg(feature = "body")]
 enum Source<'a> {
-    /// A §15.1 file at this path.
-    File(&'a str),
+    /// A §15.1 file at this path, and what it declared about its cycle.
+    ///
+    /// The declaration travels with the source because only the loader has seen
+    /// the file, and `Body` deliberately does not carry it — D-A5 makes the
+    /// grouping satellite the *calendar's* choice, not the body's.
+    File(&'a str, body_file::Grouping),
     /// A calendar this project ships, by id.
     Shipped(&'a str),
 }
@@ -3924,11 +4101,11 @@ enum Source<'a> {
 #[cfg(feature = "body")]
 impl Source<'_> {
     fn is_file(&self) -> bool {
-        matches!(self, Source::File(_))
+        matches!(self, Source::File(..))
     }
     fn name(&self) -> &str {
         match self {
-            Source::File(p) | Source::Shipped(p) => p,
+            Source::File(p, _) | Source::Shipped(p) => p,
         }
     }
 
@@ -3949,7 +4126,9 @@ impl Source<'_> {
     /// answers, because a declaration existed and this code went round it.
     fn grouping(&self, body: &ucal_body::Body) -> Option<&'static str> {
         match self {
-            Source::File(_) => body.satellites().first().map(|s| s.id()),
+            // N1 — the file's own declaration. This used to hardcode "the first
+            // satellite listed", which is now merely the default.
+            Source::File(_, g) => g.resolve(body),
             Source::Shipped(id) => ucal_body::calendar::registered()
                 .into_iter()
                 .find(|(cid, _, _)| cid == id || cid.trim_end_matches("-d") == *id)
@@ -4065,6 +4244,25 @@ fn validate_body(
             )),
         }
     }
+
+    // M3 — obliquity, reported. It is declared for ten bodies, cited, and was
+    // read by nothing but two tests: carried against a seasonal overlay that
+    // cannot be built, because the stored angle gives a season's *amplitude* and
+    // not its *phase*. Saying so where a reader is already asking what a body
+    // declares is better than leaving it invisible.
+    checks.push(check(
+        "obliquity",
+        match body.obliquity() {
+            Some(a) => format!(
+                "{} — {}. Carried and not consumed: it is what gives a body \
+                 seasons, and placing one needs the orientation of the spin axis, \
+                 which is not stored and would be a phase besides (Rule J.3)",
+                a.verbatim(),
+                a.citation().source
+            ),
+            None => "none declared for this body".to_string(),
+        },
+    ));
 
     checks.push(check(
         "cycles",
