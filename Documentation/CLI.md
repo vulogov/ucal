@@ -593,6 +593,71 @@ leak or change a published type, and the second is a breaking change. This one
 leaks, bounded by a process that exits — which is safe in a binary and would not
 be in a library.
 
+### `cal from`
+
+```
+ucal cal from <ID> <YEAR-DAY[.FRACTION]>
+```
+
+**The inverse of [`cal show`](#cal-show).** Earth's legacy calendars have gone
+both ways since 0.1.0 — `to-civil` and `from-civil`. The fifteen derived
+calendars went one way, while §15.4 says *"Earth's entry has no special code
+path, no extra fields, and no compile-time distinction from Mars's"*. That held
+inside the library and not at the surface a reader touches.
+
+```
+$ ucal cal show mars-d <INSTANT>
+  year  82
+  day   83
+
+$ ucal cal from mars-d 82-83
+window:
+  lo           8070205189123256952903759537926801463523316507316558837890625
+  hi           8070205189124903645106880591489885463523316507316558837890625
+```
+
+It accepts the form `cal show` prints — `82-83`, `0082-083`, or
+`0082-083.442043` — so the two commands read each other's output and the round
+trip is something a person can run rather than only a test.
+
+**The answer is a window, and would be wrong not to be.** Two reasons, either
+sufficient on its own:
+
+- **A local day is a span.** *Year 82, day 83* names a Martian day, not a moment.
+  With a fraction it names a moment inside that day; without one it is the whole
+  day.
+- **The anchor carries uncertainty**, and it propagates (Rule J.2). `cal show`
+  already reports `day_is_ambiguous` when the anchor's window straddles a local
+  day boundary; going the other way, that same uncertainty *is* the width. So
+  even an exact local moment is an interval in absolute time — the fraction
+  narrows the window to the anchor's own width and no further.
+
+**The endpoints are taken outward**, never inward. A local day boundary almost
+never lands on a tick boundary, so `lo` is floored and `hi` is raised; narrowing
+them to fit would be narrowing by assumption, which GE-3 forbids, and Rule R
+makes rendering the only place information may be lost. This is not rendering.
+A test asserts that consecutive local days leave no gap.
+
+**No search.** D-A21 fixed the placement — `days_before_year(y) = y × whole +
+floor(y × p / q)` — so the inverse evaluates it rather than hunting for it. The
+forward direction corrects an estimate in a loop; this one needs no estimate.
+
+| field | meaning |
+|---|---|
+| `calendar` | The calendar asked for. |
+| `local` | The local date, as it was given. |
+| `window` | `lo`, `hi` and `width_ticks` — the interval of absolute time this local date names. |
+| `lo_human` | The low end as a `UC1` text form, so the answer is readable without a second command. |
+| `anchor_revision` | Which determination produced it. An anchor is an observation (Rule J.5). |
+
+| refusal | why |
+|---|---|
+| year 0 | local years are 1-based from the anchor; year 1 is the year that began there |
+| day 0 | days of the local year are 1-based too |
+| a day past the year's end | refused, not rolled forward — the length of a local year is set by the leap rule and varies between them |
+| a fraction of 1 or more | a fraction *through* a day lies in `[0, 1)`; 1 is the next day |
+| a calendar with no anchor | `UCAL-E0062`, the same as the forward direction. Thirteen of fifteen are in this state (Rule J.3) |
+
 ### `cal export`
 
 ```

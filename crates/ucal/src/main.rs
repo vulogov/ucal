@@ -404,6 +404,19 @@ enum CalCommand {
         #[arg(long, value_name = "INSTANT")]
         at: Option<String>,
     },
+    /// A local date, back to absolute time — the inverse of `cal show`.
+    ///
+    /// Earth's legacy calendars have gone both ways since 0.1.0; the derived
+    /// ones went one way, which is a distinction §15.4 says does not exist.
+    ///
+    /// The answer is a **window**, and would be wrong not to be: a local day is
+    /// a span, and the anchor's uncertainty propagates (Rule J.2).
+    From {
+        /// Calendar id, e.g. `mars-d`.
+        id: String,
+        /// `YEAR-DAY`, or `YEAR-DAY.FRACTION` — the form `cal show` prints.
+        local: String,
+    },
     /// Write a shipped calendar out as the §15.1 file that declares it.
     ///
     /// A template that is correct by construction, and a round trip:
@@ -802,6 +815,9 @@ fn main() {
             CalCommand::List => ucal::cmd_cal_list(),
             CalCommand::Show { id, instant } => ucal::cmd_cal_show(id, pick(replacement, instant)),
             CalCommand::Anchor { id } => ucal::cmd_cal_anchor(id),
+            CalCommand::From { id, local } => {
+                ucal::cmd_cal_from(id, pick(replacement, local))
+            }
             // Handled before dispatch, like `seq`: it emits a file, not a
             // document. This arm exists because a `match` must be exhaustive.
             CalCommand::Export { .. } => Err(ucal_core::TimeError::with_context(

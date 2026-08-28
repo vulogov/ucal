@@ -227,6 +227,142 @@ impl BodyCalendar {
         }
     }
 
+    /// **The inverse: a local date, back to absolute time.**
+    ///
+    /// Earth's legacy calendars have gone both ways since 0.1.0 — `to-civil` and
+    /// `from-civil`. The fifteen derived calendars went one way, and §15.4 says
+    /// *"Earth's entry has no special code path, no extra fields, and no
+    /// compile-time distinction from Mars's"*. That held inside this crate and
+    /// not at the surface a reader touches, which is a real dent in Rule K.5's
+    /// claim that Earth is an ordinary instance.
+    ///
+    /// # It returns a `Window`, and would be wrong not to
+    ///
+    /// Two independent reasons, and either alone would be enough:
+    ///
+    /// - **A local day is a span.** *Year 82, day 83* names a Martian day, not a
+    ///   moment. Given a `fraction` it names a moment within that day; without
+    ///   one the answer is the whole day.
+    /// - **The anchor carries uncertainty** (Rule J.2), and it propagates. The
+    ///   forward direction already reports `day_is_ambiguous` when the anchor's
+    ///   window straddles a local day boundary; backwards, that same uncertainty
+    ///   *is* the width of the answer.
+    ///
+    /// # Exact, and widened rather than rounded
+    ///
+    /// A local day boundary almost never lands on a tick boundary, so the
+    /// endpoints are rationals. They are taken **outward** — `floor` for the low
+    /// end and `ceil` for the high — so the window contains the interval it
+    /// describes. Narrowing it would be narrowing by assumption, which GE-3
+    /// forbids, and Rule R makes rendering the only place information may be
+    /// lost. This is not rendering.
+    ///
+    /// # No search
+    ///
+    /// D-A21 fixed the placement — `days_before_year(y) = y × whole +
+    /// floor(y × p / q)` — so this evaluates it rather than hunting for it. The
+    /// forward `split_year` corrects an estimate in a loop; the inverse needs
+    /// no estimate, which is the sense in which this calendar is understood
+    /// rather than merely computed.
+    pub fn instant_of(
+        &self,
+        year: i64,
+        day: u32,
+        fraction: Option<&Ratio>,
+    ) -> Result<Window<UC1>> {
+        if year < 1 {
+            return Err(TimeError::with_context(
+                Code::E0020,
+                "local years are 1-based from the anchor: year 1 is the year that \
+                 began at it, and there is no year 0",
+            ));
+        }
+        if day < 1 {
+            return Err(TimeError::with_context(
+                Code::E0018,
+                "local days of the year are 1-based",
+            ));
+        }
+        if let Some(f) = fraction {
+            // `Ratio` here is unsigned (Rule B), so only the upper bound needs
+            // checking: a fraction *through* a day lies in `[0, 1)`, and 1 is
+            // the next day rather than the end of this one.
+            if f.cmp_exact(&Ratio::one()) != core::cmp::Ordering::Less {
+                return Err(TimeError::with_context(
+                    Code::E0018,
+                    "the fraction through a local day lies in [0, 1)",
+                ));
+            }
+        }
+
+        // Undo the 1-based rendering, then undo `split_year`.
+        let year0 = <Ticks as TickInt>::from_u64((year as u64) - 1);
+        let day0 = <Ticks as TickInt>::from_u64(u64::from(day) - 1);
+        let per_cycle = self.days_per_cycle()?;
+        let q = self.leap_rule.chosen.value.denom().clone();
+        let (cycles, y) = year0.quot_rem(&q);
+
+        let whole_days = cycles
+            .try_mul(&per_cycle)
+            .and_then(|v| v.try_add(&self.days_before_year(&y).ok()?))
+            .and_then(|v| v.try_add(&day0))
+            .ok_or(TimeError::new(Code::E0021))?;
+
+        // A day that does not exist in that year is refused rather than rolled
+        // into the next one. `days_before_year` is monotone, so the length of
+        // year `y` is the difference between consecutive starts.
+        let next = y.try_add(&<Ticks as TickInt>::one()).ok_or(TimeError::new(Code::E0021))?;
+        let len = self
+            .days_before_year(&next)?
+            .try_sub(&self.days_before_year(&y)?)
+            .ok_or(TimeError::new(Code::E0021))?;
+        if day0 >= len {
+            return Err(TimeError::with_context(
+                Code::E0018,
+                "that local year does not have that many days; the length of a \
+                 local year is set by the leap rule and varies between them",
+            ));
+        }
+
+        // **M2**: the epoch's solar day, like the leap rule this just inverted.
+        let solar_day = self.body.solar_day().value_at_epoch();
+        let anchor = Ratio::from_int(self.anchor.tick().ticks().clone());
+
+        let start = Ratio::from_int(whole_days.clone()).mul(solar_day)?;
+        let (lo_r, hi_r) = match fraction {
+            // A moment inside the day: the point, and the anchor's width does
+            // the rest below.
+            Some(f) => {
+                let off = f.mul(solar_day)?;
+                let p = start.add(&off)?;
+                (p.clone(), p)
+            }
+            // The whole day, from its start to the start of the next.
+            None => {
+                let next_day = Ratio::from_int(
+                    whole_days
+                        .try_add(&<Ticks as TickInt>::one())
+                        .ok_or(TimeError::new(Code::E0021))?,
+                )
+                .mul(solar_day)?;
+                (start, next_day)
+            }
+        };
+
+        let lo = Instant::from_ticks(anchor.add(&lo_r)?.floor())?;
+        let hi = Instant::from_ticks(anchor.add(&hi_r)?.ceil())?;
+        let w = Window::new(lo, hi)?;
+
+        // Rule J.2 — the anchor's uncertainty, on both ends, exactly as
+        // `fields` propagates it forwards.
+        let half = {
+            let (h, _) = self.anchor.uncertainty().divmod(&Delta::from_u64(2))?;
+            h
+        };
+        let (w, _clamped) = w.widen(&half)?;
+        Ok(w)
+    }
+
     /// Decompose an instant into local fields (§15.5).
     ///
     /// `UCAL-E0020` for an instant before the anchor: local counting had not

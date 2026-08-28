@@ -471,6 +471,31 @@ revision (Rule J.5) and the width of the window that revision implies (Rule
 J.2); each legacy one is labelled as declared table data (§8.6).
 ```
 
+## `ucal cal from mars-d 82-83`
+
+The inverse of `cal show`, and the thing the fifteen derived calendars did not have while Earth's legacy ones had it from 0.1.0. The answer is a window and would be wrong not to be: a local day is a span, and the anchor's uncertainty propagates into it (Rule J.2).
+
+```
+ucal cal from
+─────────────
+calendar         mars-d
+local            82-83
+window:
+  lo           8070205189123256952903759537926801463523316507316558837890625
+  hi           8070205189124903645106880591489885463523316507316558837890625
+  width_ticks  1646692203121053563084000000000000000000000000000
+lo_human         UC1 0031·0687·2481·2999·2840·0712:0747·1720·1796·0973·0964·
+                 0679·1235·1299·2374·0000·0000·0000
+anchor_revision  1
+
+**A local date is an interval, not an instant**, and for two reasons that would
+each be enough on their own. A local day is a span — this window is that whole
+day unless a fraction was given. And the anchor carries uncertainty, which
+propagates (Rule J.2), so it widens the answer at both ends. The endpoints are
+taken outward to tick boundaries, never inward: narrowing would be narrowing by
+assumption.
+```
+
 ## `ucal cal validate --all`
 
 The precision probe over every calendar this project ships. Fifteen calendars rest on nineteen distinct published figures and fourteen of those decide their leap rule outright — which is Rule K working, not a defect. The sharp part is the sharing: a satellite's year is its primary's orbit, so Jupiter's 4332.589 d decides five leap rules at once.

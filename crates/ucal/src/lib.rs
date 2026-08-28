@@ -3558,6 +3558,102 @@ fn check(name: &str, verdict: impl Into<String>) -> (String, Value) {
     (name.to_string(), Value::text(verdict.into()))
 }
 
+/// `ucal cal from` — a local date, back to absolute time.
+///
+/// The inverse of [`cmd_cal_show`], and the thing the fifteen derived calendars
+/// did not have while Earth's legacy ones had it from 0.1.0.
+///
+/// Accepts the form `cal show` prints — `0082-083` or `0082-083.4420` — so the
+/// two commands read each other's output, which is what makes the round trip a
+/// thing a person can run rather than only a test.
+#[cfg(feature = "body")]
+pub fn cmd_cal_from(id: &str, local: &str) -> CmdResult {
+    let cal = ucal_body::calendar::by_id(id)?;
+    let (year, day, fraction) = parse_local(local)?;
+    let w = cal.instant_of(year, day, fraction.as_ref())?;
+
+    let width = w.width();
+    let mut doc = Doc::new()
+        .title("ucal cal from")
+        .field("calendar", Value::text(id))
+        .field("local", Value::text(local))
+        .field(
+            "window",
+            Value::Section(vec![
+                ("lo".into(), Value::number(w.lo().ticks().to_dec_string())),
+                ("hi".into(), Value::number(w.hi().ticks().to_dec_string())),
+                (
+                    "width_ticks".into(),
+                    Value::number(width.ticks().to_dec_string()),
+                ),
+            ]),
+        )
+        .field(
+            "lo_human",
+            Value::form(codec::render(w.lo(), &Fmt::human()).unwrap_or_default()),
+        )
+        .field(
+            "anchor_revision",
+            Value::number(cal.anchor().revision().to_string()),
+        );
+
+    // The warning belongs here too: a local date far outside the parameters'
+    // windows converts to an instant just as readily, and Rule C does not stop
+    // applying because the arrow points the other way (M1).
+    if let Some(warn) = cal.body().outside_window(w.lo()) {
+        doc = doc.note(window_note(warn));
+    }
+
+    Ok(doc.note(
+        "**A local date is an interval, not an instant**, and for two reasons \
+         that would each be enough on their own. A local day is a span — this \
+         window is that whole day unless a fraction was given. And the anchor \
+         carries uncertainty, which propagates (Rule J.2), so it widens the \
+         answer at both ends. The endpoints are taken outward to tick \
+         boundaries, never inward: narrowing would be narrowing by assumption.",
+    ))
+}
+
+/// `YEAR-DAY` or `YEAR-DAY.FRACTION`, as `cal show` renders it.
+#[cfg(feature = "body")]
+fn parse_local(s: &str) -> Result<(i64, u32, Option<Ratio>), TimeError> {
+    let bad = || {
+        TimeError::with_context(
+            Code::E0018,
+            "a local date is `YEAR-DAY`, optionally with a fraction through the \
+             day: `82-83` or `0082-083.4420`, which is what `ucal cal show` \
+             prints. Both are 1-based and counted from the anchor",
+        )
+    };
+    let (y, rest) = s.split_once('-').ok_or_else(bad)?;
+    let year: i64 = y.trim().parse().map_err(|_| bad())?;
+    let (d, frac) = match rest.split_once('.') {
+        Some((d, f)) => (d, Some(f)),
+        None => (rest, None),
+    };
+    let day: u32 = d.trim().parse().map_err(|_| bad())?;
+    let fraction = match frac {
+        None => None,
+        Some(f) => {
+            // `0.4420` as an exact rational: the digits over a power of ten, so
+            // nothing is parsed through a float (Rule E).
+            let digits = f.trim();
+            if digits.is_empty() || !digits.bytes().all(|b| b.is_ascii_digit()) {
+                return Err(bad());
+            }
+            let numer = <Ticks as TickInt>::from_dec_str(digits).ok_or_else(bad)?;
+            let mut denom = <Ticks as TickInt>::one();
+            for _ in 0..digits.len() {
+                denom = denom
+                    .try_mul(&<Ticks as TickInt>::from_u64(10))
+                    .ok_or_else(|| TimeError::new(Code::E0021))?;
+            }
+            Some(Ratio::new(numer, denom)?)
+        }
+    };
+    Ok((year, day, fraction))
+}
+
 /// N2 — a shipped calendar, as the §15.1 file that would declare it.
 ///
 /// Lines rather than a `Doc`, for the same reason `seq` and `completions` are:

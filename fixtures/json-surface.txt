@@ -40,6 +40,14 @@ cal-derive.leap_rule.placement	string
 cal-derive.leap_rule.rule	string
 cal-derive.leap_rule.whole_days_per_year	string
 cal-derive.primary	string
+cal-from.anchor_revision	string
+cal-from.calendar	string
+cal-from.lo_human	string
+cal-from.local	string
+cal-from.window	object
+cal-from.window.hi	string
+cal-from.window.lo	string
+cal-from.window.width_ticks	string
 cal-list.calendars	object
 cal-list.calendars.*	object
 cal-list.calendars.*.anchor_revision	string
@@ -101,6 +109,7 @@ cal-validate.checks.cycles	string
 cal-validate.checks.id	string
 cal-validate.checks.intercalation	string
 cal-validate.checks.loads	string
+cal-validate.checks.obliquity	string
 cal-validate.checks.orbital_period	string
 cal-validate.checks.precision	object
 cal-validate.checks.precision.grouping_period	string
