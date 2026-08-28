@@ -621,6 +621,7 @@ checks:
                    (Williams, D. R.), Jupiter fact sheet; the original document
                    is available in the Internet Archive
   intercalation    1/24 at convergent 2, 1219 whole days per year
+  obliquity        none declared for this body
   cycles           none — no grouping satellite, so this calendar has years and
                    days and no cycle. §15.3 forbids a fallback structure, which
                    makes that the answer and not a gap

@@ -43,6 +43,7 @@ use ucal_core::{backend::TickInt, Code, Delta, Instant, Ticks, TimeError, Window
 use crate::anchor::Anchor;
 use crate::body::Body;
 use crate::derive::{derive_cycles, derive_leap_rule, Cycle, DriftBound, LeapRule};
+use ucal_core::Warning;
 
 type Result<T> = core::result::Result<T, TimeError>;
 
@@ -83,6 +84,13 @@ pub struct DerivedFields {
     /// Whether the anchor's uncertainty spans a local day boundary, so that the
     /// day number itself is not determined.
     pub day_is_ambiguous: bool,
+    /// `UCAL-W0003` when `t` fell outside a parameter's validity window (M1).
+    ///
+    /// Rule C requires the warning and forbids silent extrapolation. It was
+    /// produced by `RatedParam::evaluate` and discarded by this function's one
+    /// caller, so it reached nothing; carrying it here puts it where every
+    /// command that renders local fields can say it.
+    pub warning: Option<Warning>,
 }
 
 /// A calendar derived from a body under Rule K (§9.3).
@@ -224,10 +232,26 @@ impl BodyCalendar {
     /// `UCAL-E0020` for an instant before the anchor: local counting had not
     /// begun, and a negative year would be an invention.
     pub fn fields(&self, t: &Instant<UC1>) -> Result<DerivedFields> {
-        let solar_day = {
-            let (v, _) = self.body.solar_day().evaluate(t)?;
-            v
-        };
+        // **M2 — one convention for when a parameter is read.**
+        //
+        // The value is the epoch's, like the leap rule and the cycles, which
+        // were already built from `value_at_epoch` when this calendar was
+        // constructed. Before this, the solar day was evaluated at `t` and the
+        // other two were not: walk far enough forward and the day used to count
+        // days is not the day the leap rule was derived from.
+        //
+        // Freezing rather than evaluating all three, because a leap rule defines
+        // the year boundaries and a rule that changes with `t` makes `year(t)`
+        // non-monotonic at the seam. A calendar is a counting convention, and a
+        // convention whose rule changes underneath the count is not one.
+        //
+        // No shipped parameter declares a rate, so this changes no number today.
+        // It settles which number it would have been.
+        let solar_day = self.body.solar_day().value_at_epoch().clone();
+
+        // **M1** — and drift is reported rather than silently applied. This is
+        // the warning Rule C requires and the line above used to throw away.
+        let warning = self.body.outside_window(t);
         let elapsed = t.since(self.anchor.tick()).map_err(|_| {
             TimeError::with_context(
                 Code::E0020,
@@ -296,6 +320,7 @@ impl BodyCalendar {
             window,
             anchor_revision: self.anchor.revision(),
             day_is_ambiguous,
+            warning,
         })
     }
 

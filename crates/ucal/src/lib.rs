@@ -1651,6 +1651,9 @@ fn cmd_show_inner(
     let (t, _) = parse_instant(input)?;
     let mut rows: Vec<(String, Value)> = Vec::new();
     let mut produced = 0usize;
+    // M1 — one note for the table, not one per row. A reader asking for six
+    // calendars at a stale instant is told once that a window was left.
+    let mut stale: Option<ucal_core::Warning> = None;
 
     for id in calendars {
         let entry = match id.as_str() {
@@ -1686,6 +1689,7 @@ fn cmd_show_inner(
                 Ok(c) => {
                     let r = c.render(&t)?;
                     let f = c.fields(&t)?;
+                    stale = stale.or(f.warning);
                     produced += 1;
                     Value::Section(vec![
                         ("rendered".into(), Value::text(r.to_string())),
@@ -1714,6 +1718,7 @@ fn cmd_show_inner(
         let id = ucal_core::qualified::CalendarIdentity::id(&c).to_string();
         let r = c.render(&t)?;
         let f = c.fields(&t)?;
+        stale = stale.or(f.warning);
         produced += 1;
         rows.push((
             id,
@@ -1752,7 +1757,7 @@ fn cmd_show_inner(
         ));
     }
 
-    Ok(Doc::new()
+    let mut doc = Doc::new()
         .title("ucal show")
         .field("ticks", Value::number(t.ticks().to_dec_string()))
         .field(
@@ -1765,7 +1770,11 @@ fn cmd_show_inner(
              its anchor revision (Rule J.5) and the width of the window that \
              revision implies (Rule J.2); each legacy one is labelled as declared \
              table data (§8.6).",
-        ))
+        );
+    if let Some(w) = stale {
+        doc = doc.note(window_note(w));
+    }
+    Ok(doc)
 }
 
 /// F1 — a calendar built from §15.1 files rather than from the registry.
@@ -1818,6 +1827,7 @@ pub fn cmd_cal_show(id: &str, input: &str) -> CmdResult {
 fn cal_show_of(c: &ucal_body::calendar::BodyCalendar, id: &str, input: &str) -> CmdResult {
     let (t, _) = parse_instant(input)?;
     let f = c.fields(&t)?;
+    let window_warning = f.warning;
     let rule = c.leap_rule();
 
     // §15.2: the whole walk, so the choice is auditable.
@@ -1951,6 +1961,11 @@ fn cal_show_of(c: &ucal_body::calendar::BodyCalendar, id: &str, input: &str) -> 
             ]),
         },
     );
+
+    // M1 — Rule C's warning, on the command that renders the fields.
+    if let Some(w) = window_warning {
+        doc = doc.note(window_note(w));
+    }
 
     Ok(doc)
 }
@@ -3023,6 +3038,26 @@ pub fn cmd_tour() -> CmdResult {
 /// written down once, said "five of the seven", and was wrong the moment Y3
 /// added five bodies.
 #[cfg(feature = "body")]
+/// M1 — the note a set of local fields carries when a parameter was read
+/// outside its validity window.
+///
+/// A note whose text carries `UCAL-W0003`, which is how this program has always
+/// surfaced a warning: `role_of_prose` colours anything containing `UCAL-W` as
+/// one, so the channel existed and nothing was being put into it.
+#[cfg(feature = "body")]
+fn window_note(w: ucal_core::Warning) -> String {
+    format!(
+        "{}: {}. Rule C makes a parameter valid over a stated interval and \
+         forbids silent extrapolation, so this instant lies outside the window \
+         at least one of this body's figures was published for. The fields above \
+         are computed from the values at the epoch — see `ucal cal show <id>` for \
+         the windows themselves",
+        w.as_str(),
+        w.describe()
+    )
+}
+
+#[cfg(feature = "body")]
 fn anchorless_note() -> String {
     let derived = ucal_body::calendar::registered();
     let total = derived.len();
@@ -3214,6 +3249,12 @@ pub fn cmd_cal_derive_with(path: &str, anchor: Option<&str>, at: Option<&str>) -
                 Some(t) => {
                     let (t, _) = parse_instant(t)?;
                     let f = cal.fields(&t)?;
+                    // M1 — attached here rather than collected, because this is
+                    // the only branch of `cal derive` that produces fields.
+                    let doc = match f.warning {
+                        Some(w) => doc.note(window_note(w)),
+                        None => doc,
+                    };
                     doc.field(
                         "fields",
                         Value::Section(vec![
@@ -4107,6 +4148,25 @@ fn validate_body(
             )),
         }
     }
+
+    // M3 — obliquity, reported. It is declared for ten bodies, cited, and was
+    // read by nothing but two tests: carried against a seasonal overlay that
+    // cannot be built, because the stored angle gives a season's *amplitude* and
+    // not its *phase*. Saying so where a reader is already asking what a body
+    // declares is better than leaving it invisible.
+    checks.push(check(
+        "obliquity",
+        match body.obliquity() {
+            Some(a) => format!(
+                "{} — {}. Carried and not consumed: it is what gives a body \
+                 seasons, and placing one needs the orientation of the spin axis, \
+                 which is not stored and would be a phase besides (Rule J.3)",
+                a.verbatim(),
+                a.citation().source
+            ),
+            None => "none declared for this body".to_string(),
+        },
+    ));
 
     checks.push(check(
         "cycles",

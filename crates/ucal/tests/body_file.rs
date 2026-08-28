@@ -1294,3 +1294,117 @@ fn verdict_of(doc: &ucal::emit::Doc, name: &str) -> String {
         .map(|(_, v)| v.rendered_text())
         .unwrap_or_else(|| panic!("no field `{name}`"))
 }
+
+// ---- M1/M2/M3 -----------------------------------------------------------
+
+/// An ordinary instant, well inside every shipped window.
+const NOW_ISH: &str = "8070205189123984864657505252035637180530466139316558837890625";
+
+/// Fifty thousand Julian years after J2000 — five times Earth's declared
+/// validity window.
+fn far_outside() -> String {
+    use ucal_core::backend::TickInt;
+    let j2000 = "8070205173569972963515184424835637180530466139316558837890625";
+    let sec = ucal::clock::ticks_in_nanos(1_000_000_000).expect("a second");
+    let mut t = <ucal_core::Ticks as TickInt>::from_dec_str(j2000).expect("a tick count");
+    let span = sec
+        .try_mul(&<ucal_core::Ticks as TickInt>::from_u64(50_000 * 31_557_600))
+        .expect("in range");
+    t = t.try_add(&span).expect("in range");
+    t.to_dec_string()
+}
+
+/// **M1 — `UCAL-W0003` reaches a reader.**
+///
+/// Rule C, quoted at the top of `param.rs`: a parameter evaluated outside its
+/// validity window *"MUST warn (`UCAL-W0003`) and MUST NOT silently
+/// extrapolate"*. The warning was produced correctly by `RatedParam::evaluate`
+/// and bound to `_` by its one production caller, so it occurred zero times in
+/// any output this program could emit — a requirement with no wire, and the
+/// first of that shape found here where the spec says MUST.
+#[test]
+fn a_parameter_outside_its_window_warns() {
+    let far = far_outside();
+    let doc = ucal::cmd_cal_show("earth-d", &far).expect("a date");
+    let text = doc.to_text();
+    assert!(
+        text.contains("UCAL-W0003"),
+        "no warning fifty thousand years out:\n{text}"
+    );
+}
+
+/// **And an ordinary date stays quiet**, which is the half that makes the other
+/// half worth having.
+///
+/// M1's stop condition was that surfacing this must not make the common case
+/// noisy. Every shipped calendar's window is ±10 000 Julian years.
+#[test]
+fn an_ordinary_date_carries_no_warning() {
+    let doc = ucal::cmd_cal_show("earth-d", NOW_ISH).expect("a date");
+    assert!(
+        !doc.to_text().contains("UCAL-W0003"),
+        "an ordinary date warned"
+    );
+}
+
+/// The warning is on the fields, so every command that renders them can say it.
+#[test]
+fn the_warning_travels_on_the_fields() {
+    let cal = ucal_body::calendar::by_id("earth-d").expect("earth-d is anchored");
+    let (near, _) = ucal::parse_instant(NOW_ISH).expect("an instant");
+    let (far, _) = ucal::parse_instant(&far_outside()).expect("an instant");
+    assert!(cal.fields(&near).expect("fields").warning.is_none());
+    assert_eq!(
+        cal.fields(&far).expect("fields").warning,
+        Some(ucal_core::Warning::W0003)
+    );
+}
+
+/// **M2 — one convention for when a parameter is read.**
+///
+/// The solar day was evaluated at the instant while the leap rule and the cycles
+/// were frozen at the epoch, so walking far enough forward used a day the leap
+/// rule was not derived from. All three are the epoch's now.
+///
+/// No shipped parameter declares a rate, so this changes no number today — which
+/// is why the test is that the value used is the epoch's, rather than a
+/// comparison of two dates that would agree either way.
+#[test]
+fn every_parameter_is_read_at_the_epoch() {
+    let cal = ucal_body::calendar::by_id("earth-d").expect("earth-d is anchored");
+    let body = cal.body();
+    // The day the fields are computed from is the epoch's value, and the leap
+    // rule was built from the same one.
+    let at_epoch = body.solar_day().value_at_epoch();
+    let (v, _) = body
+        .solar_day()
+        .evaluate(body.solar_day().epoch())
+        .expect("evaluates at its own epoch");
+    assert_eq!(
+        v.cmp_exact(at_epoch),
+        core::cmp::Ordering::Equal,
+        "the epoch value and the value at the epoch must agree"
+    );
+}
+
+/// **M3 — obliquity is reported rather than invisible.**
+///
+/// Declared for ten bodies, cited, and read by nothing but two tests. A seasonal
+/// overlay cannot be built from it: the stored angle gives a season's amplitude
+/// and not its phase, placing an equinox needs the orientation of the spin axis
+/// which is not stored, and a phase is empirical besides (Rule J.3).
+///
+/// So it is surfaced with the reason attached, which is the outcome M3's stop
+/// condition prescribed.
+#[test]
+fn obliquity_is_reported_with_the_reason_it_is_unused() {
+    let doc = ucal::cmd_cal_validate("earth-d", None).expect("a report");
+    let v = verdict(&doc, "obliquity");
+    assert!(v.starts_with("23.4393"), "{v}");
+    assert!(v.contains("Carried and not consumed"), "{v}");
+
+    // A body without one says so rather than omitting the row.
+    let (_d, p) = tmp("no-obliquity", &GOOD);
+    let f = ucal::cmd_cal_validate(p.to_str().expect("utf-8"), None).expect("a report");
+    assert!(verdict(&f, "obliquity").contains("none declared"));
+}

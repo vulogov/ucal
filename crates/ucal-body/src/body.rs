@@ -293,6 +293,27 @@ impl Body {
         Ok((year.div(&day)?, w1.or(w2)))
     }
 
+    /// Whether `at` lies outside any declared parameter's validity window.
+    ///
+    /// **M1.** Rule C, quoted at the top of [`crate::param`]: a parameter
+    /// evaluated outside its window *"MUST warn (`UCAL-W0003`) and MUST NOT
+    /// silently extrapolate"*. `RatedParam::evaluate` produced that warning
+    /// correctly and its one production caller discarded it, so `UCAL-W0003`
+    /// could not reach a terminal from anywhere in this program.
+    ///
+    /// Every parameter the body declares, not only the ones a given caller
+    /// happens to divide: somebody asking for a date fifty thousand years out is
+    /// owed the warning whichever figure has gone stale.
+    ///
+    /// One implementation, used by [`Body::days_per_year`] too, so the question
+    /// is not asked two ways.
+    pub fn outside_window(&self, at: &Instant<UC1>) -> Option<Warning> {
+        let stale = [&self.rotation_period, &self.solar_day, &self.orbital_period]
+            .iter()
+            .any(|p| !p.valid().contains(at));
+        stale.then_some(Warning::W0003)
+    }
+
     /// Every parameter's citation, for auditing.
     pub fn citations(&self) -> Vec<Citation> {
         let mut out = alloc::vec![

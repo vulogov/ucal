@@ -678,6 +678,7 @@ first half they were outside the one check built to ask.
 | `primary` | What the file says this body orbits, or that it names nothing. |
 | `rotation_period`, `solar_day`, `orbital_period` | What the file states for each: a measured figure with its unit, or a `derived:` relation, and the citation either way. |
 | `intercalation` | The leap rule, **or the reason there is none** — which may be a fact about the body rather than a defect in the file. |
+| `obliquity` | The body's axial tilt, cited — and the reason it is carried and not consumed. |
 | `cycles` | The grouping satellite, or that there is none, which §15.3 makes an answer rather than a gap. |
 | `precision` | One row per measured parameter feeding the intercalation. See below. |
 | `grouping_period` | Inside `precision`: the satellite period that decides the cycle, where a calendar declares one. |
@@ -795,6 +796,22 @@ answers.
 `--all` lists every calendar including the fourteen without a cycle, because a
 section reporting one of fifteen without saying so is exactly the failure the
 1.6.0 audit found fourteen times.
+
+#### Obliquity is reported and not used
+
+Ten shipped bodies declare an axial tilt, cited to the IAU WGCCRE report, and
+until 1.10.0 nothing read it but two tests. It is what gives a body **seasons** —
+a subdivision of its year that needs no satellite, and so would exist for the
+fourteen calendars that have no cycle at all.
+
+**It cannot be built from what is stored, and the reason is worth stating.** The
+angle gives a season's *amplitude*. Placing an equinox needs the *phase* — the
+orientation of the spin axis, which the cited source publishes as α₀ and δ₀ and
+this project stores nowhere. And a phase is empirical under Rule J.3: determined
+and cited, never derived, which is the wall [`D5`](Proposals/D5-titan-anchor.md)
+hit for Titan and answered with *no anchor*.
+
+So the value is surfaced with that reason attached, rather than left invisible.
 
 **What is not checked, and cannot be.** Whether the published figures are the
 ones the body actually has. Every check is on internal consistency; a file that
