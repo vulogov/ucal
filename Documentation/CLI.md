@@ -243,7 +243,7 @@ home is a ratio between rungs, not a count of somebody's seconds.
 
 | option | notes |
 |---|---|
-| `--at <TIER>` | Also report the whole count and remainder at one named tier, by name, `T<k>` or `5^e`. Without it you get the decomposition's own choice of tiers. |
+| `--at <TIER\|CALENDAR>` | Also report the whole count and remainder in one named unit — a tier by name, `T<k>` or `5^e`, **or a calendar's own**: `--at mars-d` counts the span in Martian solar days. Without it you get the decomposition's own choice of tiers. |
 
 | field | meaning |
 |---|---|
@@ -252,7 +252,8 @@ home is a ratio between rungs, not a count of somebody's seconds.
 | `ticks` | How far apart, exactly. A magnitude, so it is unsigned; `direction` carries the rest. |
 | `natural_tier` | The coarsest rung of the whole 45-tier grid that fits inside the difference. Unnamed rungs appear as `T<k>`. |
 | `on_the_ladder.<tier>` | The difference decomposed across the **named** tiers, coarsest first. Leading zeros are omitted; a zero *between* two non-zero tiers is kept, because it is information. Reassembles to `ticks` exactly. |
-| `at.tier` | Present with `--at`: the tier asked for. |
+| `at.unit` | Present with `--at`: the unit asked for. |
+| `at.tier` | Present when that unit is a **tier**, and absent for a calendar's own — a field named `tier` should not name a Martian day. |
 | `at.whole` | How many whole ones of that tier fit. |
 | `at.remainder_ticks` | What is left over. `whole × tier + remainder_ticks == ticks`. |
 | `si_bridge.seconds` | Present with `--bridge`: the difference through the SI bridge. Rounded, and the certification block says how. |
@@ -1558,6 +1559,48 @@ not. The two places a second is named — the arc's pace and the flicker's rate 
 are statements *about the display*, not units the clock counts in.
 
 ---
+
+## `ucal add`
+
+```
+ucal add <INSTANT> <N> [--step <TIER|CALENDAR>]
+```
+
+An instant, moved by a whole number of a chosen unit. **The operation this
+program did not have**: it could read time — `now`, `to-civil`, `cal from` — and
+measure it — `between`, `explain` — and not move through it. `seq` walks between
+two instants and needs both; `between` measures a span whose ends you already
+hold.
+
+```
+ucal add <T> 1    --step mars-d-year     # one Martian year later
+ucal add <T> -3   --step T1              # three arcs earlier
+ucal add <T> 100  --step mars-d | ucal cal show mars-d -
+```
+
+`--step` takes the same vocabulary as [`seq`](#ucal-seq): a tier, or a
+calendar's own solar day or year.
+
+**Unsigned time is the whole design here.** `N` is signed and the result is not.
+Absolute time is unsigned (Rule B) and a tick count cannot be negative, so moving
+below the datum is **`UCAL-E0020`** — *result precedes the datum*, the code named
+for this operation, which until 1.11.0 no raiser had ever produced for it.
+Moving past the ceiling is `UCAL-E0021`. Rule O forbids wrapping and saturating,
+so neither is clamped: a clamped answer is a wrong answer where an error was
+available.
+
+| field | meaning |
+|---|---|
+| `ticks` / `human` / `ucid` | The instant arrived at, in each form. |
+| `from` | The instant it started from. |
+| `moved_by` | The count and the unit, as asked for. |
+| `offset_ticks` | How far it moved, exactly. |
+
+**Exact.** `N × unit` in integer ticks, and `--step` refuses a unit that is not a
+whole number of them — so a derived solar day is `UCAL-E0043` here for the same
+reason it is in `seq`. Two properties are tested: moving out and back returns
+exactly where it started, and the span it opens measures back to the same count
+with no remainder.
 
 ## `ucal seq`
 

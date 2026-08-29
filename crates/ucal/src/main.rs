@@ -155,7 +155,11 @@ enum Command {
         from: String,
         /// A `UC1` text form, a UCID, or a decimal tick count.
         to: String,
-        /// Also report the whole count and remainder at one named tier.
+        /// Also report the whole count and remainder in one named unit.
+        ///
+        /// A tier — `T1`, `arc` — **or a calendar's own unit**: `--at mars-d`
+        /// counts the span in Martian solar days, `mars-d-year` in Martian
+        /// years. The same vocabulary `seq --step` takes.
         #[arg(long)]
         at: Option<String>,
     },
@@ -199,6 +203,22 @@ enum Command {
         /// Tier to place events at: a name, `T<k>`, or `5^e`.
         #[arg(long, default_value = "drift")]
         tier: String,
+    },
+    /// An instant, moved by a whole number of a chosen unit.
+    ///
+    /// The operation this program did not have: it could read time and measure
+    /// it, and not move through it. `seq` walks between two instants you
+    /// already hold; this produces the second one.
+    Add {
+        /// A `UC1` text form, a UCID, or a decimal tick count.
+        instant: String,
+        /// How many, signed. Negative moves earlier.
+        #[arg(allow_negative_numbers = true)]
+        n: i64,
+        /// The unit: a tier like `T1`, or a calendar's own — `mars-d`,
+        /// `mars-d-year`. The same vocabulary `seq --step` takes.
+        #[arg(long, default_value = "T1")]
+        step: String,
     },
     /// Evenly spaced marks on the tier grid.
     Ruler {
@@ -804,6 +824,8 @@ fn main() {
         Command::Timeline { tier } => LocaleId::parse(&cli.locale)
             .and_then(|l| parse_tier_in(l, tier))
             .and_then(ucal::cmd_timeline),
+        Command::Add { instant, n, step } => stride_of(&cli.locale, step)
+            .and_then(|unit| ucal::cmd_add(pick(replacement, instant), *n, &unit)),
         Command::Ruler { from, to, step } => {
             let (f, t2) = (pick(replacement, from), pick(replacement, to));
             LocaleId::parse(&cli.locale)
@@ -943,10 +965,9 @@ fn main() {
             // G7 — whichever side is `-` takes the line; the other is held.
             let (f, t2) = (pick(replacement, from), pick(replacement, to));
             match at {
-                Some(a) => LocaleId::parse(&cli.locale)
-                    .and_then(|l| parse_tier_in(l, a))
-                    .and_then(|tier| ucal::cmd_between(f, t2, Some(tier))),
-                None => ucal::cmd_between(f, t2, None),
+                Some(a) => stride_of(&cli.locale, a)
+                    .and_then(|unit| ucal::cmd_between_in(f, t2, Some(unit))),
+                None => ucal::cmd_between_in(f, t2, None),
             }
         }
         Command::Now { precision, form } => run_now(&cli.locale, precision, form),
@@ -1196,6 +1217,32 @@ fn terminal_width() -> Option<usize> {
 /// ones taking **exactly one** instant. `between` and `ruler` take two, and a
 /// line-oriented filter has no natural answer for which of the two a line is —
 /// so they do not accept it rather than accepting it and guessing.
+/// A tier or a calendar's own unit, by the rule `seq --step` uses.
+///
+/// A tier first, because that is what these flags have always taken and what
+/// their defaults are; a calendar id only when the tier parser refuses. A name
+/// that is neither reports the *tier* error, since a mistyped tier is the
+/// likelier mistake — but a name that **is** a calendar and cannot be a unit
+/// reports its own reason, which is how `--step europa-d` explains itself.
+fn stride_of(locale: &str, spec: &str) -> Result<ucal::Stride, ucal_core::TimeError> {
+    let tier_err = match LocaleId::parse(locale).and_then(|l| parse_tier_in(l, spec)) {
+        Ok(t) => return Ok(ucal::Stride::tier(t)),
+        Err(e) => e,
+    };
+    // A calendar's own unit needs the bodies, so without them a tier is the
+    // whole vocabulary and the tier error is the only one there is to report.
+    #[cfg(feature = "body")]
+    {
+        return match ucal::Stride::calendar(spec) {
+            Ok(s) => Ok(s),
+            Err(e) if e.code == ucal_core::Code::E0016 => Err(tier_err),
+            Err(e) => Err(e),
+        };
+    }
+    #[cfg(not(feature = "body"))]
+    Err(tier_err)
+}
+
 /// The theme key, from the shorthands or from `--theme`.
 ///
 /// The shorthands are mutually exclusive by `conflicts_with_all`, so at most one

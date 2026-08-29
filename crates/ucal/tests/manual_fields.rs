@@ -87,6 +87,10 @@ fn all_commands() -> Vec<(&'static str, Doc)> {
             Some(concat!(env!("CARGO_MANIFEST_DIR"), "/../../Documentation/examples/earth-anchor.hjson")),
         ).unwrap()));
         v.push(("cal from", ucal::cmd_cal_from("mars-d", "82-83").unwrap()));
+        v.push((
+            "add",
+            ucal::cmd_add(T, 1, &ucal::Stride::calendar("mars-d").unwrap()).unwrap(),
+        ));
         v.push(("cal validate anchor", ucal::cmd_cal_validate(
             concat!(env!("CARGO_MANIFEST_DIR"), "/../../Documentation/examples/earth-anchor.hjson"),
             None,

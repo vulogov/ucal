@@ -194,6 +194,7 @@ on_the_ladder:
   T-3 spark    251
   T-12 tick    23621918377466499805450439453125
 at:
+  unit             T0
   tier             T0 beat
   whole            9304313109130808687
   remainder_ticks  306669363733110525505617260932922363281250
@@ -469,6 +470,58 @@ calendars:
 One instant, several local calendars. Each derived rendering carries its anchor
 revision (Rule J.5) and the width of the window that revision implies (Rule
 J.2); each legacy one is labelled as declared table data (§8.6).
+```
+
+## `ucal add 8070205189123984864657505252035637180530466139316558837890625 1 --step mars-d-year`
+
+The operation this program did not have: it could read time and measure it, and not move through it. Moving below the datum is an error rather than a negative instant, because absolute time is unsigned (Rule B).
+
+```
+ucal add
+────────
+ticks         8070205190224925567986409801898677180530466139316558837890625
+human         UC1 0031·0687·2482·0004·3034·0649:1620·0455·2719·2556·1950·2134·
+              3000·0000·0000·0000·0000·0000
+ucid          0000000000050PM6K4X2TJ6SC83N4QSJZQ5BG2NG77AJ1VM29FJ1
+from          8070205189123984864657505252035637180530466139316558837890625
+moved_by      1 x one year of `mars`
+offset_ticks  1100940703328904549863040000000000000000000000000000
+
+Exact: a whole number of a unit that is itself a whole number of ticks, so
+nothing is rounded. Moving below the datum is `UCAL-E0020` rather than a
+negative instant, because absolute time is unsigned (Rule B); moving past the
+ceiling is `UCAL-E0021`. Neither wraps and neither saturates (Rule O).
+```
+
+## `ucal between 0 8070205189123984864657505252035637180530466139316558837890625 --at mars-d`
+
+How many Martian solar days since the datum, whole and remainder. `--at` has always meant express this span in this unit; since 1.11.0 the unit can be a calendar's own and not only a tier.
+
+```
+ucal between
+────────────
+from          0
+to            8070205189123984864657505252035637180530466139316558837890625
+direction     `to` is later than `from`
+ticks         8070205189123984864657505252035637180530466139316558837890625
+natural_tier  T5 deep
+on_the_ladder:
+  tier         whole
+  ───────────  ────────────────────────────────
+  T5 deep      31
+  T4 drift     687
+  T3 span      2481
+  T2 sweep     2999
+  T1 arc       3108
+  T0 beat      2437
+  T-1 flicker  1104
+  T-2 glint    2790
+  T-3 spark    251
+  T-12 tick    23621918377466499805450439453125
+at:
+  unit             one solar day of `mars`
+  whole            4900968733496
+  remainder_ticks  445666073352520285973180530466139316558837890625
 ```
 
 ## `ucal cal from mars-d 82-83`

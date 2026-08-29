@@ -1037,6 +1037,20 @@ fn tier_label(tier: Tier) -> String {
 /// `between a b` and `between b a` print the same thing, which is the kind of
 /// convenience Rule Q refuses.
 pub fn cmd_between(from: &str, to: &str, at: Option<Tier>) -> CmdResult {
+    cmd_between_in(from, to, at.map(Stride::tier))
+}
+
+/// `ucal between --at <TIER|CALENDAR>` — the span, counted in a chosen unit.
+///
+/// `--at` has always meant *express this span in this unit*, and could only name
+/// a tier. G6 gave `seq --step` a vocabulary that reads a tier **or a body's own
+/// solar day or year**, and this is that vocabulary pointed at measurement
+/// rather than movement: `--at mars-d` answers *how many Martian days is that*.
+///
+/// One flag, widened. A second flag meaning the same thing in a different
+/// vocabulary is how two spellings of one question come to disagree, which is
+/// why `cal show` did not grow `cal derive`'s options in 1.9.0.
+pub fn cmd_between_in(from: &str, to: &str, at: Option<Stride>) -> CmdResult {
     let (a, _) = parse_instant(from)?;
     let (b, _) = parse_instant(to)?;
     let signed = b.between(&a);
@@ -1085,21 +1099,28 @@ pub fn cmd_between(from: &str, to: &str, at: Option<Tier>) -> CmdResult {
         )
         .field("on_the_ladder", Value::rows_of("tier", "whole", rows));
 
-    // `--at <tier>`: the divmod a reader actually asked for, rather than the
+    // `--at <unit>`: the divmod a reader actually asked for, rather than the
     // decomposition's opinion about which tiers are interesting.
-    if let Some(tier) = at {
-        let (whole, rem) = mag.in_tier(tier);
-        doc = doc.field(
-            "at",
-            Value::Section(vec![
-                ("tier".into(), Value::text(tier_label(tier))),
-                ("whole".into(), Value::number(whole.to_dec_string())),
-                (
-                    "remainder_ticks".into(),
-                    Value::number(rem.to_dec_string()),
-                ),
-            ]),
-        );
+    //
+    // **Whole and remainder, never a rounded count.** A span is rarely a whole
+    // number of Martian days, and Rule R makes rendering the only place a value
+    // may lose information — so the answer is the exact pair, in the same shape
+    // this field has always used for tiers.
+    if let Some(unit) = at {
+        let (whole, rem) = mag.ticks().quot_rem(unit.ticks());
+        let mut at = vec![("unit".to_string(), Value::text(unit.label().to_string()))];
+        // `tier` is a path in `ucal-json/1` and removing one is breaking, so it
+        // stays for a tier and is absent for a calendar unit — which is the
+        // honest thing for a field of that name, and additive either way.
+        if let Some(t) = unit.as_tier() {
+            at.push(("tier".to_string(), Value::text(tier_label(t))));
+        }
+        at.push(("whole".to_string(), Value::number(whole.to_dec_string())));
+        at.push((
+            "remainder_ticks".to_string(),
+            Value::number(rem.to_dec_string()),
+        ));
+        doc = doc.field("at", Value::Section(at));
     }
 
     // SI on request only. A second is an Earth unit and a duration between two
@@ -2733,16 +2754,20 @@ pub fn cmd_seq(from: &str, to: &str, step: Tier, max: u64) -> Result<Vec<String>
 /// construction; a body's day is a `Measured` converted to ticks by Rule Y.2,
 /// which rejects rather than rounds. Neither is a float and neither is
 /// approximated here.
-#[cfg(feature = "body")]
 #[derive(Clone, Debug)]
 pub struct Stride {
     /// The interval, in ticks.
     ticks: Ticks,
     /// How to name it in a message.
     label: String,
+    /// The tier, when the stride is one.
+    ///
+    /// Kept so `between --at` can go on emitting `at.tier` for a tier, which is
+    /// a path in `ucal-json/1` and removing one is breaking. A calendar unit
+    /// leaves it absent, which is the honest thing for a field named `tier`.
+    tier: Option<Tier>,
 }
 
-#[cfg(feature = "body")]
 impl Stride {
     /// The interval, in ticks.
     pub fn ticks(&self) -> &Ticks {
@@ -2759,10 +2784,23 @@ impl Stride {
         Stride {
             ticks: t.ticks(),
             label: t.to_string(),
+            tier: Some(t),
         }
     }
 
+    /// The tier this stride is, if it is one.
+    pub fn as_tier(&self) -> Option<Tier> {
+        self.tier
+    }
+
     /// A calendar's own solar day, or its year.
+    ///
+    /// The one part of this type that needs `body`: a tier is a tier in every
+    /// build, and gating the whole type on `body` broke
+    /// `--no-default-features --features u512,std`, which is one of the
+    /// twenty-three combinations the features workflow builds. Caught as a
+    /// failure — the class P1 exists to catch is the one that only *warns*.
+    #[cfg(feature = "body")]
     ///
     /// **A local unit is not a tier and this does not pretend otherwise.** Rule
     /// A.5 refuses to substitute one body's units for another's; what this does
@@ -2824,6 +2862,7 @@ impl Stride {
                 if want_year { "year" } else { "solar day" },
                 body.id()
             ),
+            tier: None,
         })
     }
 }
@@ -3556,6 +3595,75 @@ pub fn cmd_cal_validate(path: &str, anchor_path: Option<&str>) -> CmdResult {
 #[cfg(feature = "body")]
 fn check(name: &str, verdict: impl Into<String>) -> (String, Value) {
     (name.to_string(), Value::text(verdict.into()))
+}
+
+/// `ucal add` — an instant, moved by a whole number of a chosen unit.
+///
+/// # The operation that was missing
+///
+/// This program could **read** time (`now`, `to-civil`, `cal from`) and
+/// **measure** it (`between`, `explain`) and not move through it. `seq` walks
+/// from one instant to another and needs both; `between` measures a span whose
+/// ends you already hold. There was no way to say *this instant, plus one
+/// Martian year*.
+///
+/// # Unsigned time is the whole design here
+///
+/// `n` is signed and the result is not. Absolute time is unsigned by Rule B and
+/// `Ticks` cannot hold a negative, so moving below the datum is not a negative
+/// instant — it is `UCAL-E0020`, *result precedes the datum*, which is the code
+/// **named for this operation** and which no raiser had ever produced for it.
+/// Moving above the ceiling is `UCAL-E0021`. Rule O forbids wrapping and
+/// saturating, so neither is clamped.
+///
+/// # Exact
+///
+/// `n × unit`, in integer ticks. [`Stride`] refuses a unit that is not a whole
+/// number of them, so nothing here rounds and no float is involved.
+pub fn cmd_add(input: &str, n: i64, unit: &Stride) -> CmdResult {
+    let (t, _) = parse_instant(input)?;
+    let magnitude = <Ticks as TickInt>::from_u64(n.unsigned_abs())
+        .try_mul(unit.ticks())
+        .ok_or_else(|| {
+            TimeError::with_context(
+                Code::E0021,
+                "that many of that unit exceeds the domain before it is even added",
+            )
+        })?;
+
+    let moved = if n < 0 {
+        t.ticks().try_sub(&magnitude).ok_or_else(|| {
+            TimeError::with_context(
+                Code::E0020,
+                "that lands before the datum. Absolute time is unsigned (Rule B), \
+                 so there is no instant earlier than tick 0 — and clamping to it \
+                 would be a wrong answer where an error was available (Rule O)",
+            )
+        })?
+    } else {
+        t.ticks().try_add(&magnitude).ok_or_else(|| {
+            TimeError::with_context(
+                Code::E0021,
+                "that lands past the domain ceiling of 2^512 - 1",
+            )
+        })?
+    };
+    let moved = Instant::from_ticks(moved)?;
+
+    Ok(instant_doc("ucal add", &moved)
+        .field("from", Value::number(t.ticks().to_dec_string()))
+        .field("moved_by", Value::text(format!("{n} x {}", unit.label())))
+        .field(
+            "offset_ticks",
+            Value::number(magnitude.to_dec_string()),
+        )
+        .note(
+            "Exact: a whole number of a unit that is itself a whole number of \
+             ticks, so nothing is rounded. Moving below the datum is \
+             `UCAL-E0020` rather than a negative instant, because absolute time \
+             is unsigned (Rule B); moving past the ceiling is `UCAL-E0021`. \
+             Neither wraps and neither saturates (Rule O).",
+        ))
 }
 
 /// `ucal cal from` — a local date, back to absolute time.

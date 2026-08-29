@@ -2,8 +2,20 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/vulogov/ucal/blob/main/fixtures/ucal-json-1.schema.json",
   "title": "ucal-json/1",
-  "description": "Generated from fixtures/json-surface.txt by `cargo run -p xtask -- gen-schema`; do not edit. 457 field paths across 28 commands. `--json` output is per-command: validate `ucal datum --json` against #/$defs/datum. Every object permits additional properties, because ucal-json/1 promises that new fields may appear and existing ones never change name, shape or meaning; a consumer must ignore what it does not recognise. Fields shown only under `--bridge` are described but not required. An object whose keys are data - a tier, a body, an event id - is expressed as additionalProperties rather than named properties, so adding one changes no schema.",
+  "description": "Generated from fixtures/json-surface.txt by `cargo run -p xtask -- gen-schema`; do not edit. 464 field paths across 29 commands. `--json` output is per-command: validate `ucal datum --json` against #/$defs/datum. Every object permits additional properties, because ucal-json/1 promises that new fields may appear and existing ones never change name, shape or meaning; a consumer must ignore what it does not recognise. Fields shown only under `--bridge` are described but not required. An object whose keys are data - a tier, a body, an event id - is expressed as additionalProperties rather than named properties, so adding one changes no schema.",
   "$defs": {
+    "add": {
+      "type": "object",
+      "properties": {
+        "from": { "type": "string" },
+        "human": { "type": "string" },
+        "moved_by": { "type": "string" },
+        "offset_ticks": { "type": "string" },
+        "ticks": { "type": "string" },
+        "ucid": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
     "between": {
       "type": "object",
       "properties": {
@@ -12,6 +24,7 @@
           "properties": {
             "remainder_ticks": { "type": "string" },
             "tier": { "type": "string" },
+            "unit": { "type": "string" },
             "whole": { "type": "string" }
           },
           "additionalProperties": true

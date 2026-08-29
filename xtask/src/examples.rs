@@ -84,6 +84,14 @@ fn examples() -> Vec<Example> {
             why: "One instant in several calendars at once, each labelled derived or legacy.",
         },
         Example {
+            args: &["add", T, "1", "--step", "mars-d-year"],
+            why: "The operation this program did not have: it could read time and measure it, and not move through it. Moving below the datum is an error rather than a negative instant, because absolute time is unsigned (Rule B).",
+        },
+        Example {
+            args: &["between", "0", T, "--at", "mars-d"],
+            why: "How many Martian solar days since the datum, whole and remainder. `--at` has always meant express this span in this unit; since 1.11.0 the unit can be a calendar's own and not only a tier.",
+        },
+        Example {
             args: &["cal", "from", "mars-d", "82-83"],
             why: "The inverse of `cal show`, and the thing the fifteen derived calendars did not have while Earth's legacy ones had it from 0.1.0. The answer is a window and would be wrong not to be: a local day is a span, and the anchor's uncertainty propagates into it (Rule J.2).",
         },

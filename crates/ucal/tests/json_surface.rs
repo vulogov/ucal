@@ -105,6 +105,12 @@ fn commands() -> Vec<(&'static str, Doc)> {
         // The inverse of `cal show`, and a document like any other: its fields
         // are part of the promise from the release that introduces them.
         v.push(("cal-from", ucal::cmd_cal_from("mars-d", "82-83").unwrap()));
+        // `add`, and `between --at` in a calendar's own unit: both new surface,
+        // and `at.tier` is absent in the second, which is the point.
+        v.push((
+            "add",
+            ucal::cmd_add(T, 1, &ucal::Stride::calendar("mars-d").unwrap()).unwrap(),
+        ));
         v.push((
             "show",
             ucal::cmd_show(
