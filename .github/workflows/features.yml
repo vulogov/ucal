@@ -16,6 +16,19 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  # P1 — the same standard `verify.yml` sets, applied to the twenty-three
+  # combinations this workflow is the only place that builds.
+  #
+  # It was set there and not here, and the two workflows exist to catch the same
+  # defect: a `#[cfg]` that does not match what the code needs. This workflow has
+  # caught six of those by build *failure* while letting the identical defect
+  # through as a warning nobody reads — four combinations carried between two and
+  # four of them, every one an item that exists under some features and does not
+  # say so.
+  #
+  # Rule O's profile setting has the same shape and the same reason: a standard
+  # that stops at the edge of one build is not a standard.
+  RUSTFLAGS: -D warnings
 
 jobs:
   supported:

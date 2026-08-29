@@ -33,8 +33,17 @@ pub mod table;
 use emit::{Doc, Value};
 use ucal_core::backend::TickInt;
 use ucal_core::codec::{self, Fmt, Form};
-use ucal_core::num::{RatInterval, Ratio};
+use ucal_core::num::Ratio;
+// P1 — `RatInterval` is `parse_redshift`'s return type and nothing else's, so it
+// arrives with `cosmo` or not at all. An import that is unused in eight of the
+// twenty-three feature combinations is a `#[cfg]` that was never written; the
+// features workflow builds those eight and said so in a warning nobody read.
+#[cfg(feature = "cosmo")]
+use ucal_core::num::RatInterval;
 use ucal_core::locale::{self, LocaleId};
+// Read once, by `to-civil`, to say whether a rendering is legacy table data or
+// derived under Rule K.
+#[cfg(feature = "civil")]
 use ucal_core::qualified::Kind;
 use ucal_core::{
     Code, Delta, Instant, Precision, Profile, Rounding, Tier, Ticks, TimeError, Ucid, UC1,
@@ -2347,6 +2356,11 @@ pub const YEAR_DEFINITION: &str =
 /// A count of ticks divided by a Julian year is a rational, and whether its
 /// expansion fits the digits asked for depends on the value — so it goes through
 /// the certified constructor like every other rendered rational.
+///
+/// Called by `events` for a window's width and by `cosmo` for an enclosure's
+/// ends, so it exists when either does — which is what `any` is for, and what
+/// the missing attribute could not have said with one feature name.
+#[cfg(any(feature = "events", feature = "cosmo"))]
 fn years_quantity(t: &Ticks, digits: u32) -> Value {
     // ucal-lint-allow-begin(no-panic-in-cli): as `ticks_in_years`.
     let year = UC1::bridge()

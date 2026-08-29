@@ -8,12 +8,16 @@ use std::io::IsTerminal as _;
 use clap::{CommandFactory, Parser, Subcommand};
 use clap_complete::Shell;
 use ucal::style::{parse_group_sep, resolve_for_output, ColorChoice, Render, Role, Style};
+// Read once, by `to-civil`, as the default when `--round` is absent.
+#[cfg(feature = "civil")]
 use ucal_core::Rounding;
 use ucal::{
     cmd_datum, cmd_doctor, cmd_doctor_measuring, cmd_explain, cmd_ladder, exit_code,
     parse_rounding, parse_tier_in,
 };
 use ucal_core::LocaleId;
+// `parse_form`'s type and nothing else's, so it follows the same gate.
+#[cfg(all(feature = "civil", feature = "std"))]
 use ucal_core::codec::Form;
 
 #[cfg(feature = "civil")]
@@ -495,6 +499,9 @@ fn parse_calendar(s: &str) -> Result<CivilCalendar, ucal_core::TimeError> {
     }
 }
 
+// Its only caller is `run_now`, which needs `civil` and `std` — so this exists
+// exactly when that does.
+#[cfg(all(feature = "civil", feature = "std"))]
 fn parse_form(s: &str) -> Result<Form, ucal_core::TimeError> {
     match s {
         "human" => Ok(Form::HumanGroups),
