@@ -27,13 +27,23 @@ CHAPTER = {
     "E0062": "8", "E0063": "8", "E0064": "8", "E0065": "8",
     "E0070": "5", "E0071": "5", "E0080": "5",
     "E0010": "12", "E0011": "12", "E0012": "12", "E0013": "12",
+    # Appended in 1.8.0-1.11.0 and never added here, so every one of them
+    # rendered as an em dash while the committed file said 12. That is the drift
+    # this generator exists to prevent, in the generator.
+    "E0014": "12", "E0015": "12", "E0016": "12", "E0017": "12",
+    "E0018": "12", "E0019": "12",
     "W0001": "5", "W0002": "7", "W0003": "8", "W0004": "5",
     "W0005": "8", "W0006": "12",
 }
 
 BANDS = [
     ("E0001–E0007", "notation and parsing", "2"),
-    ("E0010–E0013", "profile and provenance", "6"),
+    ("E0010–E0014", "profile, provenance, and names", "6"),
+    ("E0015", "a build that does not reproduce its constants", "9"),
+    ("E0016", "a name that is not in a declared catalogue", "6"),
+    ("E0017", "a data file that will not load", "6"),
+    ("E0018", "a value this program does not accept", "2"),
+    ("E0019", "an internal invariant, which is a defect in #emph[ucal]", "9"),
     ("E0020–E0025", "domain, ordering, and the claim", "3, 9"),
     ("E0030–E0032", "identifiers and encoding", "2, 3"),
     ("E0040–E0043", "the SI bridge and civil time", "2, 4"),
@@ -91,6 +101,17 @@ def main() -> int:
     for band, subject, ex in BANDS:
         L.append(f"    [`{band}`], [{subject}], [{ex}],")
     L += ["  )", "]", "",
+          # Static prose, kept here because the alternative is a generator that
+          # deletes it. This paragraph was written into the .typ by hand and lost
+          # on the next regeneration — which is how a generator meant to prevent
+          # drift became the thing that would introduce it.
+          "Two statuses fall outside that mapping and mean different things. Exit `1` is a",
+          "usage error, raised before any code is reached — an unknown flag, a missing",
+          "argument. Exit `70` is `EX_SOFTWARE`: a panic that reached the top of the",
+          "program. It is deliberately outside the `0–9` range the table uses, so that a",
+          "defect in `ucal` cannot be mistaken for a diagnosed failure of the input. When",
+          "it appears, the message says so, and gives the issue tracker rather than a",
+          "stack trace.", "",
           "#section(\"Errors\")", "",
           "#block(width: 100%)[", "  #set text(size: 9pt)", "  #table(",
           "    columns: (auto, 1fr, auto, auto),",

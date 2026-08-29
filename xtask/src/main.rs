@@ -1251,6 +1251,18 @@ fn run_docs(mode: &str) -> i32 {
                 code = 6;
             }
         }
+        // P2 — the book's generators reproduce what is committed. The same rule
+        // §13.5 applies to the tier tables, applied where it was not.
+        match citations::check_book_generators(&root) {
+            Ok(n) => code |= report("the book's generators reproduce their files", "generators", 2, n),
+            Err(bad) => {
+                eprintln!("  FAIL  a committed artefact does not regenerate:");
+                for b in &bad {
+                    eprintln!("          {b}");
+                }
+                code = 6;
+            }
+        }
         match citations::check_ci_covers_the_procedure(&root) {
             Ok(n) => code |= report(
                 "CI runs the documented verification block",
