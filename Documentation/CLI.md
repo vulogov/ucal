@@ -1564,6 +1564,7 @@ are statements *about the display*, not units the clock counts in.
 
 ```
 ucal add <INSTANT> <N> [--step <TIER|CALENDAR>]
+ucal add <INSTANT> <N> --in <CALENDAR>
 ```
 
 An instant, moved by a whole number of a chosen unit. **The operation this
@@ -1595,6 +1596,59 @@ available.
 | `from` | The instant it started from. |
 | `moved_by` | The count and the unit, as asked for. |
 | `offset_ticks` | How far it moved, exactly. |
+
+### `--in`: moving by a date rather than by a duration
+
+`--step` adds an interval. `--in` adds a **local year of a calendar** — landing
+on the same day of the year, at the same position within that day.
+
+```
+ucal add <T> 1   --in earth-d          # same date, next local year
+ucal add <T> -3  --in mars-d           # three Martian years earlier
+ucal add <T> 1   --step earth-d-year   # one mean year: a different instant
+```
+
+**They are not the same, and the difference is measurable.** `--step
+earth-d-year` adds Earth's mean orbital period. A local year is not a constant
+span: the leap rule packs whole days into years and the lengths differ by one, so
+no fixed interval lands on the year boundaries. From year 2000 day 100, adding
+the mean year gives day 100, day 100, then **day 101**; on `mars-d` from day 668
+the day alternates 667, 669, 667. Neither result is wrong — a mean year is a real
+interval — but only one of them is *next year, same date*.
+
+| field | meaning |
+|---|---|
+| `calendar` | The calendar whose years were counted. |
+| `moved_by` | The count, and what it came to in local days — which varies with where you started, and is the whole reason a mean is the wrong step. |
+| `local.from` / `local.to` | The local date moved from and to. The day of the year is the same in both by construction. |
+| `local.day_fraction` | The position within the day, carried across unchanged. |
+| `local.days_moved` | The whole local days between the two year starts. |
+| `local.direction` | Forwards or backwards. The count is unsigned (Rule B), so the direction is a field and not a sign. |
+
+**The seam is refused, not clamped.** `earth-d` year 2003 has 366 local days and
+2004 has 365, so day 366 plus one year is `UCAL-E0018`, naming both lengths.
+Clamping to the last day and rolling into the next year are both answers and
+neither is *the* answer — Rule O's reasoning at the domain edge, applied at the
+calendar's.
+
+**The answer is an instant, not a window.** It does not route through
+[`cal from`](#ucal-cal-from), which returns a `Window` and rightly: a local date
+names an interval while the anchor has width. The input here is already an
+instant, and re-deriving it from its own fields would widen it by the anchor's
+uncertainty for nothing. The phase is never consulted — only the spacing — so
+moving out and back returns the identical tick.
+
+**`--in` takes no `-year` suffix.** `--step mars-d` is the solar day and `--in
+mars-d` is the local year, so one word would mean two units across the two flags;
+`--in mars-d-year` is therefore an error that says which flag does which, rather
+than a synonym letting the vocabularies diverge. A local *day* needs no such
+flag: day `k` begins at `anchor + k × solar_day`, so a whole number of them is a
+duration and `--step mars-d` already gives it — on all fifteen calendars,
+including the thirteen with no anchor, where `--in` cannot go because it must
+decompose the instant to know what day of the year it is on.
+
+`--in` and `--step` are mutually exclusive, so no ordering rule decides between
+them.
 
 **Exact.** `N × unit` in integer ticks, and `--step` refuses a unit that is not a
 whole number of them — so a derived solar day is `UCAL-E0043` here for the same

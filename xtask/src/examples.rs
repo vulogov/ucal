@@ -88,6 +88,10 @@ fn examples() -> Vec<Example> {
             why: "The operation this program did not have: it could read time and measure it, and not move through it. Moving below the datum is an error rather than a negative instant, because absolute time is unsigned (Rule B).",
         },
         Example {
+            args: &["add", T, "1", "--in", "mars-d"],
+            why: "The same instant, one Martian year later as the calendar counts them — same day of the year, same position within it. `--step mars-d-year` above adds the mean orbital period instead, which is a duration and lands on a different local date: a local year is not a constant span, because the leap rule makes the lengths differ by one.",
+        },
+        Example {
             args: &["between", "0", T, "--at", "mars-d"],
             why: "How many Martian solar days since the datum, whole and remainder. `--at` has always meant express this span in this unit; since 1.11.0 the unit can be a calendar's own and not only a tier.",
         },

@@ -223,6 +223,19 @@ enum Command {
         /// `mars-d-year`. The same vocabulary `seq --step` takes.
         #[arg(long, default_value = "T1")]
         step: String,
+        /// Move by a calendar's own **years** instead: `--in mars-d` lands on
+        /// the same day of the year, at the same time of day.
+        ///
+        /// `--step` moves by a duration; this moves by a date. A local year is
+        /// not a constant span — the leap rule makes the lengths uneven — so
+        /// adding the mean year drifts off the date, by a whole day within
+        /// three years on `earth-d`.
+        ///
+        /// Needs a calendar with an anchor, because it must decompose the
+        /// instant to know what day of the year it is on.
+        #[cfg(feature = "body")]
+        #[arg(long = "in", value_name = "CALENDAR", conflicts_with = "step")]
+        in_calendar: Option<String>,
     },
     /// Evenly spaced marks on the tier grid.
     Ruler {
@@ -831,6 +844,20 @@ fn main() {
         Command::Timeline { tier } => LocaleId::parse(&cli.locale)
             .and_then(|l| parse_tier_in(l, tier))
             .and_then(ucal::cmd_timeline),
+        // `--in` and `--step` are `conflicts_with`, so at most one is set and
+        // the order here cannot hide a second choice.
+        #[cfg(feature = "body")]
+        Command::Add {
+            instant,
+            n,
+            step,
+            in_calendar,
+        } => match in_calendar {
+            Some(id) => ucal::cmd_add_in(pick(replacement, instant), *n, id),
+            None => stride_of(&cli.locale, step)
+                .and_then(|unit| ucal::cmd_add(pick(replacement, instant), *n, &unit)),
+        },
+        #[cfg(not(feature = "body"))]
         Command::Add { instant, n, step } => stride_of(&cli.locale, step)
             .and_then(|unit| ucal::cmd_add(pick(replacement, instant), *n, &unit)),
         Command::Ruler { from, to, step } => {

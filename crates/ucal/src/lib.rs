@@ -3680,6 +3680,132 @@ pub fn cmd_add(input: &str, n: i64, unit: &Stride) -> CmdResult {
         ))
 }
 
+/// `ucal add --in <calendar>` — move by a **date**, where `--step` moves by a
+/// **duration**.
+///
+/// # The two are not the same, and the difference is measurable
+///
+/// `--step mars-d-year` adds Mars's mean orbital period. `--in mars-d` adds a
+/// local year *as the calendar counts them* — the whole days between one year's
+/// start and the next's, which the leap rule makes uneven on purpose.
+///
+/// From `earth-d` year 2000 day 100, adding the mean year lands on day 100, day
+/// 100, then **day 101**. From `mars-d` day 668 the day alternates 667, 669,
+/// 667. Neither is a bug in `--step`: a mean year is a real interval and a
+/// perfectly good thing to add. It is simply not *next year, same date*, and
+/// until now that was the only thing this program could do.
+///
+/// # Why the unit has no `-year` suffix here
+///
+/// `--step` takes `mars-d` for the solar day and `mars-d-year` for the mean
+/// year, and `--in mars-d` counts local years — so the same word means the day
+/// in one flag and the year in the other. That is a trap, and the way out is
+/// not a third spelling but a refusal: `--in mars-d-year` is an error that says
+/// which flag does which, rather than a synonym that lets the two vocabularies
+/// quietly diverge.
+///
+/// **A local day needs no such flag.** Day `k` starts at `anchor + k x
+/// solar_day`, so a whole number of local days *is* a duration, and `--step
+/// mars-d` already gives it — on all fifteen calendars, including the thirteen
+/// with no anchor, where `--in` cannot go because it must decompose. The year is
+/// the unit that is not a duration, and it is the only one this flag needs.
+#[cfg(feature = "body")]
+pub fn cmd_add_in(input: &str, n: i64, spec: &str) -> CmdResult {
+    if let Some(id) = spec.strip_suffix("-year") {
+        return Err(TimeError::with_context(
+            Code::E0016,
+            body_file::leak(format!(
+                "`--in` already counts local years, so `{spec}` says it twice. \
+                 `--in {id}` moves by that calendar's own years, keeping the day \
+                 of the year; `--step {spec}` moves by the body's mean orbital \
+                 period, which is a duration and lands on a different local date"
+            )),
+        ));
+    }
+    let cal = ucal_body::calendar::by_id(spec)?;
+    let (t, _) = parse_instant(input)?;
+
+    let step = cal.add_years(&t, n).map_err(|e| {
+        // The library refuses the seam; this says how short the year was. The
+        // enforcement is not repeated here — only the arithmetic that turns
+        // "no such day" into a number a reader can act on.
+        if e.code != Code::E0018 {
+            return e;
+        }
+        match cal.fields(&t).and_then(|f| {
+            let to = f.year.checked_add(n).ok_or(TimeError::new(Code::E0021))?;
+            Ok((f.day, to, cal.year_length(to)?))
+        }) {
+            Ok((day, to, len)) => TimeError::with_context(
+                Code::E0018,
+                body_file::leak(format!(
+                    "local year {to} of `{spec}` has {len} days and you are on day \
+                     {day}, so there is no such date to move to. Local year \
+                     lengths are set by the leap rule and differ by one; clamping \
+                     to the last day or rolling into the next year would both be a \
+                     date nobody asked for"
+                )),
+            ),
+            Err(_) => e,
+        }
+    })?;
+
+    let local = |y: i64| format!("{y:04}-{:03}", step.day);
+    let mut doc = instant_doc("ucal add", &step.to)
+        .field("from", Value::number(t.ticks().to_dec_string()))
+        .field("calendar", Value::text(spec))
+        .field(
+            "moved_by",
+            Value::text(format!(
+                "{n} x local year of `{spec}` = {} local days",
+                step.days.to_dec_string()
+            )),
+        )
+        .field(
+            "local",
+            Value::Section(vec![
+                ("from".into(), Value::text(local(step.from_year))),
+                ("to".into(), Value::text(local(step.to_year))),
+                (
+                    "day_fraction".into(),
+                    Value::quantity(&step.day_fraction, 6, Rounding::Trunc),
+                ),
+                (
+                    "days_moved".into(),
+                    Value::number(step.days.to_dec_string()),
+                ),
+                (
+                    "direction".into(),
+                    Value::text(if step.forward { "forwards" } else { "backwards" }),
+                ),
+                (
+                    "anchor_revision".into(),
+                    Value::number(step.anchor_revision.to_string()),
+                ),
+            ]),
+        )
+        .note(
+            "The day of the year and the position within it are carried across \
+             unchanged, not recomputed — so nothing here is rounded and the \
+             answer is an instant rather than a window. `--step <id>-year` adds \
+             the body's mean orbital period instead, which is a duration: it is \
+             exact too, and it lands on a different local date.",
+        );
+
+    if step.day_is_ambiguous {
+        doc = doc.note(
+            "The anchor's uncertainty spans a local day boundary at the starting \
+             instant, so the day this was measured from is not itself determined \
+             (Rule J.2). The step is exact; the date it started from is the \
+             thing with width.",
+        );
+    }
+    if let Some(w) = step.warning {
+        doc = doc.note(window_note(w));
+    }
+    Ok(doc)
+}
+
 /// `ucal cal from` — a local date, back to absolute time.
 ///
 /// The inverse of [`cmd_cal_show`], and the thing the fifteen derived calendars

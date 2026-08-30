@@ -91,6 +91,12 @@ fn all_commands() -> Vec<(&'static str, Doc)> {
             "add",
             ucal::cmd_add(T, 1, &ucal::Stride::calendar("mars-d").unwrap()).unwrap(),
         ));
+        // `add --in` emits fields `add --step` does not. This list and
+        // `json_surface`'s are two hand-maintained enumerations of the same
+        // commands, and an invocation added to one is not added to the other:
+        // the manual check is what noticed `days_moved` was documented and
+        // unreachable here.
+        v.push(("add --in", ucal::cmd_add_in(T, 1, "mars-d").unwrap()));
         v.push(("cal validate anchor", ucal::cmd_cal_validate(
             concat!(env!("CARGO_MANIFEST_DIR"), "/../../Documentation/examples/earth-anchor.hjson"),
             None,

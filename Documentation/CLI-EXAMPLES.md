@@ -493,6 +493,37 @@ negative instant, because absolute time is unsigned (Rule B); moving past the
 ceiling is `UCAL-E0021`. Neither wraps and neither saturates (Rule O).
 ```
 
+## `ucal add 8070205189123984864657505252035637180530466139316558837890625 1 --in mars-d`
+
+The same instant, one Martian year later as the calendar counts them — same day of the year, same position within it. `--step mars-d-year` above adds the mean orbital period instead, which is a duration and lands on a different local date: a local year is not a constant span, because the leap rule makes the lengths differ by one.
+
+```
+ucal add
+────────
+ticks     8070205190225597130539563071720833180530466139316558837890625
+human     UC1 0031·0687·2482·0005·0156·3033:1336·1423·1507·3059·0601·0562·1575·
+          0000·0000·0000·0000·0000
+ucid      0000000000050PM6K4X398QQWA8RMJM2XM2JBM466ZF1WZ429FJ1
+from      8070205189123984864657505252035637180530466139316558837890625
+calendar  mars-d
+moved_by  1 x local year of `mars-d` = 669 local days
+local:
+  from             0082-083
+  to               0083-083
+  day_fraction     0.442043
+  days_moved       669
+  direction        forwards
+  anchor_revision  1
+certification:
+  rounded, trunc, 6 digits  day_fraction
+  every other number above is exact: the digits shown are the value
+
+The day of the year and the position within it are carried across unchanged,
+not recomputed — so nothing here is rounded and the answer is an instant rather
+than a window. `--step <id>-year` adds the body's mean orbital period instead,
+which is a duration: it is exact too, and it lands on a different local date.
+```
+
 ## `ucal between 0 8070205189123984864657505252035637180530466139316558837890625 --at mars-d`
 
 How many Martian solar days since the datum, whole and remainder. `--at` has always meant express this span in this unit; since 1.11.0 the unit can be a calendar's own and not only a tier.
