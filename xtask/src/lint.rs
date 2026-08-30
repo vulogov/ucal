@@ -556,6 +556,20 @@ pub fn suppressions(workspace_root: &Path) -> Vec<Suppression> {
 /// only way to call this is to be given both.
 pub fn run(workspace_root: &Path) -> (Vec<Violation>, usize) {
     let mut v = Vec::new();
+    // **`crates/` only, and `xtask/` deliberately not.**
+    //
+    // P3 found this stated nowhere. The walker below documents why it skips
+    // `target`, `.git` and the trybuild fixtures; this scoping documented
+    // nothing, so an injected float in `xtask/src` was invisible and the count
+    // said `84 files` without saying which tree they came from.
+    //
+    // The exclusion is right and the silence was not. These rules are about
+    // *shipped* code by their own wording — Rule E forbids a float "anywhere in
+    // a shipped crate", §19.5's no-panic rule is about the CLI crate — and
+    // `xtask` is `publish = false`, renders human-readable scales in floating
+    // point on purpose, and panics freely because a failed build tool should
+    // stop. Holding it to rules written for the artefact would be enforcing a
+    // standard where it was never claimed.
     let crates_dir = workspace_root.join("crates");
     if !crates_dir.exists() {
         return (v, 0);

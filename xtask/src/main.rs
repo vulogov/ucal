@@ -911,7 +911,9 @@ fn run_lints() -> i32 {
         .parent()
         .expect("xtask lives under the workspace root")
         .to_path_buf();
-    println!("UC lint — workspace {}\n", root.display());
+    // Says which tree, because "84 files" did not — and the one it does not scan
+    // is a decision (see `lint::run`) rather than an oversight.
+    println!("UC lint — {}/crates\n", root.display());
     let (violations, scanned) = lint::run(&root);
     let allowed = lint::suppressions(&root);
 
