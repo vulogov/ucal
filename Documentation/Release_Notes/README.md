@@ -12,8 +12,8 @@ knows only what it did.
 
 | version | date | state |
 |---|---|---|
-| [1.11.0](1.11.0.md) | — | **unreleased** — the standard that stops at the edge of one build |
-| [1.10.0](1.10.0.md) | 2026-08-28 | released — a requirement with no wire |
+| [1.11.0](1.11.0.md) | 2026-08-30 | released — the standard that stops at the edge of one build |
+| [1.10.0](1.10.0.md) | 2026-08-28 | **cut, never published** — a requirement with no wire; superseded by 1.11.0 |
 | [1.9.0](1.9.0.md) | 2026-08-27 | released — the artefact, not the repository |
 | [1.8.0](1.8.0.md) | 2026-08-24 | released — the frozen four, measured |
 | [1.7.0](1.7.0.md) | 2026-08-22 | released — does each check catch what it exists for |
