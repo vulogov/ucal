@@ -98,6 +98,30 @@ pub struct Ephemeris {
     as_published: String,
 }
 
+/// O1 — one observed time against the ephemeris that predicted it.
+#[derive(Clone, PartialEq, Eq, Debug)]
+#[non_exhaustive]
+pub struct Residual {
+    /// The cycle the observation falls in.
+    pub cycle: i64,
+    /// What was observed.
+    pub observed: Instant<UC1>,
+    /// What the ephemeris predicts for that cycle, with no uncertainty applied.
+    pub calculated: Instant<UC1>,
+    /// `|O − C|`, in ticks. Unsigned (Rule B); the direction is `late`.
+    pub magnitude: Delta,
+    /// Whether the observation came **after** the prediction.
+    pub late: bool,
+    /// Whether `|O − C|` is inside the `k`σ window.
+    pub within: bool,
+    /// That window's half-width, in ticks.
+    pub half_width: Delta,
+    /// The `k` the comparison used.
+    pub k: u32,
+    /// `UCAL-W0003` when the cycle is outside the fitted range.
+    pub warning: Option<Warning>,
+}
+
 /// One predicted event.
 #[derive(Clone, PartialEq, Eq, Debug)]
 #[non_exhaustive]
@@ -393,6 +417,108 @@ impl Ephemeris {
         ))
     }
 
+    /// **E3 — the characteristic age, `τ = P/(2Ṗ)`.**
+    ///
+    /// An exact division of two fields this type already carries, and the
+    /// standard age estimate for a pulsar. Returned in ticks.
+    ///
+    /// # The caveat is the reason to ship it
+    ///
+    /// `τ` assumes a braking index of exactly 3 and an initial period much
+    /// shorter than the present one, and it is **routinely wrong by a factor of
+    /// a few**: the Crab's `τ` is about 1240 years against a historically known
+    /// age of 972. The field knows the assumption is shaky and prints the number
+    /// anyway, so the number carries the assumption with it here rather than
+    /// leaving it in a reader's memory.
+    ///
+    /// `None` when `Ṗ` is zero, which is not an error — most ephemerides have no
+    /// period derivative, and an infinite age is not a number to report.
+    pub fn characteristic_age(&self) -> Result<Option<Ratio>> {
+        if self.pdot.is_zero() {
+            return Ok(None);
+        }
+        Ok(Some(
+            self.period
+                .div(&self.pdot.mul(&Ratio::from_u64(2))?)?,
+        ))
+    }
+
+    /// **O1 — one observed time against this ephemeris.**
+    ///
+    /// `O − C`: the observed instant minus the predicted one for the cycle it
+    /// falls in. Exact integer subtraction — the standard instrument of
+    /// variable-star and pulsar work, and the thing people actually do with an
+    /// ephemeris once they have one.
+    ///
+    /// # Where this stops
+    ///
+    /// **Reporting `O − C` is exact; fitting a new ephemeris to it is not this
+    /// project's job.** A quadratic trend in the residuals *is* `Ṗ`, and
+    /// extracting it is least squares — floating point, or interval least
+    /// squares, which is a research project rather than a feature. A tool that
+    /// reports residuals honestly and refuses to fit them is more useful than
+    /// one that does both adequately, because the fit is where a reader most
+    /// needs to know which code produced the number.
+    /// # The cycle is the *nearest*, not the containing one
+    ///
+    /// An eclipse seen three seconds early is an observation of the cycle it was
+    /// three seconds early **for**, not a very late observation of the one
+    /// before. [`cycle_at`](Self::cycle_at) answers the containing question —
+    /// the right answer to *where in the cycle is this* — and using it here made
+    /// every early observation report a residual of nearly a whole period.
+    /// Found by a test that shifted an observation both ways and expected the
+    /// same magnitude.
+    pub fn residual(&self, observed: &Instant<UC1>, k: u32) -> Result<Residual> {
+        let (containing, _) = self.cycle_at(observed)?;
+        let gap = |cycle: i64| -> Result<Ticks> {
+            let c = self.centre_of(cycle)?;
+            let (a, b) = (observed.ticks(), c.ticks());
+            if a >= b {
+                a.clone().try_sub(b)
+            } else {
+                b.clone().try_sub(a)
+            }
+            .ok_or(TimeError::new(Code::E0021))
+        };
+        let next = containing
+            .checked_add(1)
+            .ok_or(TimeError::new(Code::E0021))?;
+        let cycle = if gap(next)? < gap(containing)? {
+            next
+        } else {
+            containing
+        };
+
+        let p = self.time_of(cycle, k)?;
+        let calculated = self.centre_of(cycle)?;
+
+        let late = observed.ticks() >= calculated.ticks();
+        let magnitude = if late {
+            observed.ticks().clone().try_sub(calculated.ticks())
+        } else {
+            calculated.ticks().clone().try_sub(observed.ticks())
+        }
+        .ok_or(TimeError::new(Code::E0021))?;
+
+        // Inside the window means the residual is no larger than its half-width.
+        // The comparison is on magnitudes, so it is the same test either side.
+        let within = magnitude <= p.window.width().ticks().clone()
+            .quot_rem(&<Ticks as TickInt>::from_u64(2))
+            .0;
+
+        Ok(Residual {
+            cycle,
+            observed: observed.clone(),
+            calculated,
+            magnitude: Delta::from_ticks(magnitude),
+            late,
+            within,
+            half_width: p.sigma,
+            k,
+            warning: p.warning,
+        })
+    }
+
     /// The next event strictly after `t`.
     pub fn next_after(&self, t: &Instant<UC1>, k: u32) -> Result<Prediction> {
         let (e, _) = self.cycle_at(t)?;
@@ -571,6 +697,98 @@ mod tests {
         let (bw_b, dir_b) = without.offset(-100).expect("backward");
         assert!(!dir_a && !dir_b, "both still land before the epoch");
         assert_eq!(bw_a.cmp_exact(&bw_b), core::cmp::Ordering::Less);
+    }
+
+    // ---- O1 and E3 ----
+
+    /// A prediction's own centre has a residual of zero.
+    ///
+    /// The degenerate case, and the one that catches a sign or an off-by-one in
+    /// the subtraction — both of which would show up as a residual of about one
+    /// period rather than of nothing.
+    #[test]
+    fn the_predicted_instant_has_no_residual() {
+        let e = synthetic(1, 1, Ratio::zero());
+        for cycle in [-100i64, 0, 1, 500] {
+            let centre = e.centre_of(cycle).expect("in range");
+            let r = e.residual(&centre, 1).expect("a residual");
+            assert_eq!(r.cycle, cycle);
+            assert!(r.magnitude.ticks().is_zero_ticks(), "{cycle}: {r:?}");
+            assert!(r.within, "zero is inside every window");
+        }
+    }
+
+    /// An observation off by a known amount reports that amount, both ways.
+    #[test]
+    fn a_shifted_observation_reports_its_shift() {
+        let e = synthetic(1, 1, Ratio::zero());
+        let centre = e.centre_of(10).expect("in range");
+        let shift = second()
+            .try_mul(&<Ticks as TickInt>::from_u64(3))
+            .expect("in range");
+
+        let late = Instant::<UC1>::from_ticks(
+            centre.ticks().clone().try_add(&shift).expect("in range"),
+        )
+        .expect("in the domain");
+        let r = e.residual(&late, 1).expect("a residual");
+        assert!(r.late);
+        assert_eq!(r.magnitude.ticks(), &shift);
+
+        let early = Instant::<UC1>::from_ticks(
+            centre.ticks().clone().try_sub(&shift).expect("in range"),
+        )
+        .expect("in the domain");
+        let r = e.residual(&early, 1).expect("a residual");
+        assert!(!r.late);
+        assert_eq!(r.magnitude.ticks(), &shift);
+    }
+
+    /// `within` tracks the window, and the window grows with the cycle.
+    ///
+    /// The same three-second shift is outside the 1σ window near the epoch and
+    /// inside it far away — which is the whole point of carrying the width, and
+    /// would be invisible to any check that only compared the centres.
+    #[test]
+    fn the_same_shift_falls_inside_a_wider_window() {
+        let e = synthetic(1, 1, Ratio::zero());
+        let shift = second()
+            .try_mul(&<Ticks as TickInt>::from_u64(3))
+            .expect("in range");
+        let at = |cycle: i64| {
+            let c = e.centre_of(cycle).expect("in range");
+            let t = Instant::<UC1>::from_ticks(
+                c.ticks().clone().try_add(&shift).expect("in range"),
+            )
+            .expect("in the domain");
+            e.residual(&t, 1).expect("a residual").within
+        };
+        assert!(!at(0), "3 s is outside a 1 s window at the epoch");
+        assert!(at(500), "and inside a 500 s one, 500 cycles out");
+    }
+
+    /// **E3** — the characteristic age is `P/(2Ṗ)`, and absent without a `Ṗ`.
+    #[test]
+    fn the_characteristic_age_is_the_period_over_twice_its_derivative() {
+        let none = synthetic(1, 1, Ratio::zero());
+        assert!(none
+            .characteristic_age()
+            .expect("no error")
+            .is_none(), "no Pdot, no age");
+
+        // Ṗ = 1/1000, so τ = P / (2/1000) = 500·P.
+        let pdot = Ratio::new(
+            <Ticks as TickInt>::from_u64(1),
+            <Ticks as TickInt>::from_u64(1_000),
+        )
+        .expect("a rate");
+        let e = synthetic(1, 1, pdot);
+        let tau = e
+            .characteristic_age()
+            .expect("no error")
+            .expect("a Pdot means an age");
+        let want = e.period().mul(&Ratio::from_u64(500)).expect("in range");
+        assert_eq!(tau.cmp_exact(&want), core::cmp::Ordering::Equal);
     }
 
     /// A zero period is refused rather than producing one instant for every cycle.

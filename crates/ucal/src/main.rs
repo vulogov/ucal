@@ -309,6 +309,26 @@ enum Command {
         /// Decimal places to render.
         #[arg(long, default_value_t = 18)]
         show: u32,
+        /// A clock in a **circular orbit** at that radius rather than static:
+        /// `√(1 − 3r_s/2r)`, gravitational and kinematic dilation together.
+        /// Refused at or inside the photon sphere, `r_s/r ≥ 2/3`.
+        #[arg(long)]
+        orbiting: bool,
+    },
+    /// How long light takes to cross a distance.
+    ///
+    /// `m`, `au` and `ly` convert exactly; `pc` is bracketed, because a parsec
+    /// is defined as `648000/π` astronomical units.
+    #[cfg(feature = "civil")]
+    Lighttime {
+        /// The distance, as a decimal.
+        distance: String,
+        /// `m`, `au`, `ly` or `pc`.
+        #[arg(long, default_value = "au")]
+        unit: String,
+        /// Decimal places to render.
+        #[arg(long, default_value_t = 9)]
+        digits: u32,
     },
     /// Flat ΛCDM, by certified integer quadrature (§10).
     #[cfg(feature = "cosmo")]
@@ -477,6 +497,17 @@ enum EphemCommand {
         cycle: i64,
         /// How many σ the window spans on each side. 1 is the published
         /// uncertainty; observers usually want 3.
+        #[arg(long, default_value_t = 1)]
+        sigmas: u32,
+    },
+    /// Observed minus calculated, per observation.
+    Residuals {
+        /// Path to an ephemeris file.
+        file: String,
+        /// A file of observed instants, one per line, or `-` for stdin.
+        #[arg(long, default_value = "-")]
+        observed: String,
+        /// How many σ the window spans on each side.
         #[arg(long, default_value_t = 1)]
         sigmas: u32,
     },
@@ -924,7 +955,14 @@ fn main() {
             rs_over_r,
             digits,
             show,
-        } => ucal::cmd_dilate(rs_over_r, *digits, *show),
+            orbiting,
+        } => ucal::cmd_dilate(rs_over_r, *digits, *show, *orbiting),
+        #[cfg(feature = "civil")]
+        Command::Lighttime {
+            distance,
+            unit,
+            digits,
+        } => ucal::cmd_lighttime(distance, unit, *digits),
         #[cfg(feature = "cosmo")]
         Command::Cosmo { what } => match what {
             CosmoCommand::Age {
@@ -949,6 +987,11 @@ fn main() {
                 cycle,
                 sigmas,
             } => ucal::cmd_ephem_at(file, *cycle, *sigmas),
+            EphemCommand::Residuals {
+                file,
+                observed,
+                sigmas,
+            } => ucal::cmd_ephem_residuals(file, observed, *sigmas),
             EphemCommand::Next {
                 file,
                 after,

@@ -952,6 +952,86 @@ it. It is not a measurement of the universe — it is what this parameter set
 implies, with the parameter set's own uncertainty carried through (Rule X).
 ```
 
+## `ucal lighttime 1 --unit ly`
+
+A light-year is defined as a Julian year times c, so its light-travel time is that year exactly — 31 557 600 s with no remainder. A light-year is a time unit wearing a distance's clothes. One astronomical unit of light-time, 499.004783836 s, is also the largest a barycentric correction can be, for any target and any date.
+
+```
+ucal lighttime
+──────────────
+distance          1 ly
+exact             true
+ticks             585348807057053493600000000000000000000000000000000
+seconds           31557600.000000000
+as_ratio_seconds  31557600/1
+
+A light-year is *defined* as a Julian year times `c`, so its light-travel time
+is a Julian year — 31 557 600 s exactly, with no remainder. A light-year is a
+time unit wearing a distance's clothes, and the conversion is the identity.
+
+`c` is exact by definition (the metre is defined from it) and the astronomical
+unit has been exact since IAU 2012 Resolution B2. **One astronomical unit of
+light-time, 499.004783836… s, is also the largest a barycentric correction can
+be** — for any target and any date. The correction's *value* needs an
+ephemeris; the bound needs nothing, and answers whether a measurement is
+sensitive to it at all.
+```
+
+## `ucal lighttime 1 --unit pc`
+
+And the unit that cannot convert exactly. A parsec is defined as 648000/pi astronomical units — an exact definition of an irrational number — so the answer is a bracket and no decimal for it is the value.
+
+```
+ucal lighttime
+──────────────
+distance  1 pc
+exact     false
+seconds:
+  lo  102927125.054339001
+  hi  102927125.054339001
+certification:
+  rounded, trunc, 9 digits  lo, hi
+  every other number above is exact: the digits shown are the value
+
+A parsec is defined as `648000/π` astronomical units — an exact definition of
+an irrational number — so the answer is a bracket and no decimal for it is the
+value. Two of the three units here convert exactly and this one cannot, for a
+reason about the definition rather than about this program.
+
+`c` is exact by definition (the metre is defined from it) and the astronomical
+unit has been exact since IAU 2012 Resolution B2. **One astronomical unit of
+light-time, 499.004783836… s, is also the largest a barycentric correction can
+be** — for any target and any date. The correction's *value* needs an
+ephemeris; the bound needs nothing, and answers whether a measurement is
+sensitive to it at all.
+```
+
+## `ucal from-jd 2451545.0 --scale tcb`
+
+Barycentric Coordinate Time, whose offset from TDB is a *defining* constant rather than a measurement — so that step is exact and the answer carries only TDB's own bound, not a tick more. TCB runs ahead of TDB by 0.489 s per Julian year, which reaches a minute inside two centuries.
+
+```
+ucal from-jd
+────────────
+ticks  8070205173569972754741832104732271481136685314812878837890625
+human  UC1 0031·0687·2481·1163·2191·0517:2863·3020·1358·2092·1852·2443·2769·
+       0031·2038·1293·0000·0000
+ucid   0000000000050PM6JSRZ1J9ZF64AZ6N34WEJS3ZXZJGDSSX6VFJ1
+input:
+  jd     2451545.0
+  jd     2451545/1
+  scale  tcb
+window:
+  lo           8070205173569972754741832104732271481136685314812878837890625
+  hi           8070205173569972754804897291691798881136685314812878837890625
+  width_ticks  63065186959527400000000000000000000000000
+
+`ticks` above is the low end. TDB differs from TT by a periodic series whose
+evaluation needs floating point, which Rule E forbids in a shipped crate — so
+the answer carries the series' bound of ±1.7 ms instead of a centre that would
+look exact. Rule U: the window is the value.
+```
+
 ## `ucal dilate --rs-over-r 0.0000042467 --show 18`
 
 The Sun's surface, bracketed to eighteen places by integer square roots. `f64` computing the same redshift keeps about eight of its sixteen digits, because `1/sqrt(1-x) - 1` in the weak field subtracts two numbers that agree to six places. The interval is proved to contain the value rather than converged to it.
@@ -960,6 +1040,7 @@ The Sun's surface, bracketed to eighteen places by integer square roots. `f64` c
 ucal dilate
 ───────────
 rs_over_r  42467/10000000000
+observer   static at r — gravitational dilation only, √(1 − r_s/r)
 digits     40
 proper_per_coordinate:
   lo  0.999997876647745687

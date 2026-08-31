@@ -120,6 +120,18 @@ fn examples() -> Vec<Example> {
             why: "A certified enclosure by integer quadrature. Depth 8 keeps this example fast; `CLI.md` has the cost table.",
         },
         Example {
+            args: &["lighttime", "1", "--unit", "ly"],
+            why: "A light-year is defined as a Julian year times c, so its light-travel time is that year exactly — 31 557 600 s with no remainder. A light-year is a time unit wearing a distance's clothes. One astronomical unit of light-time, 499.004783836 s, is also the largest a barycentric correction can be, for any target and any date.",
+        },
+        Example {
+            args: &["lighttime", "1", "--unit", "pc"],
+            why: "And the unit that cannot convert exactly. A parsec is defined as 648000/pi astronomical units — an exact definition of an irrational number — so the answer is a bracket and no decimal for it is the value.",
+        },
+        Example {
+            args: &["from-jd", "2451545.0", "--scale", "tcb"],
+            why: "Barycentric Coordinate Time, whose offset from TDB is a *defining* constant rather than a measurement — so that step is exact and the answer carries only TDB's own bound, not a tick more. TCB runs ahead of TDB by 0.489 s per Julian year, which reaches a minute inside two centuries.",
+        },
+        Example {
             args: &["dilate", "--rs-over-r", "0.0000042467", "--show", "18"],
             why: "The Sun's surface, bracketed to eighteen places by integer square roots. `f64` computing the same redshift keeps about eight of its sixteen digits, because `1/sqrt(1-x) - 1` in the weak field subtracts two numbers that agree to six places. The interval is proved to contain the value rather than converged to it.",
         },

@@ -181,6 +181,52 @@ pub fn schwarzschild(ratio: &Ratio, digits: u32) -> Result<Dilation> {
     })
 }
 
+/// **D1 — a circular orbit, where gravitational and kinematic dilation combine.**
+///
+/// A *static* observer at `r` runs at `√(1 − r_s/r)`. One in a **circular orbit**
+/// runs at `√(1 − 3r_s/(2r))`: the extra half comes from its orbital speed, and
+/// the factor of 3/2 is the whole difference between the two cases.
+///
+/// This is the case that covers GPS clocks, the S2 star around Sgr A*, and any
+/// pulsar in a binary — which is most of the ones whose timing anybody cares
+/// about.
+///
+/// # Why `r_s/r ≥ 2/3` is refused
+///
+/// At `r = 1.5 r_s` the factor reaches zero: that is the **photon sphere**,
+/// where a circular orbit requires the speed of light. Inside it no circular
+/// orbit exists at all, so the question has no answer rather than a small one —
+/// a different refusal from [`schwarzschild`]'s horizon, and worth its own
+/// message because a caller who confuses them has confused two radii.
+pub fn circular_orbit(ratio: &Ratio, digits: u32) -> Result<Dilation> {
+    let two_thirds = Ratio::new(
+        <Ticks as TickInt>::from_u64(2),
+        <Ticks as TickInt>::from_u64(3),
+    )?;
+    if ratio.cmp_exact(&two_thirds) != core::cmp::Ordering::Less {
+        return Err(TimeError::with_context(
+            Code::E0018,
+            "r_s/r must be below 2/3 for a circular orbit. At r = 1.5 r_s \
+             the factor is zero — that is the photon sphere, where a \
+             circular orbit would need the speed of light, and inside it \
+             no circular orbit exists. This is a different radius from \
+             the horizon, and a caller reaching it has confused the two",
+        ));
+    }
+    // The static formula, evaluated at 3x/2. Deliberately reusing it rather
+    // than duplicating the bracketing: one square root, one place it can be
+    // wrong. The guard above is what makes the argument admissible.
+    let effective = ratio
+        .mul(&Ratio::new(
+            <Ticks as TickInt>::from_u64(3),
+            <Ticks as TickInt>::from_u64(2),
+        )?)?;
+    let mut out = schwarzschild(&effective, digits)?;
+    // Report the radius the caller asked about, not the one the formula used.
+    out.ratio = ratio.clone();
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -285,6 +331,41 @@ mod tests {
             assert_eq!(e.code, Code::E0018);
             assert!(format!("{e}").contains("not a clock"), "{e}");
         }
+    }
+
+    // ---- D1 ----
+
+    /// An orbiting clock runs slower than a static one at the same radius.
+    ///
+    /// It has the same gravitational dilation and a speed on top, so the factor
+    /// must be smaller. If the 3/2 were ever dropped the two would agree, which
+    /// is the mistake this catches.
+    #[test]
+    fn an_orbiting_clock_runs_slower_than_a_static_one() {
+        for (n, d) in [(1u64, 100u64), (1, 10), (1, 3), (3, 5)] {
+            let x = r(n, d);
+            let stat = schwarzschild(&x, 30).expect("in range");
+            let orb = circular_orbit(&x, 30).expect("in range");
+            assert_eq!(
+                orb.factor.hi().cmp_exact(stat.factor.lo()),
+                core::cmp::Ordering::Less,
+                "{n}/{d}: the orbiting clock must be strictly slower"
+            );
+            // And it reports the radius asked about, not the effective one.
+            assert_eq!(orb.ratio.cmp_exact(&x), core::cmp::Ordering::Equal);
+        }
+    }
+
+    /// The photon sphere is refused, and says which radius it is.
+    #[test]
+    fn the_photon_sphere_is_refused_and_named() {
+        for (n, d) in [(2u64, 3u64), (7, 10), (1, 1)] {
+            let e = circular_orbit(&r(n, d), 20).expect_err("no circular orbit there");
+            assert_eq!(e.code, Code::E0018);
+            assert!(format!("{e}").contains("photon sphere"), "{e}");
+        }
+        // And just inside the bound it still answers.
+        assert!(circular_orbit(&r(66, 100), 20).is_ok());
     }
 
     /// Zero digits is refused rather than answering `[0, 1]`.

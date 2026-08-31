@@ -161,6 +161,12 @@ fn all_commands() -> Vec<(&'static str, Doc)> {
         let g = ucal::wallclock::Face::of(ucal::parse_instant(T).unwrap().0, &d).unwrap();
         v.push(("wallclock-full", ucal::cmd_wallclock_json(&g, "plain").unwrap()));
     }
+    #[cfg(feature = "civil")]
+    {
+        // E2 — both kinds of answer: an exact unit and the bracketed one.
+        v.push(("lighttime", ucal::cmd_lighttime("1", "ly", 9).unwrap()));
+        v.push(("lighttime", ucal::cmd_lighttime("1", "pc", 9).unwrap()));
+    }
     #[cfg(all(feature = "events", feature = "civil"))]
     {
         // B — an ephemeris file, and the certified dilation beside it. The path
@@ -172,10 +178,21 @@ fn all_commands() -> Vec<(&'static str, Doc)> {
         v.push(("ephem show", ucal::cmd_ephem_show(EPH).unwrap()));
         v.push(("ephem at", ucal::cmd_ephem_at(EPH, 5000, 3).unwrap()));
         v.push(("ephem next", ucal::cmd_ephem_next(EPH, T, 3, 2).unwrap()));
+        // O1 — residuals read observations, so one is written for the test.
+        let obs = std::env::temp_dir().join("ucal-residuals-fixture.txt");
+        let centre = ucal::cmd_ephem_at(EPH, 100, 1).unwrap();
+        std::fs::write(&obs, "8070205176188783269002882404203425480530466139316558837890625\n")
+            .unwrap();
+        let _ = centre;
+        v.push((
+            "ephem residuals",
+            ucal::cmd_ephem_residuals(EPH, obs.to_str().unwrap(), 1).unwrap(),
+        ));
     }
     #[cfg(feature = "cosmo")]
     {
-        v.push(("dilate", ucal::cmd_dilate("0.35", 40, 18).unwrap()));
+        v.push(("dilate", ucal::cmd_dilate("0.35", 40, 18, false).unwrap()));
+        v.push(("dilate", ucal::cmd_dilate("0.35", 40, 18, true).unwrap()));
         v.push(("cosmo model", ucal::cmd_cosmo_model().unwrap()));
         v.push(("cosmo age", ucal::cmd_cosmo_age("1100", 4, 8).unwrap()));
         v.push((

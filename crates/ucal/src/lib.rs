@@ -1249,12 +1249,78 @@ pub fn cmd_from_civil(date: &str, scale: Scale, cal: CivilCalendar) -> CmdResult
         ))
 }
 
+/// `ucal lighttime` — how long light takes to cross a distance (E2).
+///
+/// Three units that behave differently on purpose: `m`, `au` and `ly` convert
+/// exactly, and `pc` is bracketed because it is defined as `648000/π` au.
+#[cfg(feature = "civil")]
+pub fn cmd_lighttime(distance: &str, unit: &str, digits: u32) -> CmdResult {
+    use ucal_civil::lighttime as lt;
+    let u = lt::Unit::parse(unit)?;
+    let d = Ratio::from_decimal_str(distance).map_err(|_| {
+        TimeError::with_context(Code::E0001, "a distance is a decimal number")
+    })?;
+    let t = lt::light_time(&d, u)?;
+    let second = Ratio::from_int(UC1::bridge().ticks);
+    let secs = |r: &Ratio| -> Value {
+        match r.div(&second) {
+            Ok(v) => Value::quantity(&v, digits, Rounding::Trunc),
+            Err(_) => Value::text("out of range"),
+        }
+    };
+
+    let mut doc = Doc::new()
+        .title("ucal lighttime")
+        .field("distance", Value::text(format!("{distance} {}", u.key())))
+        .field("exact", Value::Bool(u.is_exact()));
+    if u.is_exact() {
+        doc = doc
+            .field("ticks", Value::number(t.lo().floor().to_dec_string()))
+            .field("seconds", secs(t.lo()))
+            .field("as_ratio_seconds", Value::text(
+                t.lo().div(&second).map(|v| v.to_ratio_string()).unwrap_or_default(),
+            ));
+    } else {
+        doc = doc
+            .field(
+                "seconds",
+                Value::Section(vec![
+                    ("lo".into(), secs(t.lo())),
+                    ("hi".into(), secs(t.hi())),
+                ]),
+            )
+            .note(
+                "A parsec is defined as `648000/π` astronomical units — an exact \
+                 definition of an irrational number — so the answer is a bracket \
+                 and no decimal for it is the value. Two of the three units here \
+                 convert exactly and this one cannot, for a reason about the \
+                 definition rather than about this program.",
+            );
+    }
+    if matches!(u, ucal_civil::lighttime::Unit::LightYear) {
+        doc = doc.note(
+            "A light-year is *defined* as a Julian year times `c`, so its \
+             light-travel time is a Julian year — 31 557 600 s exactly, with no \
+             remainder. A light-year is a time unit wearing a distance's \
+             clothes, and the conversion is the identity.",
+        );
+    }
+    Ok(doc.note(
+        "`c` is exact by definition (the metre is defined from it) and the \
+         astronomical unit has been exact since IAU 2012 Resolution B2. **One \
+         astronomical unit of light-time, 499.004783836… s, is also the largest \
+         a barycentric correction can be** — for any target and any date. The \
+         correction's *value* needs an ephemeris; the bound needs nothing, and \
+         answers whether a measurement is sensitive to it at all.",
+    ))
+}
+
 /// `ucal dilate` — gravitational time dilation, certified.
 ///
 /// The ratio may be a decimal or a fraction: `0.5` and `1/2` are the same
 /// input, and a fraction is often how `r_s/r` is actually known.
 #[cfg(feature = "cosmo")]
-pub fn cmd_dilate(ratio: &str, digits: u32, render: u32) -> CmdResult {
+pub fn cmd_dilate(ratio: &str, digits: u32, render: u32, orbiting: bool) -> CmdResult {
     let x = match ratio.split_once('/') {
         Some((n, d)) => {
             let parse = |v: &str| {
@@ -1275,7 +1341,11 @@ pub fn cmd_dilate(ratio: &str, digits: u32, render: u32) -> CmdResult {
             )
         })?,
     };
-    let d = ucal_cosmo::dilate::schwarzschild(&x, digits)?;
+    let d = if orbiting {
+        ucal_cosmo::dilate::circular_orbit(&x, digits)?
+    } else {
+        ucal_cosmo::dilate::schwarzschild(&x, digits)?
+    };
     let pair = |i: &ucal_core::num::RatInterval| -> Value {
         Value::Section(vec![
             ("lo".into(), Value::quantity(i.lo(), render, Rounding::Trunc)),
@@ -1285,6 +1355,14 @@ pub fn cmd_dilate(ratio: &str, digits: u32, render: u32) -> CmdResult {
     Ok(Doc::new()
         .title("ucal dilate")
         .field("rs_over_r", Value::text(d.ratio.to_ratio_string()))
+        .field(
+            "observer",
+            Value::text(if orbiting {
+                "in a circular orbit — gravitational and kinematic dilation, √(1 − 3r_s/2r)"
+            } else {
+                "static at r — gravitational dilation only, √(1 − r_s/r)"
+            }),
+        )
         .field("digits", Value::number(d.digits.to_string()))
         .field("proper_per_coordinate", pair(&d.factor))
         .field("coordinate_per_proper", pair(&d.inverse))
@@ -1429,6 +1507,110 @@ pub fn cmd_ephem_at(path: &str, cycle: i64, sigmas: u32) -> CmdResult {
              not forbid extrapolating, because that is what a reader is going to \
              do and the useful thing is to say how far out they have gone.",
             cycle,
+            e.fitted().0,
+            e.fitted().1
+        ));
+    }
+    Ok(doc)
+}
+
+/// `ucal ephem residuals` — O1, observed minus calculated.
+///
+/// Reads observed instants, one per line, from a file or from `-`. Exact
+/// integer subtraction; **it reports and does not fit**, for the reason
+/// `Ephemeris::residual` records.
+#[cfg(all(feature = "events", feature = "civil"))]
+pub fn cmd_ephem_residuals(path: &str, observed: &str, sigmas: u32) -> CmdResult {
+    let e = ephem_of(path)?;
+    let text = if observed == "-" {
+        use std::io::Read;
+        let mut buf = String::new();
+        std::io::stdin().read_to_string(&mut buf).map_err(|err| {
+            TimeError::with_context(Code::E0001, body_file::leak(format!("stdin: {err}")))
+        })?;
+        buf
+    } else {
+        std::fs::read_to_string(observed).map_err(|err| {
+            TimeError::with_context(
+                Code::E0001,
+                body_file::leak(format!("cannot read `{observed}`: {err}")),
+            )
+        })?
+    };
+
+    let mut rows: Vec<(String, Value)> = Vec::new();
+    let mut outside = 0usize;
+    let mut beyond = 0usize;
+    let mut n = 0usize;
+    for line in text.lines() {
+        let l = line.trim();
+        if l.is_empty() || l.starts_with('#') {
+            continue;
+        }
+        let (t, _) = parse_instant(l)?;
+        let r = e.residual(&t, sigmas)?;
+        n += 1;
+        if r.warning.is_some() {
+            outside += 1;
+        }
+        if !r.within {
+            beyond += 1;
+        }
+        rows.push((
+            r.cycle.to_string(),
+            Value::Section(vec![
+                ("observed".into(), Value::number(r.observed.ticks().to_dec_string())),
+                (
+                    "calculated".into(),
+                    Value::number(r.calculated.ticks().to_dec_string()),
+                ),
+                (
+                    "o_minus_c_ticks".into(),
+                    Value::number(r.magnitude.ticks().to_dec_string()),
+                ),
+                (
+                    "direction".into(),
+                    Value::text(if r.late { "late" } else { "early" }),
+                ),
+                (
+                    "half_width_ticks".into(),
+                    Value::number(r.half_width.ticks().to_dec_string()),
+                ),
+                ("within".into(), Value::Bool(r.within)),
+            ]),
+        ));
+    }
+    if n == 0 {
+        return Err(TimeError::with_context(
+            Code::E0018,
+            "no observations were read, so this would report agreement having \
+             compared nothing. Blank lines and `#` comments are skipped; \
+             everything else must be an instant",
+        ));
+    }
+
+    let mut doc = Doc::new()
+        .title("ucal ephem residuals")
+        .field("id", Value::text(e.id()))
+        .field("observations", Value::number(n.to_string()))
+        .field("outside_the_window", Value::number(beyond.to_string()))
+        .field("residuals", Value::rows("cycle", rows))
+        .note(
+            "`O − C` is exact integer subtraction, and each residual is placed \
+             against the window for its own cycle — which grows with distance \
+             from the epoch, so the same shift can be inside one window and \
+             outside another.",
+        )
+        .note(
+            "**This reports and does not fit.** A quadratic trend in these \
+             residuals is `Ṗ`, and extracting it is least squares — which is \
+             where a reader most needs to know which code produced the number, \
+             so it is not produced here.",
+        );
+    if outside > 0 {
+        doc = doc.note(format!(
+            "{outside} observation(s) fall outside the cycle range this fit \
+             covers ({} .. {}), and carry `UCAL-W0003`.",
             e.fitted().0,
             e.fitted().1
         ));

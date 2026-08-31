@@ -75,6 +75,18 @@ pub enum JdScale {
     /// Barycentric Dynamical Time. Differs from `TT` by a bounded periodic
     /// series that is not evaluated here — see [`TDB_BOUND_NANOS`].
     Tdb,
+    /// **Geocentric Coordinate Time.** `TCG − TT` is a *defining* linear rate,
+    /// so this converts **exactly** — unlike `TDB`, whose difference from `TT`
+    /// is a series. IAU 2000 Resolution B1.9.
+    Tcg,
+    /// **Barycentric Coordinate Time.** `TCB − TDB` is likewise a defining
+    /// linear rate (IAU 2006 Resolution B3), so *that* step is exact; the
+    /// remaining `TDB − TT` is the same bounded series, so `TCB` carries
+    /// exactly `TDB`'s ±1.7 ms and not a tick more.
+    ///
+    /// It runs ahead of `TDB` by **0.489 s per Julian year**, which reaches a
+    /// minute inside two centuries. Confusing the two is not a rounding.
+    Tcb,
 }
 
 impl JdScale {
@@ -84,6 +96,8 @@ impl JdScale {
             JdScale::Tt => "tt",
             JdScale::Tai => "tai",
             JdScale::Tdb => "tdb",
+            JdScale::Tcg => "tcg",
+            JdScale::Tcb => "tcb",
         }
     }
 
@@ -93,6 +107,8 @@ impl JdScale {
             "tt" | "TT" => Ok(JdScale::Tt),
             "tai" | "TAI" => Ok(JdScale::Tai),
             "tdb" | "TDB" => Ok(JdScale::Tdb),
+            "tcg" | "TCG" => Ok(JdScale::Tcg),
+            "tcb" | "TCB" => Ok(JdScale::Tcb),
             "utc" | "UTC" => Err(TimeError::with_context(
                 Code::E0016,
                 "a Julian Date counts days of 86400 SI seconds, and a UTC day \
@@ -110,8 +126,8 @@ impl JdScale {
             )),
             _ => Err(TimeError::with_context(
                 Code::E0016,
-                "no such time scale. `tt`, `tai` and `tdb` convert; `utc` and \
-                 `ut1` are refused with reasons",
+                "no such time scale. `tt`, `tai`, `tcg`, `tcb` and `tdb` \
+                 convert; `utc` and `ut1` are refused with reasons",
             )),
         }
     }
@@ -132,6 +148,37 @@ pub const TDB_BOUND_NANOS: u64 = 1_700_000;
 
 /// `JD` at J2000.0, in TT. The defining epoch.
 pub const J2000_JD: u64 = 2_451_545;
+
+/// **E1 — the coordinate time scales, which are exactly defined.**
+///
+/// `L_G` and `L_B` are *defining* constants rather than measurements: a decision
+/// the IAU took, not a quantity anybody measured. Both are terminating decimals,
+/// so both are exact rationals, so `TT ↔ TCG` and `TDB ↔ TCB` are **exact linear
+/// conversions**. This crate is exactly right about them where it can only be
+/// bounded about `TDB`.
+///
+/// The difference is not small. `TCB` runs ahead of `TDB` by 0.489 s per Julian
+/// year and `TCG` ahead of `TT` by 0.022 s — half a second a year, in a field
+/// whose residuals are microseconds.
+///
+/// `L_G = 6.969290134 × 10⁻¹⁰`, IAU 2000 Resolution B1.9.
+const L_G: (u64, u64) = (6_969_290_134, 10_000_000_000_000_000_000);
+
+/// `L_B = 1.550519768 × 10⁻⁸`, IAU 2006 Resolution B3.
+const L_B: (u64, u64) = (1_550_519_768, 100_000_000_000_000_000);
+
+/// `TDB_0 = −6.55 × 10⁻⁵ s`, the constant offset in the same resolution.
+///
+/// Negative, and `Ticks` is unsigned (Rule B), so the sign lives in the code
+/// that applies it rather than in the constant.
+const TDB_0_NEG: (u64, u64) = (655, 10_000_000);
+
+/// The epoch both rates run from: 1977 January 1, 0h TAI.
+///
+/// `JD 2443144.5003725 TT` — and the fraction is exact, because `TT − TAI` is
+/// 32.184 s and `32.184/86400 = 149/400000` terminates.
+const T0_JD_NUM: u64 = 24_431_445_003_725;
+const T0_JD_DEN: u64 = 10_000_000;
 
 /// `JD − MJD`, exactly `2400000.5`.
 pub const MJD_OFFSET_TIMES_TWO: u64 = 4_800_001;
@@ -163,6 +210,71 @@ pub fn j2000() -> Result<Instant<UC1>> {
     )
 }
 
+/// A rational from a `(numerator, denominator)` pair of `u64`.
+fn ratio(p: (u64, u64)) -> Result<Ratio> {
+    Ratio::new(
+        <Ticks as TickInt>::from_u64(p.0),
+        <Ticks as TickInt>::from_u64(p.1),
+    )
+}
+
+/// The 1977 epoch, as a Julian Date in TT.
+fn t0_jd() -> Result<Ratio> {
+    ratio((T0_JD_NUM, T0_JD_DEN))
+}
+
+/// A coordinate-time Julian Date, converted to the dynamical scale under it.
+///
+/// `TCG` sits over `TT` and `TCB` over `TDB`, and both relations have the same
+/// shape: the dynamical scale's elapsed time is the coordinate scale's, scaled
+/// by `(1 − L)`. Given a **coordinate** reading, this returns the corresponding
+/// **dynamical** reading, both as Julian Dates.
+///
+/// `TCB` additionally carries `TDB_0`, a defining constant offset.
+fn coordinate_to_dynamical(jd: &Ratio, scale: JdScale) -> Result<Ratio> {
+    let (l, offset_seconds) = match scale {
+        JdScale::Tcg => (ratio(L_G)?, None),
+        JdScale::Tcb => (ratio(L_B)?, Some(ratio(TDB_0_NEG)?)),
+        _ => return Ok(jd.clone()),
+    };
+    let t0 = t0_jd()?;
+    // Elapsed coordinate time since the 1977 epoch, in days. Before it, the
+    // scaling runs the other way; `Ratio` is unsigned so the branch is explicit.
+    let forward = jd.cmp_exact(&t0) != core::cmp::Ordering::Less;
+    let elapsed = if forward { jd.sub(&t0)? } else { t0.sub(jd)? };
+    let scaled = elapsed.mul(&Ratio::one().sub(&l)?)?;
+    let mut out = if forward { t0.add(&scaled)? } else { t0.sub(&scaled)? };
+    if let Some(secs) = offset_seconds {
+        // TDB_0 is negative, and it is a number of seconds against a Julian
+        // Date in days.
+        let in_days = secs.div(&Ratio::from_u64(86_400))?;
+        out = out.sub(&in_days)?;
+    }
+    Ok(out)
+}
+
+/// The inverse: a dynamical Julian Date, as a coordinate one.
+fn dynamical_to_coordinate(jd: &Ratio, scale: JdScale) -> Result<Ratio> {
+    let (l, offset_seconds) = match scale {
+        JdScale::Tcg => (ratio(L_G)?, None),
+        JdScale::Tcb => (ratio(L_B)?, Some(ratio(TDB_0_NEG)?)),
+        _ => return Ok(jd.clone()),
+    };
+    let t0 = t0_jd()?;
+    let mut jd = jd.clone();
+    if let Some(secs) = offset_seconds {
+        jd = jd.add(&secs.div(&Ratio::from_u64(86_400))?)?;
+    }
+    let forward = jd.cmp_exact(&t0) != core::cmp::Ordering::Less;
+    let elapsed = if forward { jd.sub(&t0)? } else { t0.sub(&jd)? };
+    let scaled = elapsed.div(&Ratio::one().sub(&l)?)?;
+    if forward {
+        t0.add(&scaled)
+    } else {
+        t0.sub(&scaled)
+    }
+}
+
 /// A Julian Date, in a named scale, as absolute time.
 ///
 /// Exact for `Tt` and `Tai` — the window has zero width. For `Tdb` the window
@@ -172,6 +284,16 @@ pub fn j2000() -> Result<Instant<UC1>> {
 /// `UCAL-E0043` rather than a rounding if the date carries more decimal places
 /// than a tick can express, which needs about 34 of them.
 pub fn from_jd(jd: &Ratio, scale: JdScale) -> Result<Window<UC1>> {
+    // E1 — a coordinate scale is exactly a rate away from the dynamical scale
+    // beneath it, so it converts to that and then follows the same path. `TCG`
+    // lands on `TT` and is exact; `TCB` lands on `TDB` and inherits its bound,
+    // and nothing but its bound — the rate step adds no uncertainty at all.
+    let (jd, scale) = match scale {
+        JdScale::Tcg => (coordinate_to_dynamical(jd, JdScale::Tcg)?, JdScale::Tt),
+        JdScale::Tcb => (coordinate_to_dynamical(jd, JdScale::Tcb)?, JdScale::Tdb),
+        other => (jd.clone(), other),
+    };
+    let jd = &jd;
     let day = julian_day()?;
     let epoch = Ratio::from_u64(J2000_JD);
 
@@ -218,6 +340,15 @@ pub fn from_jd(jd: &Ratio, scale: JdScale) -> Result<Window<UC1>> {
 
     let t = Instant::<UC1>::from_ticks(ticks)?;
     match scale {
+        // The coordinate scales were folded to their dynamical base above and
+        // cannot reach here; an explicit arm rather than a wildcard, so that a
+        // scale added later fails to compile instead of silently converting
+        // exactly when it should not.
+        JdScale::Tcg | JdScale::Tcb => Err(TimeError::with_context(
+            Code::E0019,
+            "a coordinate time scale reached the dynamical conversion, which \
+             means the fold above stopped covering it",
+        )),
         JdScale::Tt | JdScale::Tai => Ok(Window::exact(t)),
         JdScale::Tdb => {
             let half = Delta::from_ticks(
@@ -245,6 +376,11 @@ pub fn from_jd(jd: &Ratio, scale: JdScale) -> Result<Window<UC1>> {
 /// look exact. A rational carrying a bound it cannot express is worse than a
 /// rational beside one that says what it is.
 pub fn to_jd(t: &Instant<UC1>, scale: JdScale) -> Result<Ratio> {
+    // The inverse of the fold above: compute in the dynamical scale, then lift.
+    if matches!(scale, JdScale::Tcg | JdScale::Tcb) {
+        let base = to_jd(t, if scale == JdScale::Tcg { JdScale::Tt } else { JdScale::Tdb })?;
+        return dynamical_to_coordinate(&base, scale);
+    }
     let day = julian_day()?;
     let base = j2000()?;
 
@@ -340,6 +476,11 @@ mod oracle {
         Some(match scale {
             JdScale::Tt | JdScale::Tdb => e.to_jde_tt_days(),
             JdScale::Tai => e.to_jde_tai_days(),
+            // hifitime has TCG and TCB too, but its TCB in particular differs
+            // in which epoch offset it folds in; comparing them would be
+            // comparing two conventions rather than two implementations of one.
+            // Left out and said so, rather than quietly asserted.
+            JdScale::Tcg | JdScale::Tcb => return None,
         })
     }
 
@@ -511,6 +652,111 @@ mod tests {
             j2000().expect("epoch").ticks().to_dec_string(),
             "8070205173569972963515184424835637180530466139316558837890625"
         );
+    }
+
+    // ---- E1 ----
+
+    /// **`TCG` and `TCB` convert exactly, and `TDB` does not.**
+    ///
+    /// The whole point of E1 in one assertion: two of the three coordinate-ish
+    /// scales are a *defining* rate away from their base and produce a
+    /// zero-width window, while `TDB` is a series and produces a bounded one.
+    #[test]
+    fn tcg_is_exact_and_tcb_is_only_as_uncertain_as_tdb() {
+        let jd = Ratio::from_u64(J2000_JD);
+        let tcg = from_jd(&jd, JdScale::Tcg).expect("exact");
+        assert_eq!(
+            tcg.lo().ticks(),
+            tcg.hi().ticks(),
+            "TCG is a defining rate away from TT, so it converts exactly"
+        );
+
+        let tdb = from_jd(&jd, JdScale::Tdb).expect("bounded");
+        let tcb = from_jd(&jd, JdScale::Tcb).expect("bounded");
+        assert_eq!(
+            tcb.width().ticks(),
+            tdb.width().ticks(),
+            "TCB inherits TDB's bound and adds nothing: the rate step is exact"
+        );
+    }
+
+    /// `TCG` round-trips **exactly**; `TCB` round-trips to within `TDB`'s bound.
+    ///
+    /// The asymmetry is the finding, not a defect. `TCG` sits over `TT`, which
+    /// converts exactly, so nothing is lost. `TCB` sits over `TDB`, whose window
+    /// is 3.4 ms wide, and `from_jd` hands back its low end — so a round trip
+    /// through it *cannot* be exact, and a test asserting it was would be
+    /// asserting that the bound is not real.
+    #[test]
+    fn tcg_round_trips_exactly_and_tcb_within_tdbs_bound() {
+        for days in [0u64, 1, 3652, 36_525] {
+            let jd = Ratio::from_u64(J2000_JD)
+                .add(&Ratio::from_u64(days))
+                .expect("in range");
+
+            let w = from_jd(&jd, JdScale::Tcg).expect("converts");
+            let back = to_jd(w.lo(), JdScale::Tcg).expect("converts");
+            assert_eq!(
+                back.cmp_exact(&jd),
+                core::cmp::Ordering::Equal,
+                "TCG at J2000+{days} did not round-trip exactly"
+            );
+
+            let w = from_jd(&jd, JdScale::Tcb).expect("converts");
+            let back = to_jd(w.lo(), JdScale::Tcb).expect("converts");
+            // TDB's 1.7 ms, expressed in TCB — which is `1/(1 − L_B)` larger,
+            // because TCB runs faster. The difference is 26 picoseconds and it
+            // is why the first version of this assertion failed: a bound is in
+            // the units of the scale that states it, and converting one between
+            // scales scales it too.
+            let bound_days = Ratio::from_u64(TDB_BOUND_NANOS)
+                .div(&Ratio::from_u64(1_000_000_000))
+                .and_then(|v| v.div(&Ratio::from_u64(86_400)))
+                .and_then(|v| v.div(&Ratio::one().sub(&ratio(L_B)?)?))
+                .expect("in range");
+            let gap = back.abs_diff(&jd).expect("a gap");
+            assert!(
+                gap.cmp_exact(&bound_days) != core::cmp::Ordering::Greater,
+                "TCB at J2000+{days} moved by more than TDB's own bound"
+            );
+        }
+    }
+
+    /// **The measured drift, which is why the distinction matters.**
+    ///
+    /// `TCB` runs ahead of `TDB` by 0.489 s per Julian year and `TCG` ahead of
+    /// `TT` by 0.022 s. Half a second a year, in a field whose residuals are
+    /// microseconds — a linear drift, not a rounding.
+    #[test]
+    fn the_rates_are_the_published_ones() {
+        // One Julian year of coordinate time after the 1977 epoch, and how far
+        // the dynamical scale beneath it has got.
+        let year = Ratio::from_u64(36_525)
+            .div(&Ratio::from_u64(100))
+            .expect("365.25 d");
+        let start = t0_jd().expect("epoch");
+        let end = start.add(&year).expect("in range");
+
+        // Microseconds, because the answers are 22 ms and 489 ms and a
+        // millisecond count would round the first to nothing useful.
+        for (scale, want_us, tol_us) in [
+            (JdScale::Tcg, 21_993u64, 10u64),
+            (JdScale::Tcb, 489_306, 100),
+        ] {
+            let base = coordinate_to_dynamical(&end, scale).expect("converts");
+            let behind = end.sub(&base).expect("the coordinate scale runs ahead");
+            let us = behind
+                .mul(&Ratio::from_u64(86_400_000_000))
+                .expect("in range")
+                .floor()
+                .to_dec_string()
+                .parse::<u64>()
+                .expect("a count");
+            assert!(
+                us.abs_diff(want_us) < tol_us,
+                "{scale:?}: {us} µs per Julian year, expected about {want_us}"
+            );
+        }
     }
 
     /// The scales that are refused are refused with reasons, not silently.
