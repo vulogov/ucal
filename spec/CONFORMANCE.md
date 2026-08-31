@@ -61,16 +61,22 @@ something the harness does.
 **Current status: signed**, from 0.5.0.
 
 ```
-key ID           D0E4E5A9439E54CC
-public key       RWTMVJ5DqeXk0HgeN+BIdnQaamRTdzkjITkdprOPLVsGWP8R/2HYIj0r
+key ID           EBD5E4F1EBA555E0
+public key       RWTgVaXr8eTV6+dsVwvMkwZglwUJS69tF+78i2MFUi5LBaUXPf66M+FV
 signed digest    1f99cf6280f8b5dce88c6558e7c73769a40f93f7fcd3d3091f27c2658389f1f0
 ```
+
+The digest is unchanged and the signature over it is new: this file was
+re-signed on 2026-08-31 when the key was rotated. The previous signature, by
+`D0E4E5A9439E54CC`, was valid and remains verifiable against
+`fixtures/ucal-retired.pub` — it was replaced because the repository carries one
+signature, not because anything was wrong with it.
 
 Verify:
 
 ```
 minisign -Vm fixtures/SHA256SUMS \
-  -P RWTMVJ5DqeXk0HgeN+BIdnQaamRTdzkjITkdprOPLVsGWP8R/2HYIj0r
+  -P RWTgVaXr8eTV6+dsVwvMkwZglwUJS69tF+78i2MFUi5LBaUXPf66M+FV
 ```
 
 The trusted comment carries the digest and is signed along with the file, so a
@@ -83,7 +89,7 @@ out, no web of trust to reason about.
 
 ```
 # once, per maintainer
-minisign -G                                  # writes minisign.key / minisign.pub
+minisign -G -W                               # writes minisign.key / minisign.pub
 
 # at each release, after `cargo run -p xtask` regenerates the vectors
 cargo run -p xtask -- verify-vectors         # confirm the digest first
@@ -126,8 +132,15 @@ A downloader checks it with:
 
 ```
 minisign -Vm SHA256SUMS.txt \
-  -P RWTMVJ5DqeXk0HgeN+BIdnQaamRTdzkjITkdprOPLVsGWP8R/2HYIj0r
+  -P RWTgVaXr8eTV6+dsVwvMkwZglwUJS69tF+78i2MFUi5LBaUXPf66M+FV
 ```
+
+**Which key signed which release.** `EBD5E4F1EBA555E0` signs **v1.11.0
+onwards**. **v1.9.0** was signed by the retired `D0E4E5A9439E54CC`, and verifies
+only against `fixtures/ucal-retired.pub`. Releases before v1.9.0 are unsigned
+and will not be signed retrospectively — a signature made today would say a key
+vouched for them today, which is not the claim a reader would take from it.
+v1.10.0 was cut and never released, so there is no artefact of it to sign.
 
 and this repository checks a whole release — the published `.crate` files
 against a checkout of the tag, the binaries against `SHA256SUMS.txt`, and that
@@ -159,23 +172,79 @@ have what was published. Not because it makes the numbers truer.
 A signature invites an assumption about the infrastructure behind it. Here there
 is very little, and that is the honest description rather than an apology:
 
-- **One key, held by one maintainer**, on one machine, with an offline backup.
-- **No rotation procedure.** There is no schedule and no successor key.
+- **One key, held by one maintainer**, on one machine.
+- **No rotation procedure.** There is no schedule and no successor key. One
+  rotation has happened anyway, under the worst conditions for one — below.
+- **The current secret key has no passphrase.** It is a file on one machine, and
+  anyone who can read that file can sign as this project. That is a deliberate
+  choice made after the alternative failed, and it is stated here because a
+  reader inferring a passphrase would infer something that does not exist.
 - **No revocation path.** If the key were compromised there is no mechanism to
   announce it beyond amending this file and saying so in a release.
 - **No timestamping authority.** The signature says a key vouched for a digest;
   nothing independent attests to *when*.
 
 What follows from that is narrow and worth stating plainly. A verifier who
-checks this signature learns that the holder of `D0E4E5A9439E54CC` vouched for
+checks this signature learns that the holder of `EBD5E4F1EBA555E0` vouched for
 this digest. They do not learn that the key is still under its holder's control,
 and they cannot learn it from anything in this repository.
 
-The offline backup exists so that losing the laptop does not silently end the
-signing line — which would otherwise be discovered at the next release, by which
-time re-establishing trust in a new key costs more than keeping a copy did.
+### The rotation of 2026-08-31, and what it cost
+
+**The passphrase to `D0E4E5A9439E54CC` was lost.** minisign encrypts a secret
+key with scrypt and has no escrow and no reset, so that key is unusable and will
+stay unusable. `EBD5E4F1EBA555E0` replaced it the same day.
+
+The sentence that stood in this paragraph said the offline backup existed *so
+that losing the laptop does not silently end the signing line*. The backup did
+exactly what it promised and was irrelevant: it is a copy of the same encrypted
+file, protected by the same passphrase. **The custody plan guarded the machine
+and not the secret that opened it** — a mechanism covering one edge and not the
+one beside it, which is the shape
+[1.11.0](../Documentation/Release_Notes/1.11.0.md) spent a whole cycle looking
+for in the build, and did not think to look for here.
+
+What the rotation cannot do is the part that matters:
+
+- **Nothing signs the new key.** The normal transition is that the outgoing key
+  signs a statement introducing its successor, and a lost secret key is exactly
+  what makes that impossible. `EBD5E4F1EBA555E0` therefore arrives with strictly
+  less standing than `D0E4E5A9439E54CC` had: it is announced by the same
+  repository whose contents a rotation exists to let you doubt.
+- **The immutable copies now disagree, permanently.** Every crate published at
+  1.11.0 or earlier carries the retired key and cannot be edited. The
+  tamper-evidence described below therefore reports a real discrepancy with a
+  benign cause, and it cannot tell that case from the one it was built for. Only
+  a version published *after* the rotation restores the comparison.
+- **Nothing was revoked**, because there is nothing to revoke with. The retired
+  key was not compromised; it was orphaned. Its signatures — v1.9.0's release
+  checksums, and every `fixtures/SHA256SUMS.minisig` up to this one — stay valid
+  and verifiable, because that is a property of the *public* half and is
+  untouched. It is kept in `fixtures/ucal-retired.pub`.
+
+**A reader who trusted the old key has no cryptographic path to the new one.**
+That is the whole cost, and restating it here does not shrink it. It is a
+difference of degree rather than kind, since this key never had authority behind
+it that was not the author — but it is a real loss, and the honest response is
+to record it rather than publish a replacement quietly and let the check go
+green.
+
+**No passphrase, now.** The failure was a forgotten secret, so the replacement
+removes the secret rather than adding another copy of it. That trades a risk
+that has already fired once for one that has not: an unencrypted key file is
+readable by anything that can read the disk. Stated rather than defended — a
+passphrase that is not written down anywhere is a passphrase that ends a signing
+line, and this project would rather say which risk it took than imply it took
+none.
 
 ### Where the key is published, and what that does not establish
+
+```
+RWTgVaXr8eTV6+dsVwvMkwZglwUJS69tF+78i2MFUi5LBaUXPf66M+FV
+```
+
+and the retired key, which signs nothing further and verifies everything it
+already signed:
 
 ```
 RWTMVJ5DqeXk0HgeN+BIdnQaamRTdzkjITkdprOPLVsGWP8R/2HYIj0r
@@ -209,3 +278,9 @@ which fails if any declared publication has dropped the key, and if any document
 in the tree carries a key that is not this one — a truncated paste or a
 transposed character being the realistic failure rather than a forgery. A reader
 who checks a mistyped key learns nothing and believes they learned something.
+
+The retired key is the **one** exception, and it is enumerated rather than
+excused: it must be exactly the key in `fixtures/ucal-retired.pub`, and a
+document may carry it only where it also says it is retired. A key the check
+simply ignored would be a key nobody checks, which is the state that lets a
+stale paste go on reading as a live instruction.

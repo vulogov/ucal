@@ -810,6 +810,20 @@ const KEY_PUBLICATIONS: &[(&str, &str)] = &[
     ("spec/CONFORMANCE.md", "where the custody of the key is stated"),
 ];
 
+/// The one retired key, and the documents allowed to carry it.
+///
+/// A rotation leaves the old key in the tree on purpose: it verifies everything
+/// it already signed, and a history that quietly loses it makes v1.9.0's
+/// signature uncheckable. So the near-miss guard below cannot simply reject
+/// every key that is not the current one.
+///
+/// It is **enumerated rather than ignored**. The retired key must be exactly the
+/// one in `fixtures/ucal-retired.pub`, and a document may carry it only where it
+/// also says it is retired — otherwise a stale paste goes on reading as a live
+/// instruction, which is the failure the guard exists for and the one a blanket
+/// exemption would reintroduce.
+const RETIRED_MARKERS: &[&str] = &["retired", "Retired", "RETIRED"];
+
 /// Every published copy of the signing key is the key in `fixtures/ucal.pub`.
 ///
 /// The copies exist so that a reader need not trust a single file, and so that
@@ -853,16 +867,61 @@ pub fn check_signing_key(root: &Path) -> Result<usize, Vec<String>> {
         }
     }
 
+    // The retired key, read from its own file so that this check has one source
+    // for it too. Absent is fine — a tree that has never rotated has none — but
+    // present and malformed is not, because then the guard below would be
+    // comparing against nothing and passing everything.
+    let retired = match std::fs::read_to_string(root.join("fixtures/ucal-retired.pub")) {
+        Err(_) => None,
+        Ok(text) => match text
+            .lines()
+            .map(str::trim)
+            .find(|l| l.starts_with("RW") && l.len() > 40)
+            .map(str::to_string)
+        {
+            Some(k) if k == key => {
+                bad.push("fixtures/ucal-retired.pub carries the *current* key, so a \
+                          rotation either did not happen or overwrote the record of \
+                          the key it replaced"
+                    .into());
+                None
+            }
+            Some(k) => Some(k),
+            None => {
+                bad.push("fixtures/ucal-retired.pub exists but has no key line".into());
+                None
+            }
+        },
+    };
+
     // And nothing anywhere carries a different one. A near-miss is the failure
     // that matters: a reader who checks a mistyped key learns nothing and
     // believes they learned something.
+    //
+    // The retired key is the single exception, and only in a document that says
+    // so. `0.5.0.md` is why the exception is needed at all: it records the key
+    // published *at that release*, and rewriting history to keep a checker quiet
+    // would be falsifying the record the checker exists to protect.
     for rel in markdown_files(root) {
         let Ok(text) = std::fs::read_to_string(root.join(&rel)) else {
             continue;
         };
         for token in text.split(|c: char| !(c.is_ascii_alphanumeric() || c == '+' || c == '/')) {
-            if token.starts_with("RW") && token.len() > 40 && token != key {
-                bad.push(format!("{rel} carries a key that is not the published one: {token}"));
+            if !(token.starts_with("RW") && token.len() > 40) || token == key {
+                continue;
+            }
+            match &retired {
+                Some(r) if token == r => {
+                    if !RETIRED_MARKERS.iter().any(|m| text.contains(m)) {
+                        bad.push(format!(
+                            "{rel} carries the retired key without saying it is retired, \
+                             so it reads as a live instruction"
+                        ));
+                    }
+                }
+                _ => bad.push(format!(
+                    "{rel} carries a key that is not the published one: {token}"
+                )),
             }
         }
         if text.contains(&key_id) && !text.contains(key) {

@@ -588,22 +588,54 @@ fn check_signature(root: &Path, tmp: &Path) -> Verdict {
         );
     }
 
-    let pubkey = root.join("fixtures/ucal.pub");
-    let out = Command::new("minisign")
-        .arg("-Vm")
-        .arg(&sums)
-        .arg("-p")
-        .arg(&pubkey)
-        .output();
-    match out {
-        Ok(o) if o.status.success() => Verdict::Ok(
-            "SHA256SUMS.txt verifies against fixtures/ucal.pub, which is published in \
-             five places. The key has no authority behind it that is not the author"
-                .into(),
-        ),
+    // **Which key signed this release.** The 2026-08-31 rotation means one
+    // public key no longer covers the whole history: v1.9.0 was signed by the
+    // retired key, v1.11.0 onwards by the current one. Trying both, rather than
+    // deciding from the version number, because a table of which key signed
+    // which release is a second record of a fact the signature already carries
+    // — and it is the table, not the signature, that would go stale.
+    //
+    // A release that verifies under the *retired* key says so rather than
+    // reporting a plain pass: it is a weaker statement, and one worth reading.
+    let current = root.join("fixtures/ucal.pub");
+    let retired = root.join("fixtures/ucal-retired.pub");
+    let verify = |key: &std::path::Path| {
+        Command::new("minisign")
+            .arg("-Vm")
+            .arg(&sums)
+            .arg("-p")
+            .arg(key)
+            .output()
+    };
+    match verify(&current) {
+        Ok(o) if o.status.success() => {
+            return Verdict::Ok(
+                "SHA256SUMS.txt verifies against fixtures/ucal.pub, which is published in \
+                 five places. The key has no authority behind it that is not the author"
+                    .into(),
+            )
+        }
+        Err(e) => return Verdict::Skipped(format!("minisign could not run: {e}")),
+        Ok(_) => {}
+    }
+    if retired.exists() {
+        if let Ok(o) = verify(&retired) {
+            if o.status.success() {
+                return Verdict::Ok(
+                    "SHA256SUMS.txt verifies against fixtures/ucal-retired.pub — the key \
+                     retired on 2026-08-31 when its passphrase was lost. The signature is \
+                     as good as it ever was; the key was orphaned, not compromised, and \
+                     nothing signs its replacement"
+                        .into(),
+                );
+            }
+        }
+    }
+    match verify(&current) {
         Ok(o) => Verdict::Fail(vec![
             String::from_utf8_lossy(&o.stderr).trim().to_string(),
             String::from_utf8_lossy(&o.stdout).trim().to_string(),
+            "and it does not verify against the retired key either".into(),
         ]),
         Err(e) => Verdict::Skipped(format!("minisign could not run: {e}")),
     }
@@ -741,8 +773,11 @@ pub fn sign(root: &Path, version: &str) -> i32 {
     // The trusted comment is signed along with the file, so it cannot later be
     // presented as vouching for a different release. Same convention as the
     // conformance vectors, and `spec/CONFORMANCE.md` states it.
-    println!("\n  minisign will ask for the key's password. The key is yours and stays");
-    println!("  on this machine; nothing here reads, copies or transmits it.\n");
+    // Since the 2026-08-31 rotation the key carries no passphrase, so there is
+    // no prompt to warn about — and promising one that does not appear reads as
+    // the wrong key having been picked up.
+    println!("\n  The key is yours and stays on this machine; nothing here reads,");
+    println!("  copies or transmits it. It has no passphrase (spec/CONFORMANCE.md).\n");
     let signed = Command::new("minisign")
         .arg("-Sm")
         .arg(&sums)
@@ -810,7 +845,10 @@ pub fn sign(root: &Path, version: &str) -> i32 {
     println!("  ok    SHA256SUMS.txt.minisig is attached to {tag}");
     println!("\n  A downloader verifies it with:");
     println!("    minisign -Vm SHA256SUMS.txt \\");
-    println!("      -P RWTMVJ5DqeXk0HgeN+BIdnQaamRTdzkjITkdprOPLVsGWP8R/2HYIj0r");
+    println!("      -P RWTgVaXr8eTV6+dsVwvMkwZglwUJS69tF+78i2MFUi5LBaUXPf66M+FV");
+    println!("\n  That key signs v1.11.0 onwards. v1.9.0 was signed by the retired");
+    println!("  key in fixtures/ucal-retired.pub, whose secret half was lost on");
+    println!("  2026-08-31 — see spec/CONFORMANCE.md.");
     println!("\n  And this repository checks the whole release with:");
     println!("    cargo run -p xtask -- verify-release {version}");
     println!("\n  The key has no authority behind it that is not the author. What a");

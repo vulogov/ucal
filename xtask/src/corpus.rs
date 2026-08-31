@@ -138,12 +138,22 @@ pub const MUTATIONS: &[Mutation] = &[
         find: "> **[D-A24 · CORRECTION]**",
         replace: "> **[D-A24-not-applied · CORRECTION]**",
     },
+    // The other half of `signing-key`, added with the 2026-08-31 rotation. The
+    // check gained a branch that *permits* a key — the retired one — and a
+    // permission nothing exercises is a hole with a comment over it.
+    Mutation {
+        check: "signing-key",
+        what: "the retired key left in a document that no longer says it is retired",
+        file: "Documentation/Release_Notes/0.5.0.md",
+        find: "That key was **retired on 2026-08-31**",
+        replace: "That key was **replaced on 2026-08-31**",
+    },
     Mutation {
         check: "signing-key",
         what: "one published copy of the signing key altered",
         file: "Documentation/CONTACT.md",
-        find: "RWTMVJ5DqeXk0HgeN+BIdnQaamRTdzkjITkdprOPLVsGWP8R/2HYIj0r",
-        replace: "RWTMVJ5DqeXk0HgeN+BIdnQaamRTdzkjITkdprOPLVsGWP8R/2HYIj0X",
+        find: "RWTgVaXr8eTV6+dsVwvMkwZglwUJS69tF+78i2MFUi5LBaUXPf66M+FV",
+        replace: "RWTgVaXr8eTV6+dsVwvMkwZglwUJS69tF+78i2MFUi5LBaUXPf66M+FX",
     },
     Mutation {
         check: "ci-covers-procedure",

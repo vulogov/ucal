@@ -142,7 +142,20 @@ one-line version and links to it.
    release is not a minor one. It is the mechanism for the semver floor, which
    was the one promise in `STABILITY.md` with none.
 
-8. `cargo run -p xtask -- publish` for the dry run, then
+8. **Merge the cycle branch into `main` first, then publish from there.**
+
+   The order matters and was not written down until 1.11.0 published from the
+   cut commit and got it wrong. `cargo package` records the commit in
+   `.cargo_vcs_info.json`, and the tag is placed on the *merge* — so publishing
+   before merging bakes a commit into every `.crate` that a checkout of the tag
+   cannot reproduce. `verify-release` compares exactly that, and reports six
+   crates differing in one file whose contents are otherwise byte-identical.
+
+   It is unfixable after the fact: a published version cannot be replaced. 1.9.0
+   got it right by doing the merge first without the reason being recorded, and
+   1.11.0 got it wrong for the same reason.
+
+9. `cargo run -p xtask -- publish` for the dry run, then
    `cargo run -p xtask -- publish --execute` for real.
 
    It derives the order from the dependency graph rather than repeating a list,
@@ -167,7 +180,7 @@ one-line version and links to it.
    only for its float oracle, and cargo still resolves it when verifying the
    package — so the edge is real even though nothing in the shipped code uses
    it.
-9. Tag `vX.Y.Z`, annotated and signed, and push the tag.
+10. Tag `vX.Y.Z`, annotated and signed, and push the tag.
 
    Pushing the tag triggers `.github/workflows/release.yml`, which builds `ucal`
    for five targets, runs `ucal verify` on each artefact before packaging it,
@@ -176,7 +189,7 @@ one-line version and links to it.
    If a runner outage eats the run, re-dispatch it with the tag rather than
    moving the tag.
 
-10. `cargo run -p xtask -- sign-release X.Y.Z`, once that workflow has finished.
+11. `cargo run -p xtask -- sign-release X.Y.Z`, once that workflow has finished.
 
     **This step needs you, and cannot be given to CI.** The minisign secret key
     is on one laptop with an offline backup and must never enter this repository
@@ -194,7 +207,7 @@ one-line version and links to it.
     this repository; the half about the world — *the key has no authority behind
     it that is not the author* — is not closable from here.
 
-11. `cargo run -p xtask -- verify-release X.Y.Z`.
+12. `cargo run -p xtask -- verify-release X.Y.Z`.
 
     Three comparisons, none of which existed before 1.9.0: the published
     `.crate` files against a checkout of the tag, the release binaries against
@@ -209,4 +222,4 @@ one-line version and links to it.
     A comparison that could not be performed is reported as `--` and exits 5,
     not 0. A check that could not run has not passed.
 
-12. Open the next file.
+13. Open the next file.

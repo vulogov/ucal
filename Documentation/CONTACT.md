@@ -101,13 +101,25 @@ Either outcome is a result, and **a mismatch is worth more than a match**.
 
 ```
 minisign -Vm fixtures/SHA256SUMS \
-  -P RWTMVJ5DqeXk0HgeN+BIdnQaamRTdzkjITkdprOPLVsGWP8R/2HYIj0r
+  -P RWTgVaXr8eTV6+dsVwvMkwZglwUJS69tF+78i2MFUi5LBaUXPf66M+FV
 ```
 
 The same key is printed on **crates.io** and **docs.rs** in the READMEs of
 `ucal` and `ucal-core`, where a published version cannot be edited afterwards.
-If the key in this repository ever stops matching those, something is wrong and
-you found it.
+
+**Compare against a crate published after 2026-08-31.** This key replaced
+`D0E4E5A9439E54CC` on that date, because the passphrase to the old secret key
+was lost, so every version through 1.11.0 carries the retired key on crates.io
+permanently. Until a version ships with the new one, the repository and the
+registry disagree — and the sentence that stood here said such a disagreement
+means something is wrong and you found it.
+
+That instruction was right, and this is the case it did not cover: a mismatch is
+evidence of *a change*, not of an attack, and nothing in a rotation announced by
+the same repository that was rotated can tell you which. The retired key is in
+`fixtures/ucal-retired.pub` and still verifies everything it signed. Nothing
+signs the replacement, because the key that could have is the one that was
+lost.
 
 Do not read that as five independent confirmations. One person put it in all
 five places, so against a forgery you are no better off than with one copy —
