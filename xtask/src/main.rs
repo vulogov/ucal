@@ -911,7 +911,9 @@ fn run_lints() -> i32 {
         .parent()
         .expect("xtask lives under the workspace root")
         .to_path_buf();
-    println!("UC lint — workspace {}\n", root.display());
+    // Says which tree, because "84 files" did not — and the one it does not scan
+    // is a decision (see `lint::run`) rather than an oversight.
+    println!("UC lint — {}/crates\n", root.display());
     let (violations, scanned) = lint::run(&root);
     let allowed = lint::suppressions(&root);
 
@@ -1245,6 +1247,18 @@ fn run_docs(mode: &str) -> i32 {
             Ok(n) => code |= report("the signing key is published identically", "places", 3, n),
             Err(bad) => {
                 eprintln!("  FAIL  the published copies of the signing key disagree:");
+                for b in &bad {
+                    eprintln!("          {b}");
+                }
+                code = 6;
+            }
+        }
+        // P2 — the book's generators reproduce what is committed. The same rule
+        // §13.5 applies to the tier tables, applied where it was not.
+        match citations::check_book_generators(&root) {
+            Ok(n) => code |= report("the book's generators reproduce their files", "generators", 2, n),
+            Err(bad) => {
+                eprintln!("  FAIL  a committed artefact does not regenerate:");
                 for b in &bad {
                     eprintln!("          {b}");
                 }

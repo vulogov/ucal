@@ -16,6 +16,19 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  # P1 — the same standard `verify.yml` sets, applied to the twenty-three
+  # combinations this workflow is the only place that builds.
+  #
+  # It was set there and not here, and the two workflows exist to catch the same
+  # defect: a `#[cfg]` that does not match what the code needs. This workflow has
+  # caught six of those by build *failure* while letting the identical defect
+  # through as a warning nobody reads — four combinations carried between two and
+  # four of them, every one an item that exists under some features and does not
+  # say so.
+  #
+  # Rule O's profile setting has the same shape and the same reason: a standard
+  # that stops at the edge of one build is not a standard.
+  RUSTFLAGS: -D warnings
 
 jobs:
   supported:
@@ -29,39 +42,39 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       # ucal-core is the crate that runs without an allocator (GE-5).
-      - run: cargo build -p ucal-core --no-default-features --features u512
-      - run: cargo build -p ucal-core --no-default-features --features u512,alloc
-      - run: cargo build -p ucal-core --no-default-features --features u512,std
+      - run: cargo build --locked -p ucal-core --no-default-features --features u512
+      - run: cargo build --locked -p ucal-core --no-default-features --features u512,alloc
+      - run: cargo build --locked -p ucal-core --no-default-features --features u512,std
       # `bigint` implies `alloc`: a heap-backed integer cannot be built without
       # one, which is why GE-5's no-alloc build is a u512 build by construction.
-      - run: cargo build -p ucal-core --no-default-features --features bigint
-      - run: cargo build -p ucal-core --no-default-features --features bigint,std
+      - run: cargo build --locked -p ucal-core --no-default-features --features bigint
+      - run: cargo build --locked -p ucal-core --no-default-features --features bigint,std
 
       # Everything above core needs an allocator and now says so.
-      - run: cargo build -p ucal-civil --no-default-features --features u512,std
-      - run: cargo build -p ucal-civil --no-default-features --features u512,std,hifitime
-      - run: cargo build -p ucal-body  --no-default-features --features u512,std
-      - run: cargo build -p ucal-events --no-default-features --features u512,std
-      - run: cargo build -p ucal-cosmo --no-default-features --features u512,std
+      - run: cargo build --locked -p ucal-civil --no-default-features --features u512,std
+      - run: cargo build --locked -p ucal-civil --no-default-features --features u512,std,hifitime
+      - run: cargo build --locked -p ucal-body  --no-default-features --features u512,std
+      - run: cargo build --locked -p ucal-events --no-default-features --features u512,std
+      - run: cargo build --locked -p ucal-cosmo --no-default-features --features u512,std
 
       # The facade, each optional crate on its own.
-      - run: cargo build -p ucal --no-default-features --features u512,std
-      - run: cargo build -p ucal --no-default-features --features u512,std,civil
-      - run: cargo build -p ucal --no-default-features --features u512,std,body,civil
-      - run: cargo build -p ucal --no-default-features --features u512,std,events
-      - run: cargo build -p ucal --no-default-features --features u512,std,cosmo
+      - run: cargo build --locked -p ucal --no-default-features --features u512,std
+      - run: cargo build --locked -p ucal --no-default-features --features u512,std,civil
+      - run: cargo build --locked -p ucal --no-default-features --features u512,std,body,civil
+      - run: cargo build --locked -p ucal --no-default-features --features u512,std,events
+      - run: cargo build --locked -p ucal --no-default-features --features u512,std,cosmo
       # The wall clock. `tui` needs `civil` (it reads the system clock through
       # the leap table) and `body` (`--clock-local` puts a body's calendar on the
       # face). Both were missing from the feature declaration and both built
       # fine for as long as `default` happened to supply them. The bare
       # `u512,tui` line is the one that matters: it supplies neither, so the
       # feature has to declare what it needs.
-      - run: cargo build -p ucal --no-default-features --features u512,tui
-      - run: cargo build -p ucal --no-default-features --features u512,std,tui
-      - run: cargo build -p ucal --no-default-features --features u512,std,civil,tui
-      - run: cargo build -p ucal --features tui
+      - run: cargo build --locked -p ucal --no-default-features --features u512,tui
+      - run: cargo build --locked -p ucal --no-default-features --features u512,std,tui
+      - run: cargo build --locked -p ucal --no-default-features --features u512,std,civil,tui
+      - run: cargo build --locked -p ucal --features tui
       # The alias three tools wanted. Must be exactly the buildable maximum.
-      - run: cargo build -p ucal --features full
+      - run: cargo build --locked -p ucal --features full
 
   refused:
     name: every unsupported combination fails with a sentence
@@ -83,7 +96,7 @@ jobs:
       # is what a caller sees at 2am.
       - name: no backend is refused, by name
         run: |
-          out=$(cargo build -p ucal-core --no-default-features 2>&1 || true)
+          out=$(cargo build --locked -p ucal-core --no-default-features 2>&1 || true)
           echo "$out" | grep -q "exactly one of the .u512. or .bigint. features" \
             || { echo "$out"; echo "expected the backend guard"; exit 1; }
 
@@ -92,7 +105,7 @@ jobs:
       # reads and the one that says nothing.
       - name: both backends are refused, by name, first
         run: |
-          out=$(cargo build -p ucal-core --no-default-features --features u512,bigint 2>&1 || true)
+          out=$(cargo build --locked -p ucal-core --no-default-features --features u512,bigint 2>&1 || true)
           echo "$out" | grep -q "mutually exclusive" \
             || { echo "$out"; echo "expected the backend guard"; exit 1; }
           first=$(echo "$out" | grep -m1 "^error")
@@ -102,7 +115,7 @@ jobs:
       - name: a crate above core without alloc is refused, by name
         run: |
           for c in ucal-body ucal-events ucal-cosmo; do
-            out=$(cargo build -p $c --no-default-features --features u512 2>&1 || true)
+            out=$(cargo build --locked -p $c --no-default-features --features u512 2>&1 || true)
             echo "$out" | grep -q "requires the .alloc. feature" \
               || { echo "$out"; echo "$c did not name the missing feature"; exit 1; }
           done

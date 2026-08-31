@@ -514,6 +514,117 @@ fn workspace_version(root: &Path) -> Option<String> {
 ///
 /// Compares the *commands*, normalised for line continuations and whitespace —
 /// not the surrounding YAML, which is free to differ.
+/// P2 — the book's generated appendices reproduce the committed files.
+///
+/// `schema.rs` states the rule about its own artefact: *a generated artefact
+/// that is committed must be regenerable, or it is a copy that has started to
+/// drift.* `docs/TIERS.md`, the examples and the JSON schema were all held to
+/// it. **The book's generators were not**, and `gen-diagnostics.py` had drifted
+/// twenty lines: run while adding `UCAL-E0019`, it deleted a hand-written
+/// paragraph about exits 1 and 70 and downgraded every chapter cross-reference.
+///
+/// A generator written to stop a hand-copied list drifting had become the thing
+/// that would introduce the drift, and nothing would have said so — this check
+/// is what makes that impossible a second time.
+///
+/// Runs them into a temporary copy rather than over the tree: a *check* that
+/// rewrites the file it is checking cannot fail twice, and the second run would
+/// report success on the damage the first did.
+pub fn check_book_generators(root: &Path) -> Result<usize, Vec<String>> {
+    use std::collections::BTreeMap;
+
+    let samples = root.join("Documentation/LIFE_UNIVERSE_AND_GOD/samples");
+    let chapters = root.join("Documentation/LIFE_UNIVERSE_AND_GOD/chapters");
+    if !samples.exists() || !chapters.exists() {
+        return Err(alloc_vec("the book's directories are missing".into()));
+    }
+
+    // Snapshot the whole chapters directory rather than asking each script which
+    // file it writes. The first version parsed `OUT =` out of the source and
+    // `gen-rules.py` has no such variable — it writes two files inline. A check
+    // that assumes how a script is written checks the ones written that way.
+    let snapshot = |dir: &Path| -> BTreeMap<std::path::PathBuf, String> {
+        let mut m = BTreeMap::new();
+        if let Ok(rd) = std::fs::read_dir(dir) {
+            for e in rd.flatten() {
+                let p = e.path();
+                if p.is_file() {
+                    if let Ok(t) = std::fs::read_to_string(&p) {
+                        m.insert(p, t);
+                    }
+                }
+            }
+        }
+        m
+    };
+
+    let mut bad = Vec::new();
+    let mut checked = 0usize;
+    for g in ["gen-diagnostics.py", "gen-rules.py"] {
+        let script = samples.join(g);
+        if !script.exists() {
+            bad.push(format!("{g} is missing"));
+            continue;
+        }
+        let before = snapshot(&chapters);
+        if before.is_empty() {
+            bad.push("no chapters to compare against".into());
+            continue;
+        }
+
+        match std::process::Command::new("python3")
+            .arg(&script)
+            .current_dir(&samples)
+            .output()
+        {
+            Ok(o) if o.status.success() => {}
+            Ok(o) => {
+                bad.push(format!(
+                    "{g} failed: {}",
+                    String::from_utf8_lossy(&o.stderr).trim()
+                ));
+                continue;
+            }
+            // No interpreter is a skip reported as a failure, not a pass: a green
+            // run must not be able to mean "python3 was absent".
+            Err(e) => {
+                bad.push(format!("{g} could not run ({e}); python3 is required"));
+                continue;
+            }
+        }
+
+        let after = snapshot(&chapters);
+        let changed: Vec<String> = after
+            .iter()
+            .filter(|(p, t)| before.get(*p) != Some(*t))
+            .filter_map(|(p, _)| {
+                p.file_name().and_then(|n| n.to_str()).map(str::to_string)
+            })
+            .collect();
+
+        if changed.is_empty() {
+            checked += 1;
+            continue;
+        }
+        // Put the tree back before reporting: a check that leaves damage behind
+        // passes on its second run, having compared its own output.
+        for (p, t) in &before {
+            let _ = std::fs::write(p, t);
+        }
+        bad.push(format!(
+            "{g} does not reproduce {}; it has been edited by hand since it was \
+             last generated, so running it would destroy that edit",
+            changed.join(", ")
+        ));
+    }
+
+    if bad.is_empty() {
+        Ok(checked)
+    } else {
+        Err(bad)
+    }
+}
+
 pub fn check_ci_covers_the_procedure(root: &Path) -> Result<usize, Vec<String>> {
     let wf = root.join(".github/workflows/verify.yml");
     let Ok(workflow) = std::fs::read_to_string(&wf) else {

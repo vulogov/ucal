@@ -33,8 +33,17 @@ pub mod table;
 use emit::{Doc, Value};
 use ucal_core::backend::TickInt;
 use ucal_core::codec::{self, Fmt, Form};
-use ucal_core::num::{RatInterval, Ratio};
+use ucal_core::num::Ratio;
+// P1 — `RatInterval` is `parse_redshift`'s return type and nothing else's, so it
+// arrives with `cosmo` or not at all. An import that is unused in eight of the
+// twenty-three feature combinations is a `#[cfg]` that was never written; the
+// features workflow builds those eight and said so in a warning nobody read.
+#[cfg(feature = "cosmo")]
+use ucal_core::num::RatInterval;
 use ucal_core::locale::{self, LocaleId};
+// Read once, by `to-civil`, to say whether a rendering is legacy table data or
+// derived under Rule K.
+#[cfg(feature = "civil")]
 use ucal_core::qualified::Kind;
 use ucal_core::{
     Code, Delta, Instant, Precision, Profile, Rounding, Tier, Ticks, TimeError, Ucid, UC1,
@@ -1037,6 +1046,20 @@ fn tier_label(tier: Tier) -> String {
 /// `between a b` and `between b a` print the same thing, which is the kind of
 /// convenience Rule Q refuses.
 pub fn cmd_between(from: &str, to: &str, at: Option<Tier>) -> CmdResult {
+    cmd_between_in(from, to, at.map(Stride::tier))
+}
+
+/// `ucal between --at <TIER|CALENDAR>` — the span, counted in a chosen unit.
+///
+/// `--at` has always meant *express this span in this unit*, and could only name
+/// a tier. G6 gave `seq --step` a vocabulary that reads a tier **or a body's own
+/// solar day or year**, and this is that vocabulary pointed at measurement
+/// rather than movement: `--at mars-d` answers *how many Martian days is that*.
+///
+/// One flag, widened. A second flag meaning the same thing in a different
+/// vocabulary is how two spellings of one question come to disagree, which is
+/// why `cal show` did not grow `cal derive`'s options in 1.9.0.
+pub fn cmd_between_in(from: &str, to: &str, at: Option<Stride>) -> CmdResult {
     let (a, _) = parse_instant(from)?;
     let (b, _) = parse_instant(to)?;
     let signed = b.between(&a);
@@ -1085,21 +1108,28 @@ pub fn cmd_between(from: &str, to: &str, at: Option<Tier>) -> CmdResult {
         )
         .field("on_the_ladder", Value::rows_of("tier", "whole", rows));
 
-    // `--at <tier>`: the divmod a reader actually asked for, rather than the
+    // `--at <unit>`: the divmod a reader actually asked for, rather than the
     // decomposition's opinion about which tiers are interesting.
-    if let Some(tier) = at {
-        let (whole, rem) = mag.in_tier(tier);
-        doc = doc.field(
-            "at",
-            Value::Section(vec![
-                ("tier".into(), Value::text(tier_label(tier))),
-                ("whole".into(), Value::number(whole.to_dec_string())),
-                (
-                    "remainder_ticks".into(),
-                    Value::number(rem.to_dec_string()),
-                ),
-            ]),
-        );
+    //
+    // **Whole and remainder, never a rounded count.** A span is rarely a whole
+    // number of Martian days, and Rule R makes rendering the only place a value
+    // may lose information — so the answer is the exact pair, in the same shape
+    // this field has always used for tiers.
+    if let Some(unit) = at {
+        let (whole, rem) = mag.ticks().quot_rem(unit.ticks());
+        let mut at = vec![("unit".to_string(), Value::text(unit.label().to_string()))];
+        // `tier` is a path in `ucal-json/1` and removing one is breaking, so it
+        // stays for a tier and is absent for a calendar unit — which is the
+        // honest thing for a field of that name, and additive either way.
+        if let Some(t) = unit.as_tier() {
+            at.push(("tier".to_string(), Value::text(tier_label(t))));
+        }
+        at.push(("whole".to_string(), Value::number(whole.to_dec_string())));
+        at.push((
+            "remainder_ticks".to_string(),
+            Value::number(rem.to_dec_string()),
+        ));
+        doc = doc.field("at", Value::Section(at));
     }
 
     // SI on request only. A second is an Earth unit and a duration between two
@@ -2326,6 +2356,11 @@ pub const YEAR_DEFINITION: &str =
 /// A count of ticks divided by a Julian year is a rational, and whether its
 /// expansion fits the digits asked for depends on the value — so it goes through
 /// the certified constructor like every other rendered rational.
+///
+/// Called by `events` for a window's width and by `cosmo` for an enclosure's
+/// ends, so it exists when either does — which is what `any` is for, and what
+/// the missing attribute could not have said with one feature name.
+#[cfg(any(feature = "events", feature = "cosmo"))]
 fn years_quantity(t: &Ticks, digits: u32) -> Value {
     // ucal-lint-allow-begin(no-panic-in-cli): as `ticks_in_years`.
     let year = UC1::bridge()
@@ -2733,16 +2768,20 @@ pub fn cmd_seq(from: &str, to: &str, step: Tier, max: u64) -> Result<Vec<String>
 /// construction; a body's day is a `Measured` converted to ticks by Rule Y.2,
 /// which rejects rather than rounds. Neither is a float and neither is
 /// approximated here.
-#[cfg(feature = "body")]
 #[derive(Clone, Debug)]
 pub struct Stride {
     /// The interval, in ticks.
     ticks: Ticks,
     /// How to name it in a message.
     label: String,
+    /// The tier, when the stride is one.
+    ///
+    /// Kept so `between --at` can go on emitting `at.tier` for a tier, which is
+    /// a path in `ucal-json/1` and removing one is breaking. A calendar unit
+    /// leaves it absent, which is the honest thing for a field named `tier`.
+    tier: Option<Tier>,
 }
 
-#[cfg(feature = "body")]
 impl Stride {
     /// The interval, in ticks.
     pub fn ticks(&self) -> &Ticks {
@@ -2759,10 +2798,23 @@ impl Stride {
         Stride {
             ticks: t.ticks(),
             label: t.to_string(),
+            tier: Some(t),
         }
     }
 
+    /// The tier this stride is, if it is one.
+    pub fn as_tier(&self) -> Option<Tier> {
+        self.tier
+    }
+
     /// A calendar's own solar day, or its year.
+    ///
+    /// The one part of this type that needs `body`: a tier is a tier in every
+    /// build, and gating the whole type on `body` broke
+    /// `--no-default-features --features u512,std`, which is one of the
+    /// twenty-three combinations the features workflow builds. Caught as a
+    /// failure — the class P1 exists to catch is the one that only *warns*.
+    #[cfg(feature = "body")]
     ///
     /// **A local unit is not a tier and this does not pretend otherwise.** Rule
     /// A.5 refuses to substitute one body's units for another's; what this does
@@ -2824,6 +2876,7 @@ impl Stride {
                 if want_year { "year" } else { "solar day" },
                 body.id()
             ),
+            tier: None,
         })
     }
 }
@@ -3556,6 +3609,201 @@ pub fn cmd_cal_validate(path: &str, anchor_path: Option<&str>) -> CmdResult {
 #[cfg(feature = "body")]
 fn check(name: &str, verdict: impl Into<String>) -> (String, Value) {
     (name.to_string(), Value::text(verdict.into()))
+}
+
+/// `ucal add` — an instant, moved by a whole number of a chosen unit.
+///
+/// # The operation that was missing
+///
+/// This program could **read** time (`now`, `to-civil`, `cal from`) and
+/// **measure** it (`between`, `explain`) and not move through it. `seq` walks
+/// from one instant to another and needs both; `between` measures a span whose
+/// ends you already hold. There was no way to say *this instant, plus one
+/// Martian year*.
+///
+/// # Unsigned time is the whole design here
+///
+/// `n` is signed and the result is not. Absolute time is unsigned by Rule B and
+/// `Ticks` cannot hold a negative, so moving below the datum is not a negative
+/// instant — it is `UCAL-E0020`, *result precedes the datum*, which is the code
+/// **named for this operation** and which no raiser had ever produced for it.
+/// Moving above the ceiling is `UCAL-E0021`. Rule O forbids wrapping and
+/// saturating, so neither is clamped.
+///
+/// # Exact
+///
+/// `n × unit`, in integer ticks. [`Stride`] refuses a unit that is not a whole
+/// number of them, so nothing here rounds and no float is involved.
+pub fn cmd_add(input: &str, n: i64, unit: &Stride) -> CmdResult {
+    let (t, _) = parse_instant(input)?;
+    let magnitude = <Ticks as TickInt>::from_u64(n.unsigned_abs())
+        .try_mul(unit.ticks())
+        .ok_or_else(|| {
+            TimeError::with_context(
+                Code::E0021,
+                "that many of that unit exceeds the domain before it is even added",
+            )
+        })?;
+
+    let moved = if n < 0 {
+        t.ticks().try_sub(&magnitude).ok_or_else(|| {
+            TimeError::with_context(
+                Code::E0020,
+                "that lands before the datum. Absolute time is unsigned (Rule B), \
+                 so there is no instant earlier than tick 0 — and clamping to it \
+                 would be a wrong answer where an error was available (Rule O)",
+            )
+        })?
+    } else {
+        t.ticks().try_add(&magnitude).ok_or_else(|| {
+            TimeError::with_context(
+                Code::E0021,
+                "that lands past the domain ceiling of 2^512 - 1",
+            )
+        })?
+    };
+    let moved = Instant::from_ticks(moved)?;
+
+    Ok(instant_doc("ucal add", &moved)
+        .field("from", Value::number(t.ticks().to_dec_string()))
+        .field("moved_by", Value::text(format!("{n} x {}", unit.label())))
+        .field(
+            "offset_ticks",
+            Value::number(magnitude.to_dec_string()),
+        )
+        .note(
+            "Exact: a whole number of a unit that is itself a whole number of \
+             ticks, so nothing is rounded. Moving below the datum is \
+             `UCAL-E0020` rather than a negative instant, because absolute time \
+             is unsigned (Rule B); moving past the ceiling is `UCAL-E0021`. \
+             Neither wraps and neither saturates (Rule O).",
+        ))
+}
+
+/// `ucal add --in <calendar>` — move by a **date**, where `--step` moves by a
+/// **duration**.
+///
+/// # The two are not the same, and the difference is measurable
+///
+/// `--step mars-d-year` adds Mars's mean orbital period. `--in mars-d` adds a
+/// local year *as the calendar counts them* — the whole days between one year's
+/// start and the next's, which the leap rule makes uneven on purpose.
+///
+/// From `earth-d` year 2000 day 100, adding the mean year lands on day 100, day
+/// 100, then **day 101**. From `mars-d` day 668 the day alternates 667, 669,
+/// 667. Neither is a bug in `--step`: a mean year is a real interval and a
+/// perfectly good thing to add. It is simply not *next year, same date*, and
+/// until now that was the only thing this program could do.
+///
+/// # Why the unit has no `-year` suffix here
+///
+/// `--step` takes `mars-d` for the solar day and `mars-d-year` for the mean
+/// year, and `--in mars-d` counts local years — so the same word means the day
+/// in one flag and the year in the other. That is a trap, and the way out is
+/// not a third spelling but a refusal: `--in mars-d-year` is an error that says
+/// which flag does which, rather than a synonym that lets the two vocabularies
+/// quietly diverge.
+///
+/// **A local day needs no such flag.** Day `k` starts at `anchor + k x
+/// solar_day`, so a whole number of local days *is* a duration, and `--step
+/// mars-d` already gives it — on all fifteen calendars, including the thirteen
+/// with no anchor, where `--in` cannot go because it must decompose. The year is
+/// the unit that is not a duration, and it is the only one this flag needs.
+#[cfg(feature = "body")]
+pub fn cmd_add_in(input: &str, n: i64, spec: &str) -> CmdResult {
+    if let Some(id) = spec.strip_suffix("-year") {
+        return Err(TimeError::with_context(
+            Code::E0016,
+            body_file::leak(format!(
+                "`--in` already counts local years, so `{spec}` says it twice. \
+                 `--in {id}` moves by that calendar's own years, keeping the day \
+                 of the year; `--step {spec}` moves by the body's mean orbital \
+                 period, which is a duration and lands on a different local date"
+            )),
+        ));
+    }
+    let cal = ucal_body::calendar::by_id(spec)?;
+    let (t, _) = parse_instant(input)?;
+
+    let step = cal.add_years(&t, n).map_err(|e| {
+        // The library refuses the seam; this says how short the year was. The
+        // enforcement is not repeated here — only the arithmetic that turns
+        // "no such day" into a number a reader can act on.
+        if e.code != Code::E0018 {
+            return e;
+        }
+        match cal.fields(&t).and_then(|f| {
+            let to = f.year.checked_add(n).ok_or(TimeError::new(Code::E0021))?;
+            Ok((f.day, to, cal.year_length(to)?))
+        }) {
+            Ok((day, to, len)) => TimeError::with_context(
+                Code::E0018,
+                body_file::leak(format!(
+                    "local year {to} of `{spec}` has {len} days and you are on day \
+                     {day}, so there is no such date to move to. Local year \
+                     lengths are set by the leap rule and differ by one; clamping \
+                     to the last day or rolling into the next year would both be a \
+                     date nobody asked for"
+                )),
+            ),
+            Err(_) => e,
+        }
+    })?;
+
+    let local = |y: i64| format!("{y:04}-{:03}", step.day);
+    let mut doc = instant_doc("ucal add", &step.to)
+        .field("from", Value::number(t.ticks().to_dec_string()))
+        .field("calendar", Value::text(spec))
+        .field(
+            "moved_by",
+            Value::text(format!(
+                "{n} x local year of `{spec}` = {} local days",
+                step.days.to_dec_string()
+            )),
+        )
+        .field(
+            "local",
+            Value::Section(vec![
+                ("from".into(), Value::text(local(step.from_year))),
+                ("to".into(), Value::text(local(step.to_year))),
+                (
+                    "day_fraction".into(),
+                    Value::quantity(&step.day_fraction, 6, Rounding::Trunc),
+                ),
+                (
+                    "days_moved".into(),
+                    Value::number(step.days.to_dec_string()),
+                ),
+                (
+                    "direction".into(),
+                    Value::text(if step.forward { "forwards" } else { "backwards" }),
+                ),
+                (
+                    "anchor_revision".into(),
+                    Value::number(step.anchor_revision.to_string()),
+                ),
+            ]),
+        )
+        .note(
+            "The day of the year and the position within it are carried across \
+             unchanged, not recomputed — so nothing here is rounded and the \
+             answer is an instant rather than a window. `--step <id>-year` adds \
+             the body's mean orbital period instead, which is a duration: it is \
+             exact too, and it lands on a different local date.",
+        );
+
+    if step.day_is_ambiguous {
+        doc = doc.note(
+            "The anchor's uncertainty spans a local day boundary at the starting \
+             instant, so the day this was measured from is not itself determined \
+             (Rule J.2). The step is exact; the date it started from is the \
+             thing with width.",
+        );
+    }
+    if let Some(w) = step.warning {
+        doc = doc.note(window_note(w));
+    }
+    Ok(doc)
 }
 
 /// `ucal cal from` — a local date, back to absolute time.

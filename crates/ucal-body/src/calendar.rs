@@ -93,6 +93,38 @@ pub struct DerivedFields {
     pub warning: Option<Warning>,
 }
 
+/// The result of moving an instant by whole local years (§15.5).
+///
+/// Carries what it took as well as what it produced, because the interesting
+/// part of the answer is that `n` years was `days` days — a number that varies
+/// with where you started, and the whole reason a mean year is the wrong step.
+#[derive(Clone, PartialEq, Eq, Debug)]
+#[non_exhaustive]
+pub struct LocalStep {
+    /// The instant arrived at.
+    pub to: Instant<UC1>,
+    /// The local year moved from, 1-based.
+    pub from_year: i64,
+    /// The local year arrived at, 1-based.
+    pub to_year: i64,
+    /// The day of the year, which is the same in both by construction.
+    pub day: u32,
+    /// The position within that day, likewise unchanged and unrounded.
+    pub day_fraction: Ratio,
+    /// How many whole local days that was — the magnitude, unsigned.
+    pub days: Ticks,
+    /// Whether the move was forwards. `days` is unsigned (Rule B), so the
+    /// direction is a separate field rather than a sign.
+    pub forward: bool,
+    /// Whether the anchor's uncertainty spans a local day boundary at the
+    /// starting instant, so the day number is not determined (Rule J.2).
+    pub day_is_ambiguous: bool,
+    /// Which anchor determination this was computed against (Rule J.5).
+    pub anchor_revision: u32,
+    /// `UCAL-W0003` when the starting instant fell outside a validity window.
+    pub warning: Option<Warning>,
+}
+
 /// A calendar derived from a body under Rule K (§9.3).
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct BodyCalendar {
@@ -227,6 +259,38 @@ impl BodyCalendar {
         }
     }
 
+    /// Cumulative local days before local year `year0`, counted from the anchor
+    /// and 0-based across every cycle.
+    ///
+    /// [`days_before_year`](Self::days_before_year) places a year **within** one
+    /// intercalation cycle; this places it in the calendar. Both `instant_of`
+    /// and [`add_years`](Self::add_years) need the second, and computed it
+    /// inline in `instant_of` alone — two copies of one placement rule is how
+    /// they come to disagree, and D-A21 fixed the rule precisely so there would
+    /// be one.
+    fn days_before_absolute_year(&self, year0: &Ticks) -> Result<Ticks> {
+        let q = self.leap_rule.chosen.value.denom().clone();
+        let (cycles, y) = year0.quot_rem(&q);
+        cycles
+            .try_mul(&self.days_per_cycle()?)
+            .and_then(|v| v.try_add(&self.days_before_year(&y).ok()?))
+            .ok_or(TimeError::new(Code::E0021))
+    }
+
+    /// The length of local year `year0` in whole days.
+    ///
+    /// The difference between consecutive year starts, which is what makes the
+    /// intercalation a consequence rather than a table: no year is *declared*
+    /// long, and a leap year is one the fraction happened to lengthen.
+    fn length_of_year(&self, year0: &Ticks) -> Result<Ticks> {
+        let next = year0
+            .try_add(&<Ticks as TickInt>::one())
+            .ok_or(TimeError::new(Code::E0021))?;
+        self.days_before_absolute_year(&next)?
+            .try_sub(&self.days_before_absolute_year(year0)?)
+            .ok_or(TimeError::new(Code::E0021))
+    }
+
     /// **The inverse: a local date, back to absolute time.**
     ///
     /// Earth's legacy calendars have gone both ways since 0.1.0 — `to-civil` and
@@ -298,25 +362,14 @@ impl BodyCalendar {
         // Undo the 1-based rendering, then undo `split_year`.
         let year0 = <Ticks as TickInt>::from_u64((year as u64) - 1);
         let day0 = <Ticks as TickInt>::from_u64(u64::from(day) - 1);
-        let per_cycle = self.days_per_cycle()?;
-        let q = self.leap_rule.chosen.value.denom().clone();
-        let (cycles, y) = year0.quot_rem(&q);
-
-        let whole_days = cycles
-            .try_mul(&per_cycle)
-            .and_then(|v| v.try_add(&self.days_before_year(&y).ok()?))
-            .and_then(|v| v.try_add(&day0))
+        let whole_days = self
+            .days_before_absolute_year(&year0)?
+            .try_add(&day0)
             .ok_or(TimeError::new(Code::E0021))?;
 
         // A day that does not exist in that year is refused rather than rolled
-        // into the next one. `days_before_year` is monotone, so the length of
-        // year `y` is the difference between consecutive starts.
-        let next = y.try_add(&<Ticks as TickInt>::one()).ok_or(TimeError::new(Code::E0021))?;
-        let len = self
-            .days_before_year(&next)?
-            .try_sub(&self.days_before_year(&y)?)
-            .ok_or(TimeError::new(Code::E0021))?;
-        if day0 >= len {
+        // into the next one.
+        if day0 >= self.length_of_year(&year0)? {
             return Err(TimeError::with_context(
                 Code::E0018,
                 "that local year does not have that many days; the length of a \
@@ -361,6 +414,142 @@ impl BodyCalendar {
         };
         let (w, _clamped) = w.widen(&half)?;
         Ok(w)
+    }
+
+    /// The length of local year `year` — 1-based, as rendered — in whole days.
+    ///
+    /// Public because a caller that is refused a date needs to be able to say
+    /// *why*: `add_years` can only report that the day does not exist, its
+    /// context being `&'static str`, and "year 103 has 668 days" is a better
+    /// answer than "that year does not have that many days".
+    pub fn year_length(&self, year: i64) -> Result<u32> {
+        if year < 1 {
+            return Err(TimeError::with_context(
+                Code::E0020,
+                "local years are 1-based from the anchor; there is no year 0",
+            ));
+        }
+        self.length_of_year(&<Ticks as TickInt>::from_u64((year as u64) - 1))?
+            .to_dec_string()
+            .parse()
+            .map_err(|_| TimeError::with_context(Code::E0040, "local year length out of range"))
+    }
+
+    /// **Move an instant by whole local years**, keeping the day of the year and
+    /// the position within that day exactly.
+    ///
+    /// # Why this is not `t + n x orbital_period`
+    ///
+    /// Because that is a *duration* and this is a *date*. A local year is not a
+    /// constant span: the leap rule packs whole days into years and the lengths
+    /// alternate, so the year boundaries are not evenly spaced and no fixed
+    /// interval lands on them.
+    ///
+    /// Adding the mean year is what `ucal add --step <id>-year` does, and it is
+    /// the right answer to a different question. Measured on `earth-d`, from
+    /// year 2000 day 100: one mean year later is day 100, two is day 100, and
+    /// **three is day 101**. On `mars-d` from day 668 the day alternates between
+    /// 667 and 669 on consecutive years. That drift is precisely what
+    /// intercalation exists to absorb, and adding a mean steps around the rule
+    /// instead of following it.
+    ///
+    /// # Exact, and no wider than it started
+    ///
+    /// The step is `days_before(to) - days_before(from)` whole local days,
+    /// converted to ticks once. Day `k` begins at `anchor + k x solar_day`, so
+    /// a whole number of days is a whole number of those spans and the fraction
+    /// through the day is carried across unchanged — not recomputed, and so not
+    /// rounded.
+    ///
+    /// It deliberately does **not** go through [`instant_of`](Self::instant_of).
+    /// That returns a `Window`, and rightly: a local date names an interval
+    /// because the anchor has width. But `t` is already an instant, and
+    /// re-deriving it from its own fields would widen it by the anchor's
+    /// uncertainty for no reason — the phase is never consulted here, only the
+    /// spacing. Rule J.2's width belongs on an answer that *asks* where a local
+    /// date falls. This asks how far apart two of them are.
+    ///
+    /// The product must be a whole number of ticks and is refused otherwise,
+    /// never truncated. Note that this is a **weaker** requirement than
+    /// `Stride::calendar`'s: that needs one solar day to be integral, and this
+    /// needs only their sum to be.
+    pub fn add_years(&self, t: &Instant<UC1>, n: i64) -> Result<LocalStep> {
+        let f = self.fields(t)?;
+        let to_year = f.year.checked_add(n).ok_or(TimeError::with_context(
+            Code::E0021,
+            "that many local years overflows the year count before it is added",
+        ))?;
+        if to_year < 1 {
+            return Err(TimeError::with_context(
+                Code::E0020,
+                "that lands before local year 1, which is the year that began at \
+                 the anchor. Local counting had not begun, and a year 0 would be \
+                 an invention",
+            ));
+        }
+
+        let from0 = <Ticks as TickInt>::from_u64((f.year as u64) - 1);
+        let to0 = <Ticks as TickInt>::from_u64((to_year as u64) - 1);
+        let day0 = <Ticks as TickInt>::from_u64(u64::from(f.day) - 1);
+
+        // The seam. A day that the destination year does not have is refused
+        // rather than clamped into the last day or rolled into the next year:
+        // both are answers, neither is *the* answer, and a date that quietly
+        // moves is what Rule R refuses at rendering time.
+        if day0 >= self.length_of_year(&to0)? {
+            return Err(TimeError::with_context(
+                Code::E0018,
+                "the destination local year is shorter than that, and has no such \
+                 day. Local year lengths are set by the leap rule and differ; \
+                 clamping to the last day or rolling into the next year would \
+                 both be a date nobody asked for",
+            ));
+        }
+
+        let a = self.days_before_absolute_year(&from0)?;
+        let b = self.days_before_absolute_year(&to0)?;
+        let forward = to_year >= f.year;
+        let days = if forward { b.try_sub(&a) } else { a.try_sub(&b) }
+            .ok_or(TimeError::new(Code::E0021))?;
+
+        let solar_day = self.body.solar_day().value_at_epoch();
+        let span = Ratio::from_int(days.clone()).mul(solar_day)?;
+        if !span.is_integer() {
+            return Err(TimeError::with_context(
+                Code::E0043,
+                "that many local days is not a whole number of ticks, and an \
+                 instant is. Truncating would move the answer by less than a \
+                 tick and make it a different instant all the same",
+            ));
+        }
+        let span = span.floor();
+
+        let ticks = if forward {
+            t.ticks().try_add(&span).ok_or(TimeError::with_context(
+                Code::E0021,
+                "that lands past the domain ceiling",
+            ))?
+        } else {
+            t.ticks().try_sub(&span).ok_or(TimeError::with_context(
+                Code::E0020,
+                "that lands before the datum. Absolute time is unsigned (Rule B), \
+                 and clamping to tick 0 would be a wrong answer where an error \
+                 was available (Rule O)",
+            ))?
+        };
+
+        Ok(LocalStep {
+            to: Instant::from_ticks(ticks)?,
+            from_year: f.year,
+            to_year,
+            day: f.day,
+            day_fraction: f.day_fraction,
+            days,
+            forward,
+            day_is_ambiguous: f.day_is_ambiguous,
+            anchor_revision: f.anchor_revision,
+            warning: f.warning,
+        })
     }
 
     /// Decompose an instant into local fields (§15.5).

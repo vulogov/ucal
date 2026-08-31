@@ -680,7 +680,25 @@ pub fn sign(root: &Path, version: &str) -> i32 {
             }
         }
         _ => {
-            eprintln!("  FAIL  no release {tag}, or `gh` cannot see it");
+            // **Two conditions, two messages.** This said *no release, or `gh`
+            // cannot see it* and left the reader to guess which — and the first
+            // person to hit it was unauthenticated, not missing a release. That
+            // is the shape D-A24 catalogued: one diagnostic covering conditions
+            // with different remedies.
+            let authed = Command::new("gh")
+                .args(["auth", "status"])
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false);
+            if authed {
+                eprintln!("  FAIL  there is no release {tag} to sign.");
+                eprintln!("        Push the tag first; the release workflow builds the");
+                eprintln!("        binaries and attaches SHA256SUMS.txt for this to sign.");
+            } else {
+                eprintln!("  FAIL  `gh` is not authenticated, so it cannot see any release.");
+                eprintln!("        Run `gh auth login`, or set GH_TOKEN in this shell.");
+                eprintln!("        Nothing has been read or changed.");
+            }
             return 6;
         }
     }

@@ -105,6 +105,19 @@ fn commands() -> Vec<(&'static str, Doc)> {
         // The inverse of `cal show`, and a document like any other: its fields
         // are part of the promise from the release that introduces them.
         v.push(("cal-from", ucal::cmd_cal_from("mars-d", "82-83").unwrap()));
+        // `add`, and `between --at` in a calendar's own unit: both new surface,
+        // and `at.tier` is absent in the second, which is the point.
+        v.push((
+            "add",
+            ucal::cmd_add(T, 1, &ucal::Stride::calendar("mars-d").unwrap()).unwrap(),
+        ));
+        // `add --in` emits fields `add --step` does not, and they are part of
+        // the promise from the release that introduces them. Listed under the
+        // same prefix because it is the same command: two invocations, one
+        // surface. Nothing here checks that every *command* is listed — only
+        // that every listed one contributes — so a command reaches this promise
+        // by being remembered.
+        v.push(("add", ucal::cmd_add_in(T, 1, "mars-d").unwrap()));
         v.push((
             "show",
             ucal::cmd_show(

@@ -38,6 +38,16 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  # P3 — the same standard the other two build workflows set.
+  #
+  # This is the **only** workflow that compiles for anything but the host: five
+  # targets including `x86_64-pc-windows-msvc` and both aarch64 musl. A warning
+  # that fires only on one of those was invisible everywhere, because nothing
+  # else builds them — and these are the binaries a downloader actually runs.
+  #
+  # Cargo caps lints on registry dependencies, so this is about this workspace's
+  # own code and cannot be tripped by somebody else's crate.
+  RUSTFLAGS: -D warnings
 
 jobs:
   build:

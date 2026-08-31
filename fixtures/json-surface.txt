@@ -4,9 +4,24 @@
 #
 # A path removed or a kind changed is a breaking change. A path added
 # is not — that is the contract Documentation/STABILITY.md states.
+add.calendar	string
+add.from	string
+add.human	string
+add.local	object
+add.local.anchor_revision	string
+add.local.day_fraction	string
+add.local.days_moved	string
+add.local.direction	string
+add.local.from	string
+add.local.to	string
+add.moved_by	string
+add.offset_ticks	string
+add.ticks	string
+add.ucid	string
 between.at	object
 between.at.remainder_ticks	string
 between.at.tier	string
+between.at.unit	string
 between.at.whole	string
 between.direction	string
 between.from	string
