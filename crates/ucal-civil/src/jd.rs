@@ -290,6 +290,145 @@ fn half_offset() -> Result<Ratio> {
     )
 }
 
+/// D — an independent implementation, to check this one against.
+///
+/// # Why an oracle at all
+///
+/// Every claim A1 makes about exactness is checked *by A1's own arithmetic*:
+/// the round trip uses `from_jd` and `to_jd`, and a matched pair of errors in
+/// the two would cancel and pass. `S1` records the general form of this — the
+/// strongest claim available to a project this size is agreement with an
+/// independent implementation, and `ucal verify` already has to say it cannot
+/// make one.
+///
+/// `hifitime` is that implementation. It is already a dependency of this crate,
+/// under a permissive licence, written by someone else from the standards
+/// rather than from this code. `S1` assessed `siderust` for the same job and
+/// **rejected it**: AGPL-3.0-only against this workspace's MPL-2.0 settles it
+/// before `f64`, `std`-only and 351 kSLoC each settle it again.
+///
+/// # What agreement means here, and what it does not
+///
+/// `hifitime` returns `f64` days. A Julian Date near 2 460 000 has about 2×10⁻¹¹
+/// days — roughly **2 microseconds** — of representation spacing in a double, so
+/// the oracle cannot check this crate past that. It is not the finer of the two.
+///
+/// So the assertion is one-directional and stated as such: **the exact value
+/// must lie within one double's spacing of the oracle's**. That catches a wrong
+/// epoch, a wrong day length, a scale applied backwards and an off-by-one in the
+/// MJD offset — every defect that is larger than a microsecond, which is every
+/// defect anybody makes here. It cannot catch a sub-microsecond error, and
+/// nothing available could.
+// ucal-lint-allow-begin(float-free): Rule E permits a float reference
+// implementation in test code, marked as such. Everything between this marker
+// and its `-end` is `#[cfg(test)]`, unreachable from any shipped artefact, and
+// used only to check this crate's exact answer against an independent one.
+#[cfg(all(test, feature = "hifitime"))]
+mod oracle {
+    use super::*;
+
+    /// The oracle's Julian Date for an instant, in a scale.
+    ///
+    /// **Both scales, deliberately.** The first version of this test looped over
+    /// scales while converting back through `Tt` every time, so the TAI offset
+    /// cancelled on both sides and the loop compared one path with itself.
+    /// Injecting the offset backwards — the classic error, worth 64.368 s —
+    /// did not fail it. Found by running the injection rather than by reading
+    /// the test, which is the whole reason the injections are run.
+    fn hifitime_jd(t: &Instant<UC1>, scale: JdScale) -> Option<f64> {
+        let (e, _) = crate::bridge::to_epoch(t, ucal_core::Rounding::HalfEven).ok()?;
+        Some(match scale {
+            JdScale::Tt | JdScale::Tdb => e.to_jde_tt_days(),
+            JdScale::Tai => e.to_jde_tai_days(),
+        })
+    }
+
+    /// One double's spacing at a Julian Date, in days.
+    fn spacing(jd: f64) -> f64 {
+        // `f64::EPSILON` scaled to the magnitude: the gap between representable
+        // neighbours near `jd`. Two of them, because the oracle's own arithmetic
+        // rounds at least once on the way.
+        2.0 * jd.abs() * f64::EPSILON
+    }
+
+    /// This crate's Julian Date agrees with an independent one.
+    ///
+    /// Across five orders of magnitude of offset from the epoch, both
+    /// directions, and both exact scales.
+    #[test]
+    fn the_julian_date_agrees_with_hifitime() {
+        let mut checked = 0usize;
+        for days in [0i64, 1, -1, 365, -365, 36_525, -36_525, 730_500] {
+            for scale in [JdScale::Tt, JdScale::Tai] {
+                let jd = Ratio::from_u64(J2000_JD);
+                let jd = if days >= 0 {
+                    jd.add(&Ratio::from_u64(days as u64)).expect("in range")
+                } else {
+                    jd.sub(&Ratio::from_u64(days.unsigned_abs())).expect("in range")
+                };
+                let jd_f: f64 = jd
+                    // The oracle compares against an `f64`, whose spacing
+                    // here is ~2 µs — coarser than any two of the four modes
+                    // could differ by. There is no caller to take a mode from.
+                    .to_decimal_string(9, ucal_core::Rounding::HalfEven) // ucal-lint-allow(rounding-is-declared)
+                    .expect("rendered")
+                    .parse()
+                    .expect("a number");
+
+                // **Forwards**: the instant `from_jd` produces for a date in
+                // this scale must read back as that date, to the oracle, in the
+                // same scale. This is what exercises `from_jd`'s scale branch —
+                // the earlier version converted forwards in `Tt` always, so
+                // injecting the TAI offset backwards still passed.
+                let w = from_jd(&jd, scale).expect("exact");
+                let theirs = hifitime_jd(w.lo(), scale).expect("the oracle answers");
+                let gap = (jd_f - theirs).abs();
+                assert!(
+                    gap <= spacing(theirs),
+                    "forwards {scale:?} at J2000{days:+}: asked {jd_f}, hifitime \
+                     reads {theirs}, gap {gap} exceeds one double's spacing {}",
+                    spacing(theirs)
+                );
+
+                // **Backwards**: and `to_jd` returns what was asked for.
+                let ours = to_jd(w.lo(), scale).expect("exact");
+                let ours_f: f64 = ours
+                    // The oracle compares against an `f64`, whose spacing
+                    // here is ~2 µs — coarser than any two of the four modes
+                    // could differ by. There is no caller to take a mode from.
+                    .to_decimal_string(9, ucal_core::Rounding::HalfEven) // ucal-lint-allow(rounding-is-declared)
+                    .expect("rendered")
+                    .parse()
+                    .expect("a number");
+                let gap = (ours_f - theirs).abs();
+                assert!(
+                    gap <= spacing(theirs),
+                    "backwards {scale:?} at J2000{days:+}: ours {ours_f}, \
+                     hifitime {theirs}, gap {gap}"
+                );
+                checked += 1;
+            }
+        }
+        assert_eq!(checked, 16, "the sweep stopped early");
+    }
+
+    /// And the epoch itself, which is the one value with a defined answer.
+    ///
+    /// J2000.0 **is** JD 2451545.0 TT by definition, so this is the one case
+    /// where the oracle is not the authority — the definition is, and both must
+    /// meet it.
+    #[test]
+    fn both_implementations_put_j2000_at_2451545() {
+        let theirs =
+            hifitime_jd(&j2000().expect("epoch"), JdScale::Tt).expect("the oracle answers");
+        assert!(
+            (theirs - 2_451_545.0).abs() <= spacing(2_451_545.0),
+            "hifitime puts J2000 at {theirs}"
+        );
+    }
+}
+// ucal-lint-allow-end(float-free)
+
 #[cfg(test)]
 mod tests {
     use super::*;

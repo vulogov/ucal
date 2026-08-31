@@ -33,6 +33,7 @@ shows what they *look like*.
 - [Global options](#global-options)
 - [Reading a timestamp](#reading-a-timestamp)
 - [Exit codes](#exit-codes)
+- [Consuming this from another language](INTEROP.md)
 - Commands: [`now`](#ucal-now) · [`datum`](#ucal-datum) ·
   [`explain`](#ucal-explain) · [`between`](#ucal-between) ·
   [`from-civil`](#ucal-from-civil) ·
