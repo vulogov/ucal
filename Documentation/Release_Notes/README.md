@@ -223,4 +223,17 @@ one-line version and links to it.
     A comparison that could not be performed is reported as `--` and exits 5,
     not 0. A check that could not run has not passed.
 
-13. Open the next file.
+13. `cargo run -p xtask -- check-releases`, which asks the world whether the
+    row you are about to write is true.
+
+    Tag on the remote, GitHub release, and every crate on the registry, for
+    every version the Contents table marks `released`. It runs daily on a
+    schedule and opens an issue on failure, for the reason `check-links` does —
+    but running it here closes the gap it exists for, which is the hours between
+    writing `released` and it becoming so.
+
+    **1.10.0's row said `released` and 1.10.0 existed nowhere.** Nothing noticed
+    for three days and nothing would have: every other check in this tree reads
+    files that are in it.
+
+14. Open the next file.

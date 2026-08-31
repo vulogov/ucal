@@ -669,6 +669,12 @@ Write a shipped calendar out as the §15.1 body file that declares it — HJSON 
 stdout, because a generator's output is an input to something else, here
 `cal validate` and `cal derive`.
 
+`--json` does not apply: the output is a body file, and a document would not
+round-trip into `cal derive`. Like [`seq`](#ucal-seq), [`man`](#ucal-man) and
+[`completions`](#ucal-completions), this command contributes nothing to the
+`ucal-json/1` surface, and since 1.12.0 a check requires it to say so rather
+than leaving a deliberate absence indistinguishable from an oversight.
+
 ```
 ucal cal export mars > mars.hjson
 ucal cal validate mars.hjson
