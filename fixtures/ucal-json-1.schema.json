@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/vulogov/ucal/blob/main/fixtures/ucal-json-1.schema.json",
   "title": "ucal-json/1",
-  "description": "Generated from fixtures/json-surface.txt by `cargo run -p xtask -- gen-schema`; do not edit. 487 field paths across 31 commands. `--json` output is per-command: validate `ucal datum --json` against #/$defs/datum. Every object permits additional properties, because ucal-json/1 promises that new fields may appear and existing ones never change name, shape or meaning; a consumer must ignore what it does not recognise. Fields shown only under `--bridge` are described but not required. An object whose keys are data - a tier, a body, an event id - is expressed as additionalProperties rather than named properties, so adding one changes no schema.",
+  "description": "Generated from fixtures/json-surface.txt by `cargo run -p xtask -- gen-schema`; do not edit. 531 field paths across 35 commands. `--json` output is per-command: validate `ucal datum --json` against #/$defs/datum. Every object permits additional properties, because ucal-json/1 promises that new fields may appear and existing ones never change name, shape or meaning; a consumer must ignore what it does not recognise. Fields shown only under `--bridge` are described but not required. An object whose keys are data - a tier, a body, an event id - is expressed as additionalProperties rather than named properties, so adding one changes no schema.",
   "$defs": {
     "add": {
       "type": "object",
@@ -615,6 +615,38 @@
       },
       "additionalProperties": true
     },
+    "dilate": {
+      "type": "object",
+      "properties": {
+        "coordinate_per_proper": {
+          "type": "object",
+          "properties": {
+            "hi": { "type": "string" },
+            "lo": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "digits": { "type": "string" },
+        "proper_per_coordinate": {
+          "type": "object",
+          "properties": {
+            "hi": { "type": "string" },
+            "lo": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "redshift_z": {
+          "type": "object",
+          "properties": {
+            "hi": { "type": "string" },
+            "lo": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "rs_over_r": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
     "doctor": {
       "type": "object",
       "properties": {
@@ -666,6 +698,84 @@
               "items": { "type": "string" }
             },
             "rfc": { "type": "string" }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "ephem-at": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "prediction": {
+          "type": "object",
+          "properties": {
+            "centre_ticks": { "type": "string" },
+            "cycle": { "type": "string" },
+            "half_width_ticks": { "type": "string" },
+            "hi": { "type": "string" },
+            "lo": { "type": "string" },
+            "sigmas": { "type": "string" }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "ephem-next": {
+      "type": "object",
+      "properties": {
+        "after": { "type": "string" },
+        "id": { "type": "string" },
+        "position": {
+          "type": "object",
+          "properties": {
+            "cycle": { "type": "string" },
+            "phase": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "upcoming": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "centre_ticks": { "type": "string" },
+              "cycle": { "type": "string" },
+              "half_width_ticks": { "type": "string" },
+              "hi": { "type": "string" },
+              "lo": { "type": "string" },
+              "sigmas": { "type": "string" }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "ephem-show": {
+      "type": "object",
+      "properties": {
+        "citation": { "type": "string" },
+        "epoch": {
+          "type": "object",
+          "properties": {
+            "sigma_ticks": { "type": "string" },
+            "ticks": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "fitted_cycles": { "type": "string" },
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "period": {
+          "type": "object",
+          "properties": {
+            "as_published": { "type": "string" },
+            "days": { "type": "string" },
+            "pdot": { "type": "string" },
+            "sigma_days": { "type": "string" }
           },
           "additionalProperties": true
         }

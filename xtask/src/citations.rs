@@ -417,6 +417,7 @@ const NOT_A_DOCUMENT: &[(&str, &str)] = &[
     ("cal", "a parent; its subcommands contribute under their own names"),
     ("cosmo", "a parent; its subcommands contribute under their own names"),
     ("events", "a parent; its subcommands contribute under their own names"),
+    ("ephem", "a parent; its subcommands contribute under their own names"),
     ("completions", "emits a shell script, which is not a document"),
     ("man", "emits roff, which is not a document"),
     (
@@ -476,6 +477,7 @@ pub fn check_json_surface_covers_commands(root: &Path) -> Result<usize, Vec<Stri
         ("cal", "enum CalCommand {"),
         ("events", "enum EventCommand {"),
         ("cosmo", "enum CosmoCommand {"),
+        ("ephem", "enum EphemCommand {"),
     ] {
         for sub in variants(&src, enum_name) {
             wanted.push(format!("{parent}-{sub}"));

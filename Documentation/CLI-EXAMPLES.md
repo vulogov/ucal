@@ -952,6 +952,82 @@ it. It is not a measurement of the universe — it is what this parameter set
 implies, with the parameter set's own uncertainty carried through (Rule X).
 ```
 
+## `ucal dilate --rs-over-r 0.0000042467 --show 18`
+
+The Sun's surface, bracketed to eighteen places by integer square roots. `f64` computing the same redshift keeps about eight of its sixteen digits, because `1/sqrt(1-x) - 1` in the weak field subtracts two numbers that agree to six places. The interval is proved to contain the value rather than converged to it.
+
+```
+ucal dilate
+───────────
+rs_over_r  42467/10000000000
+digits     40
+proper_per_coordinate:
+  lo  0.999997876647745687
+  hi  0.999997876647745688
+coordinate_per_proper:
+  lo  1.000002123356762946
+  hi  1.000002123356762947
+redshift_z:
+  lo  0.000002123356762946
+  hi  0.000002123356762947
+certification:
+  rounded, trunc, 18 digits  lo
+  rounded, ceil, 18 digits   hi
+  every other number above is exact: the digits shown are the value
+
+Certified, not iterated: the two ends use `isqrt_floor` and `isqrt_ceil`, so
+the interval is **proved** to contain the value rather than converged to it.
+The same standard `cosmo` holds its quadrature to.
+
+Exactness earns its keep at the two ends, not in the middle. `z = 1/√(1−x) − 1`
+in `f64` keeps about 8 of its 16 digits at the Sun's surface and about 1 just
+outside a horizon, both to cancellation; a neutron star at r_s/r = 0.35 is
+where a double does best. The solar and white-dwarf redshifts are measured
+quantities, and they sit in the band where the float has already lost half its
+digits.
+
+This is the ratio between two clocks and not a claim that either is the one
+`ucal` keeps. Tick 0 is the FLRW t→0 limit, so absolute time here is a
+cosmological coordinate; giving UC-1 a stated frame is a 2.0 question, because
+one unsigned integer per instant asserts there is one time.
+```
+
+## `ucal ephem at Documentation/examples/ephemeris.hjson --cycle 5000`
+
+A prediction five thousand cycles past a fit that covers five hundred. The window is the answer — it has grown from 7.5 s at the epoch to 164 s here — and `UCAL-W0003` says the fit does not reach this far. The figures in that file are illustrative and cite nothing, which it states.
+
+```
+ucal ephem at
+─────────────
+id  example
+prediction:
+  cycle             5000
+  centre_ticks      807020520386767765210871024949775188053046613931655883789062
+                    4
+  lo                807020520386767460398120255424865432871303364528914287047265
+                    0
+  hi                807020520386768070023621794474684943234789863334397480530860
+                    0
+  half_width_ticks  3048127507695249097551817432494027415967417974
+  sigmas            1
+
+The window is what the answer is. `half_width_ticks` is `k·√(σ_T₀² +
+(E·σ_P)²)`, so a prediction far from the epoch is wider than one near it —
+which is the quantity that decides whether an observation is worth scheduling,
+and the one most tooling drops.
+
+UCAL-W0003: body parameter evaluated outside its validity window. Rule C makes
+a parameter valid over a stated interval and forbids silent extrapolation, so
+this instant lies outside the window at least one of this body's figures was
+published for. The fields above are computed from the values at the epoch — see
+`ucal cal show <id>` for the windows themselves
+
+Cycle 5000 is outside the range this fit covers (-500 .. 500). Rule C requires
+the warning and forbids extrapolating silently; it does not forbid
+extrapolating, because that is what a reader is going to do and the useful
+thing is to say how far out they have gone.
+```
+
 ## `ucal verify`
 
 The binary re-deriving the constants it ships with, and saying plainly that agreeing with itself is not verification.

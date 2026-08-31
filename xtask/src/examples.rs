@@ -120,6 +120,14 @@ fn examples() -> Vec<Example> {
             why: "A certified enclosure by integer quadrature. Depth 8 keeps this example fast; `CLI.md` has the cost table.",
         },
         Example {
+            args: &["dilate", "--rs-over-r", "0.0000042467", "--show", "18"],
+            why: "The Sun's surface, bracketed to eighteen places by integer square roots. `f64` computing the same redshift keeps about eight of its sixteen digits, because `1/sqrt(1-x) - 1` in the weak field subtracts two numbers that agree to six places. The interval is proved to contain the value rather than converged to it.",
+        },
+        Example {
+            args: &["ephem", "at", "Documentation/examples/ephemeris.hjson", "--cycle", "5000"],
+            why: "A prediction five thousand cycles past a fit that covers five hundred. The window is the answer — it has grown from 7.5 s at the epoch to 164 s here — and `UCAL-W0003` says the fit does not reach this far. The figures in that file are illustrative and cite nothing, which it states.",
+        },
+        Example {
             args: &["verify"],
             why: "The binary re-deriving the constants it ships with, and saying plainly that agreeing with itself is not verification.",
         },

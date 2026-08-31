@@ -43,6 +43,8 @@ extern crate alloc;
 // backend guard in `ucal-core` fails a bad combination with one sentence, and
 // an unsupported combination that fails with twenty errors is unsupported by
 // accident rather than by design.
+pub mod ephem;
+
 #[cfg(not(feature = "alloc"))]
 compile_error!(
     "this crate requires the `alloc` feature. `ucal-core` builds without an \

@@ -26,6 +26,10 @@ pub mod body_file;
 pub mod emit;
 #[cfg(feature = "body")]
 pub mod body_export;
+/// B — declaring an ephemeris in a file. Needs `events` for the type and
+/// `civil` for the Julian Date the epoch is stated as.
+#[cfg(all(feature = "events", feature = "civil"))]
+pub mod ephem_file;
 pub mod clock;
 pub mod style;
 pub mod table;
@@ -1243,6 +1247,240 @@ pub fn cmd_from_civil(date: &str, scale: Scale, cal: CivilCalendar) -> CmdResult
                 ),
             ]),
         ))
+}
+
+/// `ucal dilate` — gravitational time dilation, certified.
+///
+/// The ratio may be a decimal or a fraction: `0.5` and `1/2` are the same
+/// input, and a fraction is often how `r_s/r` is actually known.
+#[cfg(feature = "cosmo")]
+pub fn cmd_dilate(ratio: &str, digits: u32, render: u32) -> CmdResult {
+    let x = match ratio.split_once('/') {
+        Some((n, d)) => {
+            let parse = |v: &str| {
+                <Ticks as TickInt>::from_dec_str(v.trim()).ok_or_else(|| {
+                    TimeError::with_context(
+                        Code::E0001,
+                        "a fraction is two whole numbers, like `1/2`",
+                    )
+                })
+            };
+            Ratio::new(parse(n)?, parse(d)?)?
+        }
+        None => Ratio::from_decimal_str(ratio).map_err(|_| {
+            TimeError::with_context(
+                Code::E0001,
+                "r_s/r is a dimensionless number in [0, 1). Give it as a decimal \
+                 like `0.35`, or as a fraction like `1/2`",
+            )
+        })?,
+    };
+    let d = ucal_cosmo::dilate::schwarzschild(&x, digits)?;
+    let pair = |i: &ucal_core::num::RatInterval| -> Value {
+        Value::Section(vec![
+            ("lo".into(), Value::quantity(i.lo(), render, Rounding::Trunc)),
+            ("hi".into(), Value::quantity(i.hi(), render, Rounding::Ceil)),
+        ])
+    };
+    Ok(Doc::new()
+        .title("ucal dilate")
+        .field("rs_over_r", Value::text(d.ratio.to_ratio_string()))
+        .field("digits", Value::number(d.digits.to_string()))
+        .field("proper_per_coordinate", pair(&d.factor))
+        .field("coordinate_per_proper", pair(&d.inverse))
+        .field("redshift_z", pair(&d.redshift))
+        .note(
+            "Certified, not iterated: the two ends use `isqrt_floor` and \
+             `isqrt_ceil`, so the interval is **proved** to contain the value \
+             rather than converged to it. The same standard `cosmo` holds its \
+             quadrature to.",
+        )
+        .note(
+            "Exactness earns its keep at the two ends, not in the middle. \
+             `z = 1/√(1−x) − 1` in `f64` keeps about 8 of its 16 digits at the \
+             Sun's surface and about 1 just outside a horizon, both to \
+             cancellation; a neutron star at r_s/r = 0.35 is where a double does \
+             best. The solar and white-dwarf redshifts are measured quantities, \
+             and they sit in the band where the float has already lost half its \
+             digits.",
+        )
+        .note(
+            "This is the ratio between two clocks and not a claim that either is \
+             the one `ucal` keeps. Tick 0 is the FLRW t→0 limit, so absolute \
+             time here is a cosmological coordinate; giving UC-1 a stated frame \
+             is a 2.0 question, because one unsigned integer per instant asserts \
+             there is one time.",
+        ))
+}
+
+/// The ephemeris named by a path, loaded and reported (B).
+#[cfg(all(feature = "events", feature = "civil"))]
+fn ephem_of(path: &str) -> Result<ucal_events::ephem::Ephemeris, TimeError> {
+    let text = std::fs::read_to_string(path).map_err(|e| {
+        TimeError::with_context(
+            Code::E0001,
+            body_file::leak(format!("cannot read `{path}`: {e}")),
+        )
+    })?;
+    ephem_file::load(&text)
+}
+
+/// One prediction, as a section.
+#[cfg(all(feature = "events", feature = "civil"))]
+fn prediction_rows(p: &ucal_events::ephem::Prediction) -> Vec<(String, Value)> {
+    vec![
+        ("cycle".into(), Value::number(p.cycle.to_string())),
+        (
+            "centre_ticks".into(),
+            Value::number(
+                p.window
+                    .lo()
+                    .ticks()
+                    .clone()
+                    .try_add(p.sigma.ticks())
+                    .map(|v| v.to_dec_string())
+                    .unwrap_or_default(),
+            ),
+        ),
+        ("lo".into(), Value::number(p.window.lo().ticks().to_dec_string())),
+        ("hi".into(), Value::number(p.window.hi().ticks().to_dec_string())),
+        (
+            "half_width_ticks".into(),
+            Value::number(p.sigma.ticks().to_dec_string()),
+        ),
+        ("sigmas".into(), Value::number(p.k.to_string())),
+    ]
+}
+
+/// `ucal ephem show` — the declaration, as loaded.
+#[cfg(all(feature = "events", feature = "civil"))]
+pub fn cmd_ephem_show(path: &str) -> CmdResult {
+    let e = ephem_of(path)?;
+    let day = UC1::bridge()
+        .ticks
+        .try_mul(&<Ticks as TickInt>::from_u64(86_400))
+        .ok_or_else(|| TimeError::new(Code::E0021))?;
+    let in_days = |r: &Ratio| -> Value {
+        match r.div(&Ratio::from_int(day.clone())) {
+            Ok(v) => Value::quantity(&v, 9, Rounding::HalfEven),
+            Err(_) => Value::text("out of range"),
+        }
+    };
+    Ok(Doc::new()
+        .title("ucal ephem show")
+        .field("id", Value::text(e.id()))
+        .field("label", Value::text(e.label()))
+        .field(
+            "epoch",
+            Value::Section(vec![
+                ("ticks".into(), Value::number(e.epoch().ticks().to_dec_string())),
+                (
+                    "sigma_ticks".into(),
+                    Value::number(e.epoch_sigma().ticks().to_dec_string()),
+                ),
+            ]),
+        )
+        .field(
+            "period",
+            Value::Section(vec![
+                ("as_published".into(), Value::text(e.as_published())),
+                ("days".into(), in_days(e.period())),
+                ("sigma_days".into(), in_days(e.period_sigma())),
+                (
+                    "pdot".into(),
+                    Value::quantity(e.pdot(), 12, Rounding::HalfEven),
+                ),
+            ]),
+        )
+        .field(
+            "fitted_cycles",
+            Value::text(format!("{} .. {}", e.fitted().0, e.fitted().1)),
+        )
+        .field("citation", Value::text(e.citation().source))
+        .note(
+            "The uncertainties are the source's own. This project carries an \
+             uncertainty when it is cited and never when it is inferred, which \
+             is why `ucal-body`'s parameters have none: the planetary sources do \
+             not uniformly publish one, and a fabricated σ is worse than an \
+             absent one.",
+        ))
+}
+
+/// `ucal ephem at` — the window for one cycle.
+#[cfg(all(feature = "events", feature = "civil"))]
+pub fn cmd_ephem_at(path: &str, cycle: i64, sigmas: u32) -> CmdResult {
+    let e = ephem_of(path)?;
+    let p = e.time_of(cycle, sigmas)?;
+    let mut doc = Doc::new()
+        .title("ucal ephem at")
+        .field("id", Value::text(e.id()))
+        .field("prediction", Value::Section(prediction_rows(&p)))
+        .note(
+            "The window is what the answer is. `half_width_ticks` is \
+             `k·√(σ_T₀² + (E·σ_P)²)`, so a prediction far from the epoch is \
+             wider than one near it — which is the quantity that decides whether \
+             an observation is worth scheduling, and the one most tooling drops.",
+        );
+    if let Some(w) = p.warning {
+        doc = doc.note(window_note(w));
+        doc = doc.note(format!(
+            "Cycle {} is outside the range this fit covers ({} .. {}). Rule C \
+             requires the warning and forbids extrapolating silently; it does \
+             not forbid extrapolating, because that is what a reader is going to \
+             do and the useful thing is to say how far out they have gone.",
+            cycle,
+            e.fitted().0,
+            e.fitted().1
+        ));
+    }
+    Ok(doc)
+}
+
+/// `ucal ephem next` — the coming events after an instant.
+#[cfg(all(feature = "events", feature = "civil"))]
+pub fn cmd_ephem_next(path: &str, after: &str, sigmas: u32, count: u32) -> CmdResult {
+    let e = ephem_of(path)?;
+    let (t, _) = parse_instant(after)?;
+    let (now_cycle, phase) = e.cycle_at(&t)?;
+    let ups = e.upcoming(&t, sigmas, count.max(1))?;
+
+    let rows: Vec<(String, Value)> = ups
+        .iter()
+        .map(|p| {
+            (
+                p.cycle.to_string(),
+                Value::Section(prediction_rows(p)),
+            )
+        })
+        .collect();
+    let outside = ups.iter().filter(|p| p.warning.is_some()).count();
+
+    let mut doc = Doc::new()
+        .title("ucal ephem next")
+        .field("id", Value::text(e.id()))
+        .field("after", Value::number(t.ticks().to_dec_string()))
+        .field(
+            "position",
+            Value::Section(vec![
+                ("cycle".into(), Value::number(now_cycle.to_string())),
+                (
+                    "phase".into(),
+                    Value::quantity(&phase, 6, Rounding::Trunc),
+                ),
+            ]),
+        )
+        .field("upcoming", Value::rows("cycle", rows));
+    if outside > 0 {
+        doc = doc.note(format!(
+            "{outside} of these lie outside the cycle range this fit covers \
+             ({} .. {}), and carry `UCAL-W0003`. The window grows with distance \
+             from the epoch whether or not the fit reaches that far; the warning \
+             is about the *fit*, and the width is about the arithmetic.",
+            e.fitted().0,
+            e.fitted().1
+        ));
+    }
+    Ok(doc)
 }
 
 /// `ucal from-jd` — a Julian Date, in a named scale, as absolute time (A1).

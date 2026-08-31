@@ -161,8 +161,21 @@ fn all_commands() -> Vec<(&'static str, Doc)> {
         let g = ucal::wallclock::Face::of(ucal::parse_instant(T).unwrap().0, &d).unwrap();
         v.push(("wallclock-full", ucal::cmd_wallclock_json(&g, "plain").unwrap()));
     }
+    #[cfg(all(feature = "events", feature = "civil"))]
+    {
+        // B — an ephemeris file, and the certified dilation beside it. The path
+        // is relative to this crate, the way the body-file invocations are.
+        const EPH: &str = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../Documentation/examples/ephemeris.hjson"
+        );
+        v.push(("ephem show", ucal::cmd_ephem_show(EPH).unwrap()));
+        v.push(("ephem at", ucal::cmd_ephem_at(EPH, 5000, 3).unwrap()));
+        v.push(("ephem next", ucal::cmd_ephem_next(EPH, T, 3, 2).unwrap()));
+    }
     #[cfg(feature = "cosmo")]
     {
+        v.push(("dilate", ucal::cmd_dilate("0.35", 40, 18).unwrap()));
         v.push(("cosmo model", ucal::cmd_cosmo_model().unwrap()));
         v.push(("cosmo age", ucal::cmd_cosmo_age("1100", 4, 8).unwrap()));
         v.push((

@@ -1094,6 +1094,126 @@ ucal ruler --from <INSTANT> --to <INSTANT> --step <TIER>
 
 ---
 
+## `ucal ephem`
+
+```
+ucal ephem show <FILE>
+ucal ephem at   <FILE> --cycle <E> [--sigmas <K>]
+ucal ephem next <FILE> [--after <T>] [--sigmas <K>] [--count <N>]
+```
+
+A published linear ephemeris, **carrying the uncertainty it was published with**.
+
+Nearly every repeating astronomical event is published as `T(E) = T₀ + E·P`, and
+the useful answer is not `T(E)`. It is the window `± k·√(σ_T₀² + (E·σ_P)²)`,
+because that is what decides whether an observation is worth scheduling. Most
+tooling computes the centre and drops the width, so an observer books thirty
+minutes for an event predicted to ±forty.
+
+```
+ucal ephem show Documentation/examples/ephemeris.hjson
+ucal ephem at   Documentation/examples/ephemeris.hjson --cycle 5000
+ucal ephem next Documentation/examples/ephemeris.hjson --after now --count 5
+```
+
+**The window grows, and that is the feature.** On the example file the half-width
+runs 7.5 s at the epoch, 34 s at cycle 1000, and 164 s at cycle 5000.
+
+**`UCAL-W0003` when the cycle is outside the fitted range.** `fitted_cycles` is
+required in the file, because it is the only field that makes the warning mean
+anything — without it every extrapolation looks exactly like an interpolation.
+Rule C forbids extrapolating *silently*, not extrapolating: a reader is going to
+do it, and the useful thing is to say how far out they have gone.
+
+| field | meaning |
+|---|---|
+| `epoch.ticks` / `epoch.sigma_ticks` | `T₀` and its published 1σ. A `tdb` epoch's own ±1.7 ms is added to σ rather than reported as if it were the source's measurement. |
+| `period.as_published` | The period exactly as the source printed it (Rule Y.1). |
+| `period.days` / `period.sigma_days` | `P` and its published 1σ, converted to days for reading. The tick value is what the arithmetic uses. |
+| `after` | The instant `next` counted from, echoed so the answer carries its own question. |
+| `period.pdot` | `Ṗ`, dimensionless. Acts through `E²`, so it pushes past and future cycles the same way. |
+| `fitted_cycles` | The range the published fit covers. |
+| `prediction.centre_ticks` | The predicted instant. |
+| `prediction.half_width_ticks` | `k·√(σ_T₀² + (E·σ_P)²)`. **The answer.** |
+| `prediction.sigmas` | The `k` asked for. `1` is the published uncertainty; observers usually want `3`. |
+| `position.cycle` / `position.phase` | Where `--after` falls. |
+| `upcoming.<cycle>` | One row per coming event. |
+
+**Quadrature assumes independence.** From a joint fit `σ_T₀` and `σ_P` are
+correlated and the covariance is usually not published; the convention of placing
+`T₀` near the centre of the data span exists precisely to minimise it. Where a
+source states a covariance, this is an underestimate and the source's window
+should be used instead.
+
+**This release ships no ephemerides**, and the reason is Rule C rather than
+effort. A shipped one must quote `T₀`, `P` and both σ verbatim from a paper, and
+a figure typed from memory is the defect `cal validate` found in this project's
+own `europa.hjson`. [`ephemeris.hjson`](examples/ephemeris.hjson) is a **format
+example whose figures are illustrative and cite nothing**, and it says so.
+
+---
+
+## `ucal dilate`
+
+```
+ucal dilate --rs-over-r <X> [--digits <N>] [--show <N>]
+```
+
+Gravitational time dilation at a radius, as a **certified** interval:
+
+```
+dτ/dt = √(1 − r_s/r)          proper time per unit coordinate time
+z     = 1/√(1 − r_s/r) − 1    the gravitational redshift
+```
+
+Bracketed by `isqrt_floor` and `isqrt_ceil` in exact rationals — **proved** to
+contain the value, not converged to it. `--rs-over-r` takes a decimal or a
+fraction; `1/2` and `0.5` are the same input.
+
+```
+ucal dilate --rs-over-r 0.0000042467      # the Sun's surface
+ucal dilate --rs-over-r 0.35              # a neutron star
+ucal dilate --rs-over-r 999999/1000000    # just outside a horizon
+```
+
+**Exactness earns its keep at the two ends, not in the middle.** Computing
+`z = 1/√(1−x) − 1` in `f64`, against the exact value:
+
+| | `r_s/r` | correct digits in `f64` |
+|---|---|---|
+| the Sun | 4.25 × 10⁻⁶ | **~8** of 16 |
+| Sirius B, a white dwarf | 1.15 × 10⁻⁴ | ~11 |
+| a neutron star | 0.35 | ~14 |
+| just outside a horizon | 0.999999 | **~1** |
+
+In the weak field `1/√(1−x)` is a hair above 1 and subtracting 1 throws away half
+the mantissa; near the horizon `1 − x` is itself the cancellation. The neutron
+star — the case that *sounds* like it needs care — is where a double does best.
+So this is **not only a black-hole tool**: the solar gravitational redshift is a
+measured quantity, white dwarf redshifts are how their masses are checked, and
+both sit where `f64` has already lost half its digits.
+
+| field | meaning |
+|---|---|
+| `rs_over_r` | The input, as an exact fraction. |
+| `digits` | Places the bracketing was carried to. Cost is quadratic in this. |
+| `proper_per_coordinate` | `√(1 − r_s/r)`, as `lo`/`hi`. |
+| `coordinate_per_proper` | Its reciprocal. |
+| `redshift_z` | `1/√(1 − r_s/r) − 1`. |
+
+**`r_s/r ≥ 1` is refused.** At `r = r_s` the factor is zero, and inside, the
+Schwarzschild radial coordinate is not a clock at all — the coordinate that was
+time outside the horizon is not time inside it. That is a change in what the
+question means, not a larger number.
+
+**It reports a ratio between two clocks and does not claim either is the one
+`ucal` keeps.** Tick 0 is the FLRW `t → 0` limit, so absolute time here is a
+cosmological coordinate. Giving `UC-1` a stated frame is a 2.0 question, because
+one unsigned integer per instant asserts there is one time — which is the thing
+general relativity denies.
+
+---
+
 ## `ucal cosmo`
 
 Flat ΛCDM, by certified integer quadrature (§10). No floating point anywhere:
