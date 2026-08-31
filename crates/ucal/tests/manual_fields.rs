@@ -86,6 +86,16 @@ fn all_commands() -> Vec<(&'static str, Doc)> {
             concat!(env!("CARGO_MANIFEST_DIR"), "/../../Documentation/examples/earth.hjson"),
             Some(concat!(env!("CARGO_MANIFEST_DIR"), "/../../Documentation/examples/earth-anchor.hjson")),
         ).unwrap()));
+        // A1 — the JD converters emit documents like any other command, and
+        // R3's check caught their absence from this list the day they were
+        // written, which is the answer to whether it was worth building.
+        v.push(("from jd", ucal::cmd_from_jd("2451545.0", "tt", false).unwrap()));
+        v.push(("from jd", ucal::cmd_from_jd("2460000.5", "tdb", false).unwrap()));
+        v.push(("to jd", ucal::cmd_to_jd(T, "tt", false, 6).unwrap()));
+        // And with `--mjd`, because the field is named for the flag: a list that
+        // only ever passes `false` documents a field no command emits, which is
+        // what `manual_fields` reported the first time this was added.
+        v.push(("to jd", ucal::cmd_to_jd(T, "tt", true, 6).unwrap()));
         v.push(("cal from", ucal::cmd_cal_from("mars-d", "82-83").unwrap()));
         v.push((
             "add",

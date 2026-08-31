@@ -1245,6 +1245,106 @@ pub fn cmd_from_civil(date: &str, scale: Scale, cal: CivilCalendar) -> CmdResult
         ))
 }
 
+/// `ucal from-jd` — a Julian Date, in a named scale, as absolute time (A1).
+///
+/// **The scale is mandatory.** Every cited parameter in this project is indexed
+/// by JD in its source and J2000.0 *is* JD 2451545.0 TT, so this closes the loop
+/// that made checking a shipped figure against its paper a hand operation.
+///
+/// `TT` and `TAI` convert exactly and the window has zero width. `TDB` reports
+/// the ±1.7 ms bound on a series this project does not evaluate, because Rule E
+/// forbids the float that would evaluate it and a centre without its width would
+/// claim a precision that is not there.
+#[cfg(feature = "civil")]
+pub fn cmd_from_jd(value: &str, scale: &str, mjd: bool) -> CmdResult {
+    use ucal_civil::jd;
+    let scale = jd::JdScale::parse(scale)?;
+    let given = Ratio::from_decimal_str(value).map_err(|_| {
+        TimeError::with_context(
+            Code::E0001,
+            "a Julian Date is a decimal number of days, like `2451545.0`",
+        )
+    })?;
+    let as_jd = if mjd { jd::mjd_to_jd(&given)? } else { given.clone() };
+    let w = jd::from_jd(&as_jd, scale)?;
+
+    let exact = w.lo().ticks() == w.hi().ticks();
+    let mut doc = instant_doc("ucal from-jd", w.lo())
+        .field(
+            "input",
+            Value::Section(vec![
+                (
+                    if mjd { "mjd".into() } else { "jd".into() },
+                    Value::text(value),
+                ),
+                ("jd".into(), Value::text(as_jd.to_ratio_string())),
+                ("scale".into(), Value::text(scale.key())),
+            ]),
+        );
+    if !exact {
+        doc = doc
+            .field(
+                "window",
+                Value::Section(vec![
+                    ("lo".into(), Value::number(w.lo().ticks().to_dec_string())),
+                    ("hi".into(), Value::number(w.hi().ticks().to_dec_string())),
+                    (
+                        "width_ticks".into(),
+                        Value::number(w.width().ticks().to_dec_string()),
+                    ),
+                ]),
+            )
+            .note(
+                "`ticks` above is the low end. TDB differs from TT by a periodic \
+                 series whose evaluation needs floating point, which Rule E \
+                 forbids in a shipped crate — so the answer carries the series' \
+                 bound of ±1.7 ms instead of a centre that would look exact. Rule \
+                 U: the window is the value.",
+            );
+    } else {
+        doc = doc.note(
+            "Exact: a Julian day is a whole number of ticks, so nothing here is \
+             rounded. `TT` is the pivot and `TT = TAI + 32.184 s` exactly. The \
+             scale is required and has no default, because a converter that \
+             defaults is silently wrong by 69 seconds whenever it guesses.",
+        );
+    }
+    Ok(doc)
+}
+
+/// `ucal to-jd` — absolute time as a Julian Date, exactly.
+#[cfg(feature = "civil")]
+pub fn cmd_to_jd(input: &str, scale: &str, mjd: bool, digits: u32) -> CmdResult {
+    use ucal_civil::jd;
+    let scale = jd::JdScale::parse(scale)?;
+    let (t, _) = parse_instant(input)?;
+    let value = jd::to_jd(&t, scale)?;
+    let shown = if mjd { jd::jd_to_mjd(&value)? } else { value.clone() };
+
+    let mut doc = Doc::new()
+        .title("ucal to-jd")
+        .field("ticks", Value::number(t.ticks().to_dec_string()))
+        .field("scale", Value::text(scale.key()))
+        .field(
+            if mjd { "mjd" } else { "jd" },
+            Value::quantity(&shown, digits, Rounding::HalfEven),
+        )
+        .field("exact", Value::text(shown.to_ratio_string()));
+    if scale == jd::JdScale::Tdb {
+        doc = doc.note(
+            "This is the **TT** Julian Date. TDB differs from it by a periodic \
+             series bounded by 1.7 ms, which this crate does not evaluate — the \
+             bound is reported beside the value rather than folded into it, \
+             because a rational carrying a bound it cannot express is worse than \
+             one standing next to a statement of what it is.",
+        );
+    }
+    Ok(doc.note(
+        "The rational is exact; the decimal is a rendering and is the only place \
+         a value may be rounded (Rule R).",
+    ))
+}
+
 /// `ucal to-civil <T>` (§19).
 #[cfg(feature = "civil")]
 pub fn cmd_to_civil(

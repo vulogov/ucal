@@ -117,6 +117,41 @@ enum Command {
     },
     /// The datum: what tick 0 is, what is claimed about it, and how it was fixed.
     Datum,
+    /// A Julian Date, in a named scale, as absolute time.
+    ///
+    /// **`--scale` is required and has no default.** A converter that defaults
+    /// is silently wrong by 69 seconds whenever it guesses, and the whole value
+    /// of this command is that the scale is something you typed.
+    ///
+    /// `tt` and `tai` are exact. `tdb` reports the ±1.7 ms bound on a series
+    /// this crate does not evaluate. `utc` and `ut1` are refused, with reasons.
+    #[cfg(feature = "civil")]
+    FromJd {
+        /// The date, as a decimal number of days: `2451545.0`.
+        value: String,
+        /// `tt`, `tai` or `tdb`. Required.
+        #[arg(long)]
+        scale: String,
+        /// Read the value as a Modified Julian Date: `JD - 2400000.5`.
+        #[arg(long)]
+        mjd: bool,
+    },
+    /// Absolute time as a Julian Date, exactly.
+    #[cfg(feature = "civil")]
+    ToJd {
+        /// A `UC1` text form, a UCID, or a decimal tick count.
+        instant: String,
+        /// `tt`, `tai` or `tdb`. Required.
+        #[arg(long)]
+        scale: String,
+        /// Emit a Modified Julian Date instead.
+        #[arg(long)]
+        mjd: bool,
+        /// Fractional digits in the rendered decimal. The exact rational is
+        /// emitted beside it either way.
+        #[arg(long, default_value_t = 6)]
+        digits: u32,
+    },
     /// Convert a civil date to absolute time. Exact or an error, never rounded.
     #[cfg(feature = "civil")]
     FromCivil {
@@ -1005,6 +1040,17 @@ fn main() {
             }
         }
         Command::Now { precision, form } => run_now(&cli.locale, precision, form),
+        #[cfg(feature = "civil")]
+        Command::FromJd { value, scale, mjd } => {
+            ucal::cmd_from_jd(pick(replacement, value), scale, *mjd)
+        }
+        #[cfg(feature = "civil")]
+        Command::ToJd {
+            instant,
+            scale,
+            mjd,
+            digits,
+        } => ucal::cmd_to_jd(pick(replacement, instant), scale, *mjd, *digits),
         #[cfg(feature = "civil")]
         Command::FromCivil {
             date,

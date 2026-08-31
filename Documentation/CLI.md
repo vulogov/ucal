@@ -270,6 +270,80 @@ two absolute instants is not an Earth quantity. `--bridge` converts on request
 
 ---
 
+## `ucal from-jd`
+
+```
+ucal from-jd <VALUE> --scale <tt|tai|tdb> [--mjd]
+```
+
+A Julian Date, in a named scale, as absolute time.
+
+**Every cited parameter in this project is indexed by JD in its source**, and
+J2000.0 — the epoch the body layer hangs on — *is* JD 2451545.0 TT. Until 1.12.0
+checking a shipped figure against the paper it came from was a hand operation.
+
+```
+ucal from-jd 2451545.0 --scale tt        # J2000.0, exactly
+ucal from-jd 51544.5   --scale tt --mjd  # the same instant
+ucal from-jd 2460000.5 --scale tdb       # a window, not a point
+```
+
+**`--scale` is required and has no default.** A converter that defaults is
+silently wrong by 69 seconds whenever it guesses, and the entire value of this
+command is that the scale is something you typed. `TT − TAI` is 32.184 s exactly;
+`TT − UTC` is 69.184 s today and changes without warning.
+
+| | answer |
+|---|---|
+| `--scale tt` | Exact. Terrestrial Time is the pivot. |
+| `--scale tai` | Exact. The same numeral in TAI names an instant 32.184 s later than in TT. |
+| `--scale tdb` | A **window** of ±1.7 ms — the bound on a periodic series this crate does not evaluate. |
+| `--scale utc` | Refused: a UTC day containing a leap second has 86401 s, so `JD(UTC)` is not a uniform day count. Use [`from-civil --scale utc`](#ucal-from-civil), which has the leap table. |
+| `--scale ut1` | Refused: needs ΔUT1, an observed IERS quantity this repository does not carry and Rule C will not let it invent. |
+
+**Why TDB is a window.** The difference from TT is a periodic series whose
+evaluation is floating point, which Rule E forbids in a shipped crate. Reporting
+its centre without its width would claim a precision that is not here, and
+ignoring it would be a 1.7 ms error stated as exact. Rule U: the window is the
+value, and a zero-width window and a ±1.7 ms one are the same kind of answer.
+
+| field | meaning |
+|---|---|
+| `input.jd` | The date as an exact rational, after any `--mjd` offset. |
+| `input.scale` | The scale you named. There is no default. |
+| `window.lo` / `window.hi` / `window.width_ticks` | Present only when the scale is not exact. |
+
+A date needing more decimal places than a tick can express — about 34 — is
+`UCAL-E0043` rather than a rounding.
+
+---
+
+## `ucal to-jd`
+
+```
+ucal to-jd <INSTANT> --scale <tt|tai|tdb> [--mjd] [--digits <N>]
+```
+
+The inverse. A tick count is an integer and a Julian day is a whole number of
+ticks, so the quotient is an exact rational; `exact` carries it and the decimal
+beside it is a rendering (Rule R).
+
+```
+ucal to-jd $(ucal now --json | jq -r .ticks) --scale tt
+```
+
+| field | meaning |
+|---|---|
+| `ticks` | The instant, as given. |
+| `scale` | The scale you named. |
+| `jd` / `mjd` | The date, rendered to `--digits` places. A rendering, and the only place a value may be rounded (Rule R). |
+| `exact` | The same value as an exact rational, which is what the conversion actually produced. |
+
+For `tdb` the value is the **TT** Julian Date, with the ±1.7 ms bound stated
+beside it rather than folded into a number that would then look exact.
+
+---
+
 ## `ucal from-civil`
 
 A civil date to absolute time. Exact, or an error — never rounded.

@@ -1097,6 +1097,54 @@ lossy        false
 warning      UCAL-W0005: value produced by a legacy (non-derived) calendar
 ```
 
+## `ucal from-jd 2451545.0 --scale tt`
+
+J2000.0, the epoch every parameter in this project is stated at, and the first time this program could convert it. `--scale` is required and has no default: a converter that defaults is silently wrong by 69 seconds whenever it guesses.
+
+```
+ucal from-jd
+────────────
+ticks  8070205173569972963515184424835637180530466139316558837890625
+human  UC1 0031·0687·2481·1163·2191·0758:1924·0749·2247·0012·1174·0800·0000·
+       0000·0000·0000·0000·0000
+ucid   0000000000050PM6JSRZ1JEN8CJ8JG0H3SXHYWVS2CY7KBM29FJ1
+input:
+  jd     2451545.0
+  jd     2451545/1
+  scale  tt
+
+Exact: a Julian day is a whole number of ticks, so nothing here is rounded.
+`TT` is the pivot and `TT = TAI + 32.184 s` exactly. The scale is required and
+has no default, because a converter that defaults is silently wrong by 69
+seconds whenever it guesses.
+```
+
+## `ucal from-jd 2460000.5 --scale tdb`
+
+The same conversion in a scale that is not exact. TDB differs from TT by a periodic series whose evaluation needs floating point, which Rule E forbids here — so the answer is a window carrying the series' 1.7 ms bound, rather than a centre that would look exact.
+
+```
+ucal from-jd
+────────────
+ticks  8070205187120737749440984658555873480530466139316558837890625
+human  UC1 0031·0687·2481·2763·1541·0134:0558·2432·0156·0826·0630·0023·0035·
+       0000·0000·0000·0000·0000
+ucid   0000000000050PM6K2TPVFCTBADGEDG60D4QW3N7DZB7MXT29FJ1
+input:
+  jd     2460000.5
+  jd     4920001/2
+  scale  tdb
+window:
+  lo           8070205187120737749440984658555873480530466139316558837890625
+  hi           8070205187120737749504049845515400880530466139316558837890625
+  width_ticks  63065186959527400000000000000000000000000
+
+`ticks` above is the low end. TDB differs from TT by a periodic series whose
+evaluation needs floating point, which Rule E forbids in a shipped crate — so
+the answer carries the series' bound of ±1.7 ms instead of a centre that would
+look exact. Rule U: the window is the value.
+```
+
 ## `ucal from-civil 2026-08-07`
 
 And back. Exact or an error, never rounded.

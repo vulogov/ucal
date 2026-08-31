@@ -262,13 +262,16 @@ pub(crate) fn leak(s: String) -> &'static str {
 }
 
 /// J2000.0, the epoch every shipped parameter is stated at.
+///
+/// **Derived, since A1.** This was a 61-digit literal, and a committed copy of a
+/// value the code can compute is a copy that has started to drift — the finding
+/// P2 made about the book's diagnostics appendix, and `schema.rs` states the
+/// principle about its own artefact. `ucal-civil` now converts a Julian Date,
+/// and J2000.0 *is* JD 2451545.0 TT by definition, so this is that conversion
+/// rather than its remembered result. A test asserts the two agree, which is how
+/// the literal was checked before being removed.
 fn j2000() -> Result<Instant<UC1>> {
-    Instant::from_ticks(
-        <Ticks as TickInt>::from_dec_str(
-            "8070205173569972963515184424835637180530466139316558837890625",
-        )
-        .ok_or(TimeError::new(Code::E0021))?,
-    )
+    ucal_civil::jd::j2000()
 }
 
 /// A window of `± years` Julian years about J2000.0.

@@ -20,6 +20,7 @@ extern crate alloc;
 pub mod bridge;
 pub mod calendar;
 pub mod legacy;
+pub mod jd;
 pub mod leap;
 pub mod rubber;
 pub mod si;

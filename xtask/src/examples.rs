@@ -132,6 +132,14 @@ fn examples() -> Vec<Example> {
             why: "An Earth calendar label. This is an Earth command, so it carries Earth units unasked.",
         },
         Example {
+            args: &["from-jd", "2451545.0", "--scale", "tt"],
+            why: "J2000.0, the epoch every parameter in this project is stated at, and the first time this program could convert it. `--scale` is required and has no default: a converter that defaults is silently wrong by 69 seconds whenever it guesses.",
+        },
+        Example {
+            args: &["from-jd", "2460000.5", "--scale", "tdb"],
+            why: "The same conversion in a scale that is not exact. TDB differs from TT by a periodic series whose evaluation needs floating point, which Rule E forbids here — so the answer is a window carrying the series' 1.7 ms bound, rather than a centre that would look exact.",
+        },
+        Example {
             args: &["from-civil", "2026-08-07"],
             why: "And back. Exact or an error, never rounded.",
         },
