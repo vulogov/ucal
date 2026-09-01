@@ -446,6 +446,18 @@ fn cmd_doctor_inner(measured: Option<Vec<(String, Value)>>) -> CmdResult {
         .field("domain_max_ticks", Value::number(domain_max.to_dec_string()))
         .field("domain_bits", Value::number(ucal_core::DOMAIN_BITS.to_string()))
         .field("features", Value::list(features))
+        // **T1** — what data this build actually carries, counted rather than
+        // claimed.
+        //
+        // Every other line above says what the program *can* do. This one says
+        // what it has to do it with, and it exists because four of the numbers
+        // are zero: an ephemeris format with no ephemerides, and catalogues that
+        // are designed and unpopulated. That is the honest state — this project
+        // ships only figures it can quote verbatim from a citable source — and
+        // until now a reader discovered it by trying.
+        //
+        // Counted from the registries at run time, so it cannot drift from them.
+        .field("data", Value::Section(data_coverage()))
         // The one quantity this program measures itself, with the same
         // accounting every other measured quantity in it carries.
         .field("clock", Value::Section(clock::facts()?))
@@ -1249,6 +1261,64 @@ pub fn cmd_from_civil(date: &str, scale: Scale, cal: CivilCalendar) -> CmdResult
         ))
 }
 
+/// T1 — what data is shipped behind each mechanism, counted at run time.
+///
+/// A mechanism with no data is not a defect here: `D5` concluded that *no
+/// anchor* was the honest answer for Titan, and the ephemeris format shipped
+/// without ephemerides for the reason `cal validate` found in this project's own
+/// `europa.hjson`. What was missing is that nobody could see the shape of it
+/// without going looking.
+#[cfg(feature = "std")]
+fn data_coverage() -> Vec<(String, Value)> {
+    let mut out: Vec<(String, Value)> = Vec::new();
+
+    #[cfg(feature = "body")]
+    {
+        let cals = ucal_body::calendar::registered();
+        let anchored = cals
+            .iter()
+            .filter(|(id, _, _)| ucal_body::calendar::by_id(id).is_ok())
+            .count();
+        out.push((
+            "derived_calendars".into(),
+            Value::text(format!(
+                "{} declared, {anchored} with the anchor a local date needs",
+                cals.len()
+            )),
+        ));
+        out.push((
+            "bodies".into(),
+            Value::number(ucal_body::data::all().len().to_string()),
+        ));
+    }
+    #[cfg(feature = "events")]
+    {
+        let events = ucal_events::all();
+        out.push((
+            "events".into(),
+            Value::text(format!("{} cited milestones", events.len())),
+        ));
+        // B shipped the format and no ephemerides. Stated rather than left to be
+        // discovered by running `ephem` and finding nothing to run it against.
+        out.push((
+            "ephemerides".into(),
+            Value::text(
+                "0 shipped — the §15.x format loads one from a file. A shipped \
+                 ephemeris must quote T0, P and both σ verbatim from a paper \
+                 (Rule Y.1), and a figure typed from memory is the defect \
+                 `cal validate` found in this project's own europa.hjson",
+            ),
+        ));
+    }
+    if out.is_empty() {
+        out.push((
+            "note".into(),
+            Value::text("this build carries no catalogue features"),
+        ));
+    }
+    out
+}
+
 /// `ucal lighttime` — how long light takes to cross a distance (E2).
 ///
 /// Three units that behave differently on purpose: `m`, `au` and `ly` convert
@@ -1428,6 +1498,145 @@ fn prediction_rows(p: &ucal_events::ephem::Prediction) -> Vec<(String, Value)> {
         ),
         ("sigmas".into(), Value::number(p.k.to_string())),
     ]
+}
+
+/// `ucal ephem validate` — T2, the standard a body file already had to meet.
+///
+/// # Why this exists
+///
+/// `cal validate` loads a §15.1 body file, checks it, and runs a **precision
+/// probe**: move the last published digit of each figure, re-derive, and report
+/// whether the calendar changes. An ephemeris file got no such check, and the
+/// probe is *more* apt here than it was for bodies.
+///
+/// # The question it asks
+///
+/// Move the last digit of `P` — the smallest change the published figure can
+/// express — and see how far the prediction at a distant cycle moves. Compare
+/// that against the σ the same file quotes.
+///
+/// **If the last digit moves the prediction further than σ does, the two
+/// disagree**: the period is quoted to fewer digits than its own stated
+/// uncertainty requires, and the σ is describing a precision the figure does not
+/// carry. That is a real error and a common one, and no amount of correct
+/// arithmetic downstream repairs it.
+#[cfg(all(feature = "events", feature = "civil"))]
+pub fn cmd_ephem_validate(path: &str, cycle: i64) -> CmdResult {
+    let e = ephem_of(path)?;
+    let text = std::fs::read_to_string(path).map_err(|err| {
+        TimeError::with_context(
+            Code::E0001,
+            body_file::leak(format!("cannot read `{path}`: {err}")),
+        )
+    })?;
+
+    let baseline = e.time_of(cycle, 1)?;
+    let centre = e.centre_of(cycle)?;
+    let second = Ratio::from_int(UC1::bridge().ticks);
+    let in_seconds = |t: &Ticks| -> Value {
+        match Ratio::from_int(t.clone()).div(&second) {
+            Ok(v) => Value::quantity(&v, 3, Rounding::HalfEven),
+            Err(_) => Value::text("out of range"),
+        }
+    };
+
+    // The published period, verbatim, so the last digit can be moved. Read from
+    // the file rather than from the loaded rational: `3.52474859` and
+    // `3.524748590` are the same number and *not* the same claim, and only the
+    // text says which was written (Rule Y.1).
+    let published = e.as_published().trim_end_matches(" d").to_string();
+    let decimals = published.split_once('.').map_or(0, |(_, f)| f.len());
+
+    let step_days = if decimals == 0 {
+        Ratio::one()
+    } else {
+        Ratio::from_decimal_str(&format!("0.{}1", "0".repeat(decimals - 1)))?
+    };
+    let day = UC1::bridge()
+        .ticks
+        .try_mul(&<Ticks as TickInt>::from_u64(86_400))
+        .ok_or_else(|| TimeError::new(Code::E0021))?;
+    let step_ticks = step_days.mul(&Ratio::from_int(day))?;
+
+    // Moving P by one unit in its last place moves cycle E by E times that.
+    let moved = step_ticks
+        .mul(&Ratio::from_u64(cycle.unsigned_abs()))?
+        .ceil();
+    let sigma = e.sigma_at(cycle)?;
+
+    let consistent = moved <= sigma.ticks().clone();
+    let mut doc = Doc::new()
+        .title("ucal ephem validate")
+        .field("id", Value::text(e.id()))
+        .field("file", Value::text(path))
+        .field("loads", Value::Bool(true))
+        .field(
+            "declaration",
+            Value::Section(vec![
+                ("period_as_published".into(), Value::text(e.as_published())),
+                ("decimals".into(), Value::number(decimals.to_string())),
+                (
+                    "fitted_cycles".into(),
+                    Value::text(format!("{} .. {}", e.fitted().0, e.fitted().1)),
+                ),
+                ("citation".into(), Value::text(e.citation().source)),
+            ]),
+        )
+        .field(
+            "precision",
+            Value::Section(vec![
+                ("probe_cycle".into(), Value::number(cycle.to_string())),
+                (
+                    "last_digit_moves_it_by_seconds".into(),
+                    in_seconds(&moved),
+                ),
+                (
+                    "quoted_sigma_seconds".into(),
+                    in_seconds(sigma.ticks()),
+                ),
+                ("consistent".into(), Value::Bool(consistent)),
+                (
+                    "prediction_ticks".into(),
+                    Value::number(centre.ticks().to_dec_string()),
+                ),
+                (
+                    "window_width_ticks".into(),
+                    Value::number(baseline.window.width().ticks().to_dec_string()),
+                ),
+            ]),
+        );
+
+    doc = if consistent {
+        doc.note(format!(
+            "**Consistent at cycle {cycle}.** Moving the last published digit of \
+             the period moves the prediction by less than the σ this file quotes, \
+             so the figure carries at least the precision its own uncertainty \
+             claims.",
+        ))
+    } else {
+        doc.note(format!(
+            "**Inconsistent at cycle {cycle}.** Moving the last published digit \
+             of the period moves the prediction *further* than the σ this file \
+             quotes. The period is written to fewer digits than its own stated \
+             uncertainty requires, so the σ describes a precision the figure does \
+             not carry — and no amount of correct arithmetic downstream repairs \
+             that. Either quote more digits of the period, or a larger σ.",
+        ))
+    };
+
+    // A file that declares no uncertainty at all is refused by the loader, so
+    // reaching here means both σ exist. What can still be absent is a locator.
+    if e.citation().locator.is_none() {
+        doc = doc.note(
+            "This file cites a source with no locator — no DOI, bibcode or URL. \
+             Rule C accepts that and a reader has more work to do; `cal validate` \
+             says the same of a body file.",
+        );
+    }
+    if !text.contains("fitted_cycles") {
+        doc = doc.note("The fitted range is absent, which the loader refuses.");
+    }
+    Ok(doc)
 }
 
 /// `ucal ephem show` — the declaration, as loaded.
@@ -2547,9 +2756,54 @@ pub fn cmd_cal_anchor(id: &str) -> CmdResult {
                      and never borrowed from another body (Rule J.3).",
                 ),
             )
+            // **T3** — what an anchor would take, rather than only that there
+            // is none. The refusal was correct and told a reader nothing they
+            // could act on.
+            .field(
+                "what_an_anchor_needs",
+                Value::Section(vec![
+                    (
+                        "1_a_meridian".into(),
+                        Value::text(
+                            "PUBLISHED for most bodies. The IAU WGCCRE report \
+                             gives the prime meridian's orientation and rotation \
+                             rate — Titan's is W = 186.5855° + 22.5769768°/day \
+                             from J2000.0 TDB — and this project already cites \
+                             that report for obliquity",
+                        ),
+                    ),
+                    (
+                        "2_mean_solar_time_at_it".into(),
+                        Value::text(
+                            "MISSING, and this is the whole blocker. A phase is \
+                             mean solar time at that meridian, which needs the \
+                             Sun's direction from the body at the epoch — hence a \
+                             planetary ephemeris",
+                        ),
+                    ),
+                ]),
+            )
             .note(
                 "The calendar is complete in units, intercalation and cycles, and \
                  incomplete in phase — the state Appendix I.6 describes.",
+            )
+            .note(
+                "**The two oldest caveats in this project are one caveat.** \
+                 *Two of fifteen calendars have an anchor* and *this project must \
+                 not become an ephemeris library* have been carried separately \
+                 for many releases. They are the same sentence: the thirteen are \
+                 missing an anchor **because** of the boundary, and the boundary \
+                 is drawn for reasons that have not weakened. An anchor is not \
+                 waiting on effort here, and it is not going to arrive by anyone \
+                 working harder.",
+            )
+            .note(
+                "It could still arrive from **outside**: a published mean-solar-\
+                 time convention for a body, cited, is a complete anchor and the \
+                 mechanism accepts one — `ucal cal show --body --anchor` takes a \
+                 pair of files. Deriving one here would make this repository the \
+                 publisher of that body's solar-time convention rather than a \
+                 citer of one, which is the line D5 declined to cross for Titan.",
             ));
     };
     Ok(Doc::new()

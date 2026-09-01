@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/vulogov/ucal/blob/main/fixtures/ucal-json-1.schema.json",
   "title": "ucal-json/1",
-  "description": "Generated from fixtures/json-surface.txt by `cargo run -p xtask -- gen-schema`; do not edit. 550 field paths across 37 commands. `--json` output is per-command: validate `ucal datum --json` against #/$defs/datum. Every object permits additional properties, because ucal-json/1 promises that new fields may appear and existing ones never change name, shape or meaning; a consumer must ignore what it does not recognise. Fields shown only under `--bridge` are described but not required. An object whose keys are data - a tier, a body, an event id - is expressed as additionalProperties rather than named properties, so adding one changes no schema.",
+  "description": "Generated from fixtures/json-surface.txt by `cargo run -p xtask -- gen-schema`; do not edit. 570 field paths across 38 commands. `--json` output is per-command: validate `ucal datum --json` against #/$defs/datum. Every object permits additional properties, because ucal-json/1 promises that new fields may appear and existing ones never change name, shape or meaning; a consumer must ignore what it does not recognise. Fields shown only under `--bridge` are described but not required. An object whose keys are data - a tier, a body, an event id - is expressed as additionalProperties rather than named properties, so adding one changes no schema.",
   "$defs": {
     "add": {
       "type": "object",
@@ -664,6 +664,16 @@
           },
           "additionalProperties": true
         },
+        "data": {
+          "type": "object",
+          "properties": {
+            "bodies": { "type": "string" },
+            "derived_calendars": { "type": "string" },
+            "ephemerides": { "type": "string" },
+            "events": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
         "datum_provenance": {
           "type": "object",
           "properties": {
@@ -801,6 +811,37 @@
             "days": { "type": "string" },
             "pdot": { "type": "string" },
             "sigma_days": { "type": "string" }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "ephem-validate": {
+      "type": "object",
+      "properties": {
+        "declaration": {
+          "type": "object",
+          "properties": {
+            "citation": { "type": "string" },
+            "decimals": { "type": "string" },
+            "fitted_cycles": { "type": "string" },
+            "period_as_published": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "file": { "type": "string" },
+        "id": { "type": "string" },
+        "loads": { "type": "boolean" },
+        "precision": {
+          "type": "object",
+          "properties": {
+            "consistent": { "type": "boolean" },
+            "last_digit_moves_it_by_seconds": { "type": "string" },
+            "prediction_ticks": { "type": "string" },
+            "probe_cycle": { "type": "string" },
+            "quoted_sigma_seconds": { "type": "string" },
+            "window_width_ticks": { "type": "string" }
           },
           "additionalProperties": true
         }

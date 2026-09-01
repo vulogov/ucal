@@ -1111,6 +1111,7 @@ ucal ephem show <FILE>
 ucal ephem at   <FILE> --cycle <E> [--sigmas <K>]
 ucal ephem next <FILE> [--after <T>] [--sigmas <K>] [--count <N>]
 ucal ephem residuals <FILE> [--observed <FILE|->] [--sigmas <K>]
+ucal ephem validate  <FILE> [--cycle <E>]
 ```
 
 A published linear ephemeris, **carrying the uncertainty it was published with**.
@@ -1176,6 +1177,26 @@ code produced the number, so it is not produced here.
 | `residuals.<cycle>.o_minus_c_ticks` | `\|O − C\|`, exactly. |
 | `residuals.<cycle>.direction` | `late` or `early`. The count is unsigned (Rule B). |
 | `residuals.<cycle>.within` | Whether it is inside the window for that cycle. |
+
+**`validate` holds an ephemeris file to the standard a body file already had
+to meet** — it loads, checks, and runs a **precision probe**: move the last
+published digit of the period, and see how far the prediction at `--cycle`
+moves. Compare that against the σ the same file quotes.
+
+**If the last digit moves it further than σ does, the two disagree.** The period
+is written to fewer digits than its own stated uncertainty requires, so the σ
+describes a precision the figure does not carry — and no correct arithmetic
+downstream repairs it. Either quote more digits of the period, or a larger σ.
+
+| field | meaning |
+|---|---|
+| `declaration.period_as_published` | The period exactly as the file wrote it (Rule Y.1) — `3.52` and `3.520` are the same number and not the same claim. |
+| `declaration.decimals` | How many decimal places that was, which sets the probe's step. |
+| `precision.probe_cycle` | Where the probe was taken. Distance from the epoch is what makes the last digit visible. |
+| `precision.last_digit_moves_it_by_seconds` | The probe's answer. |
+| `precision.quoted_sigma_seconds` | The file's own σ at that cycle. |
+| `precision.consistent` | Whether the first is no larger than the second. |
+| `precision.prediction_ticks` / `precision.window_width_ticks` | The prediction being probed. |
 
 **Quadrature assumes independence.** From a joint fit `σ_T₀` and `σ_P` are
 correlated and the covariance is usually not published; the convention of placing
@@ -2098,6 +2119,11 @@ ucal doctor
 | `domain_max_ticks` | The largest representable instant: `2^512 − 1`, all 155 digits. |
 | `domain_bits` | `512`. Fixed so it never has to change; the canonical binary form is 64 bytes *because* of this. |
 | `features[]` | Which optional crates are compiled in. |
+| `data` | **What data this build actually carries**, counted from the registries at run time rather than written down. Every other line here says what the program *can* do; this one says what it has to do it with. |
+| `data.derived_calendars` | How many are declared, and how many have the anchor a local date needs. It is 15 and 2, and it has been for many releases — see [`cal anchor`](#ucal-cal). |
+| `data.bodies` | Cited bodies in the catalogue. |
+| `data.events` | Cited milestones. Every one is in the past. |
+| `data.ephemerides` | **Zero.** The §15.x format loads one from a file; none ships, because a shipped ephemeris must quote `T₀`, `P` and both σ verbatim from a paper and a figure typed from memory is the defect `cal validate` found in this project's own `europa.hjson`. |
 | `datum_provenance.present` | Whether a provenance record exists. Its absence is `UCAL-E0013` — a profile without provenance is not usable (Rule Q.4). |
 | `leap_seconds.table_version` | The bundled IERS bulletin. |
 | `leap_seconds.entries` | How many leap seconds are in it. |

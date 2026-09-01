@@ -500,6 +500,15 @@ enum EphemCommand {
         #[arg(long, default_value_t = 1)]
         sigmas: u32,
     },
+    /// Load an ephemeris file, check it, and probe its precision.
+    Validate {
+        /// Path to an ephemeris file.
+        file: String,
+        /// The cycle to probe at. Distance from the epoch is what makes the
+        /// last published digit visible.
+        #[arg(long, default_value_t = 5000)]
+        cycle: i64,
+    },
     /// Observed minus calculated, per observation.
     Residuals {
         /// Path to an ephemeris file.
@@ -987,6 +996,9 @@ fn main() {
                 cycle,
                 sigmas,
             } => ucal::cmd_ephem_at(file, *cycle, *sigmas),
+            EphemCommand::Validate { file, cycle } => {
+                ucal::cmd_ephem_validate(file, *cycle)
+            }
             EphemCommand::Residuals {
                 file,
                 observed,

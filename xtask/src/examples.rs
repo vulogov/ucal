@@ -136,6 +136,10 @@ fn examples() -> Vec<Example> {
             why: "The Sun's surface, bracketed to eighteen places by integer square roots. `f64` computing the same redshift keeps about eight of its sixteen digits, because `1/sqrt(1-x) - 1` in the weak field subtracts two numbers that agree to six places. The interval is proved to contain the value rather than converged to it.",
         },
         Example {
+            args: &["ephem", "validate", "Documentation/examples/ephemeris.hjson"],
+            why: "The precision probe, applied to an ephemeris: move the last published digit of the period and see how far the prediction at cycle 5000 moves, against the sigma the same file quotes. If the digit moves it further than sigma does, the period is written to fewer places than its own uncertainty requires — a real error that no correct arithmetic downstream repairs.",
+        },
+        Example {
             args: &["ephem", "residuals", "Documentation/examples/ephemeris.hjson",
                     "--observed", "Documentation/examples/observations.txt"],
             why: "O minus C, the standard instrument of variable-star and pulsar work. The four synthetic observations are the predicted centres of four cycles moved by 0, +3, -7 and +41 seconds, so the residuals are known in advance and the arithmetic can be checked by eye. The last is outside its own window and the others are not — which is the point of carrying a width that grows with the cycle.",
@@ -150,7 +154,7 @@ fn examples() -> Vec<Example> {
         },
         Example {
             args: &["doctor"],
-            why: "Which profile, which backend, which features — the first thing to paste into a bug report.",
+            why: "Which profile, which backend, which features — the first thing to paste into a bug report — and, since 1.13.0, what data this build actually carries. Four of those counts are zero and one is two-fifteenths, which is the honest state and used to be something a reader discovered by trying.",
         },
         Example {
             args: &["to-civil", T, "--digits", "3"],

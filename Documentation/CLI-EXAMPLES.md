@@ -1073,6 +1073,43 @@ cosmological coordinate; giving UC-1 a stated frame is a 2.0 question, because
 one unsigned integer per instant asserts there is one time.
 ```
 
+## `ucal ephem validate Documentation/examples/ephemeris.hjson`
+
+The precision probe, applied to an ephemeris: move the last published digit of the period and see how far the prediction at cycle 5000 moves, against the sigma the same file quotes. If the digit moves it further than sigma does, the period is written to fewer places than its own uncertainty requires — a real error that no correct arithmetic downstream repairs.
+
+```
+ucal ephem validate
+───────────────────
+id     example
+file   Documentation/examples/ephemeris.hjson
+loads  true
+declaration:
+  period_as_published  3.52474859 d
+  decimals             8
+  fitted_cycles        -500 .. 500
+  citation             illustrative only; this file is a format example and
+                       cites nothing
+precision:
+  probe_cycle                     5000
+  last_digit_moves_it_by_seconds  4.320
+  quoted_sigma_seconds            164.332
+  consistent                      true
+  prediction_ticks                8070205203867677652108710249497751880530466139
+                                  316558837890625
+  window_width_ticks              6096255015390498195103634864988054831934835950
+certification:
+  rounded, half-even, 3 digits  quoted_sigma_seconds
+  every other number above is exact: the digits shown are the value
+
+**Consistent at cycle 5000.** Moving the last published digit of the period
+moves the prediction by less than the σ this file quotes, so the figure carries
+at least the precision its own uncertainty claims.
+
+This file cites a source with no locator — no DOI, bibcode or URL. Rule C
+accepts that and a reader has more work to do; `cal validate` says the same of
+a body file.
+```
+
 ## `ucal ephem residuals Documentation/examples/ephemeris.hjson --observed Documentation/examples/observations.txt`
 
 O minus C, the standard instrument of variable-star and pulsar work. The four synthetic observations are the predicted centres of four cycles moved by 0, +3, -7 and +41 seconds, so the residuals are known in advance and the arithmetic can be checked by eye. The last is outside its own window and the others are not — which is the point of carrying a width that grows with the cycle.
@@ -1206,7 +1243,7 @@ what_this_does_not_establish  This is a self-check. Every number above was
 
 ## `ucal doctor`
 
-Which profile, which backend, which features — the first thing to paste into a bug report.
+Which profile, which backend, which features — the first thing to paste into a bug report — and, since 1.13.0, what data this build actually carries. Four of those counts are zero and one is two-fifteenths, which is the honest state and used to be something a reader discovered by trying.
 
 ```
 ucal doctor
@@ -1226,6 +1263,15 @@ features:
   events
   cosmo
   tui
+data:
+  derived_calendars  15 declared, 2 with the anchor a local date needs
+  bodies             16
+  events             22 cited milestones
+  ephemerides        0 shipped — the §15.x format loads one from a file. A
+                     shipped ephemeris must quote T0, P and both σ verbatim
+                     from a paper (Rule Y.1), and a figure typed from memory is
+                     the defect `cal validate` found in this project's own
+                     europa.hjson
 clock:
   granularity        1 ns — this program reads the clock to nine decimal places
   granularity_ticks  18548584399861000000000000000000000

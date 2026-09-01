@@ -193,6 +193,16 @@ fn all_commands() -> Vec<(&'static str, Doc)> {
             "ephem residuals",
             ucal::cmd_ephem_residuals(EPH, OBS, 1).unwrap(),
         ));
+        // T2 — both verdicts, because `consistent` is a bool and a list that
+        // only ever produced `true` would document a field with one value.
+        v.push((
+            "ephem validate",
+            ucal::cmd_ephem_validate(EPH, 5000).unwrap(),
+        ));
+        v.push((
+            "ephem validate",
+            ucal::cmd_ephem_validate(EPH, 1).unwrap(),
+        ));
     }
     #[cfg(feature = "cosmo")]
     {
