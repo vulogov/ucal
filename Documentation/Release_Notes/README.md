@@ -12,6 +12,7 @@ knows only what it did.
 
 | version | date | state |
 |---|---|---|
+| [1.13.0](1.13.0.md) | — | **unreleased** — the mechanism is built and the data is not |
 | [1.12.0](1.12.0.md) | 2026-08-31 | released — *released* is a claim about the world |
 | [1.11.0](1.11.0.md) | 2026-08-30 | released — the standard that stops at the edge of one build |
 | [1.10.0](1.10.0.md) | 2026-08-28 | **cut, never published** — a requirement with no wire; superseded by 1.11.0 |
