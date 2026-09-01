@@ -174,15 +174,20 @@ fn commands() -> Vec<(&'static str, Doc)> {
         v.push(("ephem-show", ucal::cmd_ephem_show(EPH).unwrap()));
         v.push(("ephem-at", ucal::cmd_ephem_at(EPH, 5000, 3).unwrap()));
         v.push(("ephem-next", ucal::cmd_ephem_next(EPH, T, 3, 2).unwrap()));
-        // O1 — residuals read observations, so one is written for the test.
-        let obs = std::env::temp_dir().join("ucal-residuals-fixture.txt");
-        let centre = ucal::cmd_ephem_at(EPH, 100, 1).unwrap();
-        std::fs::write(&obs, "8070205176188783269002882404203425480530466139316558837890625\n")
-            .unwrap();
-        let _ = centre;
+        // O1 — residuals read observations from a **committed** fixture.
+        //
+        // The first version wrote one into `std::env::temp_dir()` under a fixed
+        // name, and this file and `manual_fields.rs` both did it — two test
+        // binaries, one path, run concurrently. One truncated the file while the
+        // other read it, which produced a residuals run that had read nothing.
+        // It passed locally every time and failed in CI on the cut commit.
+        const OBS: &str = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../Documentation/examples/observations.txt"
+        );
         v.push((
             "ephem-residuals",
-            ucal::cmd_ephem_residuals(EPH, obs.to_str().unwrap(), 1).unwrap(),
+            ucal::cmd_ephem_residuals(EPH, OBS, 1).unwrap(),
         ));
     }
     #[cfg(feature = "cosmo")]

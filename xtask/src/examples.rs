@@ -136,6 +136,11 @@ fn examples() -> Vec<Example> {
             why: "The Sun's surface, bracketed to eighteen places by integer square roots. `f64` computing the same redshift keeps about eight of its sixteen digits, because `1/sqrt(1-x) - 1` in the weak field subtracts two numbers that agree to six places. The interval is proved to contain the value rather than converged to it.",
         },
         Example {
+            args: &["ephem", "residuals", "Documentation/examples/ephemeris.hjson",
+                    "--observed", "Documentation/examples/observations.txt"],
+            why: "O minus C, the standard instrument of variable-star and pulsar work. The four synthetic observations are the predicted centres of four cycles moved by 0, +3, -7 and +41 seconds, so the residuals are known in advance and the arithmetic can be checked by eye. The last is outside its own window and the others are not — which is the point of carrying a width that grows with the cycle.",
+        },
+        Example {
             args: &["ephem", "at", "Documentation/examples/ephemeris.hjson", "--cycle", "5000"],
             why: "A prediction five thousand cycles past a fit that covers five hundred. The window is the answer — it has grown from 7.5 s at the epoch to 164 s here — and `UCAL-W0003` says the fit does not reach this far. The figures in that file are illustrative and cite nothing, which it states.",
         },

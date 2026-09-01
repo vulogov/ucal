@@ -1073,6 +1073,57 @@ cosmological coordinate; giving UC-1 a stated frame is a 2.0 question, because
 one unsigned integer per instant asserts there is one time.
 ```
 
+## `ucal ephem residuals Documentation/examples/ephemeris.hjson --observed Documentation/examples/observations.txt`
+
+O minus C, the standard instrument of variable-star and pulsar work. The four synthetic observations are the predicted centres of four cycles moved by 0, +3, -7 and +41 seconds, so the residuals are known in advance and the arithmetic can be checked by eye. The last is outside its own window and the others are not — which is the point of carrying a width that grows with the cycle.
+
+```
+ucal ephem residuals
+────────────────────
+id                  example
+observations        4
+outside_the_window  1
+residuals:
+  cycle  observed
+  ─────  ─────────────────────────────────────────────────────────────
+  0      8070205175623907873429294080830071880530466139316558837890624
+         calculated  80702051756239078734292940808300718805304661393165588378906
+                     25
+         o_minus_c_ticks  1
+         direction  early
+         half_width_ticks  139457531810354928500000000000000000000000000
+         within  true
+  100    8070205176188783324648635603786425480530466139316558837890624
+         calculated  80702051761887832690028824042034254805304661393165588378906
+                     25
+         o_minus_c_ticks  55645753199582999999999999999999999999999999
+         direction  late
+         half_width_ticks  152174427347804015506965194791676480586918702
+         within  true
+  250    8070205177036096232523174090236455880530466139316558837890624
+         calculated  80702051770360963623632648892634558805304661393165588378906
+                     25
+         o_minus_c_ticks  129840090799027000000000000000000000000000001
+         direction  early
+         half_width_ticks  206464247337428117497454246549902820677142135
+         within  true
+  500    8070205178448285611789196091997839880530466139316558837890624
+         calculated  80702051784482848512972356976968398805304661393165588378906
+                     25
+         o_minus_c_ticks  760491960394300999999999999999999999999999999
+         direction  late
+         half_width_ticks  334910035947766581224283466812573678432981384
+         within  false
+
+`O − C` is exact integer subtraction, and each residual is placed against the
+window for its own cycle — which grows with distance from the epoch, so the
+same shift can be inside one window and outside another.
+
+**This reports and does not fit.** A quadratic trend in these residuals is `Ṗ`,
+and extracting it is least squares — which is where a reader most needs to know
+which code produced the number, so it is not produced here.
+```
+
 ## `ucal ephem at Documentation/examples/ephemeris.hjson --cycle 5000`
 
 A prediction five thousand cycles past a fit that covers five hundred. The window is the answer — it has grown from 7.5 s at the epoch to 164 s here — and `UCAL-W0003` says the fit does not reach this far. The figures in that file are illustrative and cite nothing, which it states.

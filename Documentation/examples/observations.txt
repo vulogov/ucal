@@ -1,0 +1,21 @@
+# Observed instants, one decimal tick count per line, for
+# `ucal ephem residuals Documentation/examples/ephemeris.hjson --observed <this>`.
+#
+# Blank lines and lines starting with `#` are skipped. Reading none at all is an
+# error rather than a report of agreement having compared nothing.
+#
+# THESE ARE SYNTHETIC, like the ephemeris they go with: each is the predicted
+# centre of a cycle, moved by a stated number of seconds, so the residuals are
+# known in advance and the arithmetic can be checked by eye.
+
+# cycle 0, +0 s
+8070205175623907873429294080830071880530466139316558837890624
+
+# cycle 100, +3 s
+8070205176188783324648635603786425480530466139316558837890624
+
+# cycle 250, -7 s
+8070205177036096232523174090236455880530466139316558837890624
+
+# cycle 500, +41 s
+8070205178448285611789196091997839880530466139316558837890624
