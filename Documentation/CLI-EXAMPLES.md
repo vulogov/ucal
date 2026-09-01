@@ -882,6 +882,14 @@ events:
                                   at  398 T6, 1702 deep, 574 drift
                                   tiers_since_datum  3892038074
                                   as_published  10^14 to 10^15 yr
+  the Degenerate Era
+                                  at  124 T13, 1531 T12, 33 T11, 2536 T10, 2530
+                                      T9, 1414 T8, 2433 T7, 3038 T6, 902 deep,
+                                      827 drift
+                                  tiers_since_datum  353821643165946914336956702
+                                                     4303952
+                                  as_published  cosmological decades eta = 15
+                                                to 39
   proton decay, if it happens
                                   at  1244 T13, 2813 T12, 3120 T11, 1052 T10,
                                       2336 T9, 2898 T8, 2312 T7, 1445 T6, 583
@@ -901,6 +909,18 @@ events:
                                                      000000000000000000000000000
                                                      00000000000000
                                   as_published  about 10^100 yr
+  the Dark Era
+                                  at  1556 T31, 1630 T30, 1108 T29, 940 T28,
+                                      1645 T27, 2001 T26, 1733 T25, 118 T24,
+                                      1028 T23, 1379 T22, 76 T21, 1775 T20,
+                                      1125 T19, 1294 T18, 108 T17, 1707 T16, 11
+                                      T15, 750 T14, 0 drift
+                                  tiers_since_datum  357359859597606383480325912
+                                                     094839567619719168000000000
+                                                     000000000000000000000000000
+                                                     00000000000000000
+                                  as_published  cosmological decade eta > 101,
+                                                open-ended
 
 Positions are the windows' midpoints floored to the stated tier. The midpoint
 is a rendering choice; the window is the value (Rule U).
@@ -1266,7 +1286,7 @@ features:
 data:
   derived_calendars  15 declared, 2 with the anchor a local date needs
   bodies             16
-  events             22 cited milestones
+  events             24 cited milestones
   ephemerides        0 shipped — the §15.x format loads one from a file. A
                      shipped ephemeris must quote T0, P and both σ verbatim
                      from a paper (Rule Y.1), and a figure typed from memory is

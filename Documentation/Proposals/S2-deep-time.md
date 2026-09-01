@@ -38,19 +38,27 @@ stating because it answers the question *what can this clock index* exactly:
 
 ### And what the catalogue actually covers
 
-`ucal timeline` calls itself *the whole of time, in one document*. Its nineteen
-events run from inflation to the bridge epoch:
+> **CORRECTION, 1.13.0.** What stood here was wrong, and it was wrong because I
+> read the first nineteen rows of `events list` and not the last three. The
+> catalogue **already reached cosmological decade 100** when this was written:
+> `stelliferous-end`, `proton-decay` and `black-hole-evaporation` all ship, all
+> cite Adams & Laughlin, and a comment in `ucal-events`'s own test says in as
+> many words that *the catalogue no longer ends at the present*.
+>
+> The claim below — *ten decades of a hundred and three, and every event is in
+> the past* — was false, and it survived into this proposal, into 1.13.0's
+> opening table, and into two summaries before anybody typed the command that
+> disproves it. It is left visible rather than edited away, because the
+> interesting part is not the mistake but that four separate documents repeated
+> a number nobody re-derived.
+>
+> What was genuinely missing was the two era **spans** between and after those
+> entries, `degenerate-era` and `dark-era`; 1.13.0 added them, and the second
+> reaches the domain ceiling.
 
-| | |
-|---|---|
-| catalogue | η ≤ 10.1 |
-| domain | η ≤ 103.4 |
-| fraction of the domain, linearly | **6 × 10⁻⁹⁴** |
-
-**Ten decades of a hundred and three, and every event is in the past.** The
-catalogue has no entry after the present. That is the finding both of these
-questions run into before they run into anything else, and it is the cheapest
-thing on this page to fix.
+~~`ucal timeline` calls itself *the whole of time, in one document*. Its nineteen
+events run from inflation to the bridge epoch: ten decades of a hundred and
+three, and every event is in the past.~~
 
 ---
 

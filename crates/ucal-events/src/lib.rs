@@ -60,8 +60,9 @@ use ucal_core::{Citation, Code, Instant, Profile, Ticks, TimeError, Warning, Win
 /// The citation set this catalogue is versioned by (D-7).
 ///
 /// Bumped when a source is revised, independently of the library's own version.
-pub const CITATION_SET: &str = "ucal-events/2026-07 (Planck 2018; IUGS 2023; \
-                               Bouvier & Wadhwa 2010; Betts et al. 2018)";
+pub const CITATION_SET: &str = "ucal-events/2026-09 (Planck 2018; IUGS 2023; \
+                               Bouvier & Wadhwa 2010; Betts et al. 2018; \
+                               Adams & Laughlin 1997)";
 
 /// Which side of the datum an event's window is stated from.
 ///
@@ -79,6 +80,37 @@ pub enum StatedAs {
     BeforeBridgeEpoch,
 }
 
+/// What kind of claim an entry is.
+///
+/// **Every entry in this catalogue was an observation until 1.13.0**, and the
+/// far-future entries added then are not: they are what a model says will
+/// happen, and no instrument has been or will be pointed at them.
+///
+/// That is a difference in kind, not in confidence, and it belongs in the type
+/// rather than in a description a renderer might drop. It is the same
+/// distinction this project draws between a defining constant and a measured
+/// one, and between an uncertainty that is cited and one that is inferred.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
+pub enum Basis {
+    /// Dated, measured or observed. Something happened and somebody recorded it.
+    Observed,
+    /// A model's extrapolation. Nothing has been observed and nothing will be:
+    /// every one of these lies past the present, most of them past any
+    /// conceivable observer.
+    Predicted,
+}
+
+impl Basis {
+    /// A word for a renderer.
+    pub const fn label(self) -> &'static str {
+        match self {
+            Basis::Observed => "observed — dated or measured",
+            Basis::Predicted => "predicted — a model's extrapolation, not an observation",
+        }
+    }
+}
+
 /// One catalogued milestone (§17).
 #[derive(Clone, PartialEq, Eq, Debug)]
 #[non_exhaustive]
@@ -93,6 +125,8 @@ pub struct Event {
     pub window: Window<UC1>,
     /// How the source states it.
     pub stated_as: StatedAs,
+    /// Whether this was observed or is predicted.
+    pub basis: Basis,
     /// The published figure, verbatim.
     pub as_published: &'static str,
     /// Where it comes from.
@@ -203,6 +237,7 @@ pub fn all() -> Vec<Event> {
                           stipulated",
             window: window("18548584", "185485843998"),
             stated_as: StatedAs::AfterDatum,
+            basis: Basis::Observed,
             as_published: "10^-36 to 10^-32 s",
             citation: GUTH_1981,
         },
@@ -219,6 +254,7 @@ pub fn all() -> Vec<Event> {
                 "251699987034533002248000000000000000000000000000000000000",
             ),
             stated_as: StatedAs::AfterDatum,
+            basis: Basis::Observed,
             as_published: "240 to 430 kyr (z = 1400 to z = 1000)",
             citation: PLANCK_2018,
         },
@@ -231,6 +267,7 @@ pub fn all() -> Vec<Event> {
                 "234139522822821397440000000000000000000000000000000000000000",
             ),
             stated_as: StatedAs::AfterDatum,
+            basis: Basis::Observed,
             as_published: "100 to 400 Myr",
             citation: BROMM_2011,
         },
@@ -244,6 +281,7 @@ pub fn all() -> Vec<Event> {
                 "585348807057053493600000000000000000000000000000000000000000",
             ),
             stated_as: StatedAs::AfterDatum,
+            basis: Basis::Observed,
             as_published: "150 Myr to 1 Gyr",
             citation: PLANCK_2018,
         },
@@ -256,6 +294,7 @@ pub fn all() -> Vec<Event> {
                 "585348807057053493600000000000000000000000000000000000000000",
             ),
             stated_as: StatedAs::AfterDatum,
+            basis: Basis::Observed,
             as_published: "400 Myr to 1 Gyr",
             citation: BROMM_2011,
         },
@@ -269,6 +308,7 @@ pub fn all() -> Vec<Event> {
                 "5396916001066033210673143085635637180530466139316558837890625",
             ),
             stated_as: StatedAs::BeforeBridgeEpoch,
+            basis: Basis::Observed,
             as_published: "4567 to 4571 Ma ago",
             citation: BOUVIER_2010,
         },
@@ -282,6 +322,7 @@ pub fn all() -> Vec<Event> {
                 "6021483178195909288344343085635637180530466139316558837890625",
             ),
             stated_as: StatedAs::BeforeBridgeEpoch,
+            basis: Basis::Observed,
             as_published: "3500 to 3800 Ma ago",
             citation: BETTS_2018,
         },
@@ -295,6 +336,7 @@ pub fn all() -> Vec<Event> {
                 "7754818065653256093592663085635637180530466139316558837890625",
             ),
             stated_as: StatedAs::BeforeBridgeEpoch,
+            basis: Basis::Observed,
             as_published: "538.8 ± 0.1 Ma ago",
             citation: IUGS,
         },
@@ -307,6 +349,7 @@ pub fn all() -> Vec<Event> {
                 "8031570981629830985366743085635637180530466139316558837890625",
             ),
             stated_as: StatedAs::BeforeBridgeEpoch,
+            basis: Basis::Observed,
             as_published: "66.0 to 66.1 Ma ago",
             citation: IUGS,
         },
@@ -320,8 +363,46 @@ pub fn all() -> Vec<Event> {
                 "8066691910053254194982743085635637180530466139316558837890625",
             ),
             stated_as: StatedAs::BeforeBridgeEpoch,
+            basis: Basis::Observed,
             as_published: "6 to 7 Ma ago",
             citation: BETTS_2018,
+        },
+        // ---- The far future (S2's first item) ----
+        //
+        // Every entry above is dated or measured. Every entry below is a model's
+        // extrapolation, marked `Basis::Predicted` so that a renderer cannot
+        // present the two as the same kind of claim.
+        //
+        // **They are stated as `AfterDatum`, and that is honest at this scale.**
+        // Adams & Laughlin measure from the present; the datum is 1.38e10 years
+        // earlier, which is 0.014% of the nearest entry below and vanishes
+        // entirely in the rest. A claim stated to one significant figure in the
+        // exponent cannot tell the two apart.
+        Event {
+            id: "degenerate-era",
+            label: "the Degenerate Era",
+            description: "what is left is white dwarfs, neutron stars and brown dwarfs. \
+                          Energy comes from proton decay if the proton \
+                          decays, and from very little else if it does not",
+            window: window("585348807057053493600000000000000000000000000000000000000000000000", "585348807057053493600000000000000000000000000000000000000000000000000000000000000000000000"),
+            stated_as: StatedAs::AfterDatum,
+            basis: Basis::Predicted,
+            as_published: "cosmological decades eta = 15 to 39",
+            citation: ADAMS_LAUGHLIN_1997,
+        },
+        Event {
+            id: "dark-era",
+            label: "the Dark Era",
+            description: "after the last black hole. This entry stops at decade 103 \
+                          because that is where UC-1 stops: the domain \
+                          holds 2.29e103 Julian years and the Dark Era \
+                          does not. The only entry in this catalogue \
+                          bounded by the clock rather than by its source",
+            window: window("58534880705705349360000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "5853488070570534936000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
+            stated_as: StatedAs::AfterDatum,
+            basis: Basis::Predicted,
+            as_published: "cosmological decade eta > 101, open-ended",
+            citation: ADAMS_LAUGHLIN_1997,
         },
         Event {
             id: "bridge-epoch",
@@ -334,6 +415,7 @@ pub fn all() -> Vec<Event> {
                 "8070204002895596515944343085635637180530466139316558837890625",
             ),
             stated_as: StatedAs::AfterDatum,
+            basis: Basis::Observed,
             as_published: "0000-01-01T00:00:00 TT",
             citation: PLANCK_2018,
         },
@@ -346,6 +428,7 @@ pub fn all() -> Vec<Event> {
                 "22258301279833200000000000000000000000000000000",
             ),
             stated_as: StatedAs::AfterDatum,
+            basis: Basis::Observed,
             as_published: "about 10 s to 20 min",
             citation: CYBURT_2016,
         },
@@ -358,6 +441,7 @@ pub fn all() -> Vec<Event> {
                 "32779533195194995641600000000000000000000000000000000000",
             ),
             stated_as: StatedAs::AfterDatum,
+            basis: Basis::Observed,
             as_published: "z_eq = 3387 +/- 21",
             citation: PLANCK_2018,
         },
@@ -370,6 +454,7 @@ pub fn all() -> Vec<Event> {
                 "6438836877627588429600000000000000000000000000000000000000000",
             ),
             stated_as: StatedAs::AfterDatum,
+            basis: Basis::Observed,
             as_published: "z = 0.3 to 0.6",
             citation: PLANCK_2018,
         },
@@ -382,6 +467,7 @@ pub fn all() -> Vec<Event> {
                 "5436134371138855794744343085635637180530466139316558837890625",
             ),
             stated_as: StatedAs::BeforeBridgeEpoch,
+            basis: Basis::Observed,
             as_published: "4.50 to 4.57 Ga",
             citation: BOUVIER_2010,
         },
@@ -394,6 +480,7 @@ pub fn all() -> Vec<Event> {
                 "6770729651228937760152343085635637180530466139316558837890625",
             ),
             stated_as: StatedAs::BeforeBridgeEpoch,
+            basis: Basis::Observed,
             as_published: "2.22 to 2.45 Ga",
             citation: GUMSLEY_2017,
         },
@@ -406,6 +493,7 @@ pub fn all() -> Vec<Event> {
                 "7922767516071679996083362285635637180530466139316558837890625",
             ),
             stated_as: StatedAs::BeforeBridgeEpoch,
+            basis: Basis::Observed,
             as_published: "251.902 +/- 0.024 Ma",
             citation: IUGS,
         },
@@ -418,6 +506,7 @@ pub fn all() -> Vec<Event> {
                 "8070040105229620540966135085635637180530466139316558837890625",
             ),
             stated_as: StatedAs::BeforeBridgeEpoch,
+            basis: Basis::Observed,
             as_published: "315 +/- 34 ka",
             citation: HUBLIN_2017,
         },
@@ -430,6 +519,7 @@ pub fn all() -> Vec<Event> {
                 "8070197212849434654123817325635637180530466139316558837890625",
             ),
             stated_as: StatedAs::BeforeBridgeEpoch,
+            basis: Basis::Observed,
             as_published: "11 700 yr b2k",
             citation: IUGS,
         },
@@ -442,6 +532,7 @@ pub fn all() -> Vec<Event> {
                 "585348807057053493600000000000000000000000000000000000000000000000",
             ),
             stated_as: StatedAs::AfterDatum,
+            basis: Basis::Predicted,
             as_published: "10^14 to 10^15 yr",
             citation: ADAMS_LAUGHLIN_1997,
         },
@@ -454,6 +545,7 @@ pub fn all() -> Vec<Event> {
                 "5853488070570534936000000000000000000000000000000000000000000000000000000000000000000000000",
             ),
             stated_as: StatedAs::AfterDatum,
+            basis: Basis::Predicted,
             as_published: "10^34 to 10^40 yr (lower bound only)",
             citation: ADAMS_LAUGHLIN_1997,
         },
@@ -466,6 +558,7 @@ pub fn all() -> Vec<Event> {
                 "5853488070570534936000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
             ),
             stated_as: StatedAs::AfterDatum,
+            basis: Basis::Predicted,
             as_published: "about 10^100 yr",
             citation: ADAMS_LAUGHLIN_1997,
         },
@@ -583,6 +676,41 @@ mod tests {
         }
     }
 
+    /// **Every entry says whether it was observed or is predicted.**
+    ///
+    /// The distinction is in the type since 1.13.0, and it was in prose before
+    /// that — including in a comment in this very module saying the far-future
+    /// entries "are predictions and are labelled as such", which was true of the
+    /// description text and not of anything a renderer could read.
+    ///
+    /// The ordering property is the interesting one: **every observed entry
+    /// precedes every predicted one**, because an observation is of the past.
+    /// A predicted entry that sorted before an observed one would mean one of
+    /// the two was mislabelled.
+    #[test]
+    fn observation_stops_where_prediction_starts() {
+        let c = chronological();
+        let observed = c.iter().filter(|e| e.basis == Basis::Observed).count();
+        let predicted = c.iter().filter(|e| e.basis == Basis::Predicted).count();
+        assert!(observed > 10, "{observed}");
+        assert!(predicted >= 5, "{predicted}");
+
+        let first_predicted = c
+            .iter()
+            .position(|e| e.basis == Basis::Predicted)
+            .expect("the catalogue reaches past the present");
+        assert!(
+            c[first_predicted..]
+                .iter()
+                .all(|e| e.basis == Basis::Predicted),
+            "an observed entry sorts after a predicted one, so one is mislabelled"
+        );
+        assert_eq!(
+            c[first_predicted].id, "stelliferous-end",
+            "the first thing this catalogue predicts rather than records"
+        );
+    }
+
     #[test]
     fn the_catalogue_is_chronological_and_spans_the_domain() {
         let c = chronological();
@@ -595,11 +723,15 @@ mod tests {
             );
         }
         assert_eq!(c.first().unwrap().id, "inflation");
-        // The catalogue no longer ends at the present. `bridge-epoch` used to be
+        // The catalogue does not end at the present. `bridge-epoch` used to be
         // last, which meant the upper half of the tier ladder held nothing at
-        // all: forty-five rungs, and every event inside the first ten. The three
-        // far-future entries are predictions and are labelled as such.
-        assert_eq!(c.last().unwrap().id, "black-hole-evaporation");
+        // all: forty-five rungs, and every event inside the first ten.
+        //
+        // 1.13.0 added the two era *spans* that were missing between and after
+        // the far-future entries — and got here by trying to add the far-future
+        // entries themselves, which already existed. The miscount is recorded in
+        // that release's notes.
+        assert_eq!(c.last().unwrap().id, "dark-era");
         let latest = c.last().unwrap().window.hi().ticks();
         assert!(
             latest < &<Ticks as TickInt>::domain_max(),
