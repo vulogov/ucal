@@ -1,0 +1,129 @@
+# R1 — notice when a version marked *released* is not anywhere a reader can get it.
+#
+# 1.10.0's row in the release-notes Contents table said `released — 2026-08-28`.
+# There was no tag in any remote, no GitHub release, and no crate on the
+# registry; `crates.io` went 1.9.0 → 1.11.0. The procedure has thirteen steps and
+# the first seven ran, and the row was written on the strength of the cut.
+#
+# Nothing noticed for three days, and nothing would have noticed at all: every
+# check in this tree reads files that are in the tree. *Released* is a claim
+# about the world, and the world was never asked.
+#
+# # Why this is not in `verify.yml`
+#
+# The same reason `links.yml` is not, and stated there at length: three network
+# services decide the answer, and a job that turns the repository red because
+# `crates.io` is having a bad morning trains its reader to ignore it. A check
+# nobody reads is the defect this file exists for, one level up — `verify-release`
+# has been reporting `UNSIGNED` for v1.9.0 since the day it was written, and that
+# is exactly how.
+#
+# # Why daily rather than weekly
+#
+# `links.yml` runs weekly because a URL rots on nobody's schedule. This one has a
+# schedule: it is wrong only in the hours or days after a release, and it is
+# *most* wrong immediately after — which is when somebody is still around to
+# finish the job. A week's delay would reliably report the failure to a person
+# who had moved on.
+#
+# # Only on `main`
+#
+# GitHub runs `schedule:` only on the default branch.
+
+name: releases
+
+on:
+  schedule:
+    # 06:00 UTC daily, an hour before `links.yml`, so two scheduled jobs that
+    # both open issues do not arrive as one indistinguishable batch.
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    inputs:
+      rehearse:
+        description: >-
+          Fail the check on purpose, to prove the issue actually gets opened.
+          Every other check in this tree is verified strict by injecting the
+          defect it exists to catch; a notification path deserves the same and
+          cannot get it from a run where nothing is wrong.
+        type: boolean
+        default: false
+
+# Not `push:`. See the header — that is the whole design of this file.
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  # `never`: this log is pasted into an issue body, and an issue is not a
+  # terminal. The same lesson `links.yml` learned from its first rehearsal.
+  CARGO_TERM_COLOR: never
+
+jobs:
+  releases:
+    name: every released version exists
+    runs-on: ubuntu-latest
+    steps:
+      # `fetch-depth: 0` and `fetch-tags` are *not* set, deliberately. The check
+      # asks the remote with `git ls-remote` rather than reading local refs,
+      # because a shallow clone's missing tag and a deleted tag look identical
+      # to anything that reads what was fetched.
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      # Built separately so the log the issue carries is the check's output and
+      # not cargo's.
+      - name: build xtask
+        run: cargo build -p xtask --quiet
+
+      - name: check-releases
+        id: check
+        env:
+          # `gh release list` needs a token. Unauthenticated it reports no
+          # releases at all, which the check would read as every release being
+          # missing — so the check refuses rather than reporting that, and this
+          # is what stops it having to.
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -o pipefail
+          ./target/debug/xtask check-releases 2>&1 | tee releases.log
+          if [ "${{ inputs.rehearse }}" = "true" ]; then
+            echo "  REHEARSAL: failing on purpose to exercise the issue path." \
+              | tee -a releases.log
+            exit 2
+          fi
+        continue-on-error: true
+
+      # The wire. A scheduled job that fails into the Actions tab is a mechanism
+      # with nothing attached to it, which is the shape this project keeps
+      # finding in its own work.
+      - name: open or update the issue
+        if: steps.check.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ inputs.rehearse }}" = "true" ]; then
+            title="A version marked released is not published (rehearsal)"
+          else
+            title="A version marked released is not published"
+          fi
+          existing=$(gh issue list --state open --search "$title in:title" \
+            --json number --jq '.[0].number // empty')
+          body=$(printf '%s\n\n```\n%s\n```\n' \
+            "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            "$(tail -c 40000 releases.log)")
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi
+
+      # Reported separately so a failure to *file* cannot be mistaken for the
+      # releases being fine.
+      - name: fail if a released version is missing
+        if: steps.check.outcome == 'failure'
+        run: |
+          echo "check-releases reported a version that is not where the table says."
+          echo "Either the release did not finish, or the row is wrong."
+          exit 1

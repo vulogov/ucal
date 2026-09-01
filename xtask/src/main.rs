@@ -20,6 +20,7 @@ mod citations;
 mod corpus;
 mod publish;
 mod release;
+mod releases;
 mod declared;
 mod derivation;
 mod gendocs;
@@ -123,6 +124,10 @@ const MODES: &[(&str, &str)] = &[
     ("gen-examples", "write Documentation/CLI-EXAMPLES.md"),
     ("gen-schema", "write the ucal-json/1 schema"),
     ("check-links", "resolve every cited URL (opt-in; makes network requests)"),
+    (
+        "check-releases",
+        "every version marked released exists in the world (needs the network)",
+    ),
     ("verify-vectors", "re-derive the conformance vectors"),
     ("corpus", "run the defect corpus: every check must reject a known defect"),
     ("publish", "the release procedure"),
@@ -181,6 +186,9 @@ fn main() {
     }
     if mode == "check-links" {
         std::process::exit(links::run(&workspace_root()));
+    }
+    if mode == "check-releases" {
+        std::process::exit(releases::run(&workspace_root()));
     }
     if mode == "verify-release" {
         let Some(version) = std::env::args().nth(2) else {
@@ -1274,6 +1282,21 @@ fn run_docs(mode: &str) -> i32 {
             ),
             Err(bad) => {
                 eprintln!("  FAIL  CI and the release procedure have drifted:");
+                for b in &bad {
+                    eprintln!("          {b}");
+                }
+                code = 6;
+            }
+        }
+        match citations::check_json_surface_covers_commands(&root) {
+            Ok(n) => code |= report(
+                "every command reaches the ucal-json/1 surface, or says why not",
+                "commands",
+                15,
+                n,
+            ),
+            Err(bad) => {
+                eprintln!("  FAIL  a command is outside the ucal-json/1 promise:");
                 for b in &bad {
                     eprintln!("          {b}");
                 }

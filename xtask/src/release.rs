@@ -173,9 +173,21 @@ fn compare_all(root: &Path, tmp: &Path, pkg_root: &Path, version: &str, tag: &st
     }
 
     println!("1. the published .crate against the tag");
+    let mut explained_lock = false;
+    let mut explained_files: Vec<String> = Vec::new();
     for name in &members {
         match compare_crate(pkg_root, tmp, name, version) {
-            Verdict::Ok(note) => println!("  ok    {name} {version}  {note}"),
+            Verdict::Ok(note) => {
+                if note.contains("Cargo.lock") {
+                    explained_lock = true;
+                }
+                for (_, f, _) in EXPLAINED {
+                    if note.contains(f) && !explained_files.iter().any(|e| e == f) {
+                        explained_files.push((*f).to_string());
+                    }
+                }
+                println!("  ok    {name} {version}  {note}");
+            }
             Verdict::Skipped(why) => {
                 skipped += 1;
                 println!("  --    {name} {version}  {why}");
@@ -187,6 +199,33 @@ fn compare_all(root: &Path, tmp: &Path, pkg_root: &Path, version: &str, tag: &st
                     println!("          {l}");
                 }
             }
+        }
+    }
+
+    // R2 — the reason, once. Six crates each carrying the same paragraph is a
+    // legend repeated until it is scenery, which is the state that let two
+    // standing failures go unread in the first place.
+    let mut legend: Vec<&str> = Vec::new();
+    if explained_lock {
+        legend.push(
+            "Cargo.lock — differs only in the recorded versions of this workspace's own \
+             crates. `cargo package` strips the path from an intra-workspace dependency \
+             and resolves the registry requirement instead, so it names whichever \
+             compatible release existed at the moment of packaging. That makes \
+             `cargo package` unreproducible for this workspace from the moment a later \
+             compatible version is published — 1.9.0 measured byte-reproducibility \
+             correctly, and nobody stated its shelf life.",
+        );
+    }
+    for (v, f, why) in EXPLAINED {
+        if *v == version && explained_files.iter().any(|e| e == f) {
+            legend.push(why);
+        }
+    }
+    if !legend.is_empty() {
+        println!("\n  understood differences:");
+        for l in &legend {
+            println!("    {l}");
         }
     }
 
@@ -337,7 +376,98 @@ const REWRITTEN: &[&str] = &["Cargo.toml"];
 /// Files cargo *adds* while packaging, which have no counterpart in the tree.
 const GENERATED: &[&str] = &[".cargo_vcs_info.json", "Cargo.lock", "Cargo.toml.orig"];
 
+/// R2 — differences that are understood, enumerated so they cannot grow quietly.
+///
+/// A standing failure is worse than no check: `verify-release` reported five
+/// crates differing for v1.9.0 and six for v1.11.0 from the day each was
+/// published, and nothing read either. *CI green with no known-failing job* is a
+/// 1.0 exit criterion, and a check whose output is known-bad entries is one
+/// nobody reads.
+///
+/// So each is either fixed or **named here with its reason**, keyed to the exact
+/// version it applies to — the shape the retired signing key got in
+/// `check_signing_key`. A blanket exemption for `.cargo_vcs_info.json` would
+/// make the next release free to repeat the mistake unnoticed; this one does not.
+const EXPLAINED: &[(&str, &str, &str)] = &[(
+    "1.11.0",
+    ".cargo_vcs_info.json",
+    "1.11.0 published from the cut commit while the tag sits on the merge, so \
+     cargo recorded a commit that a checkout of the tag cannot reproduce. Every \
+     other byte matches. The procedure now says to merge before publishing; a \
+     published version cannot be replaced, so this one stays",
+)];
+
+/// Whether a `Cargo.lock` difference is only in the versions of *this
+/// workspace's own crates*.
+///
+/// **Measured, and it is the whole of the v1.9.0 finding.** `cargo package`
+/// strips the `path` from an intra-workspace dependency and resolves the
+/// registry requirement instead, so packaging `ucal-civil` records whichever
+/// `ucal-core` satisfies `^1.9.0` *at that moment*. In August that was 1.9.0,
+/// because nothing newer existed; today it is 1.11.0. Four lines differ, all of
+/// them one `[[package]]` block.
+///
+/// That makes `cargo package` **not reproducible** for a workspace whose crates
+/// depend on each other by caret requirement, from the moment a later compatible
+/// version is published. 1.9.0's notes recorded byte-reproducibility measured
+/// across 1.8.0; the measurement was correct and the claim had a shelf life that
+/// nobody stated. `ucal-core` still matches to the byte, because it is the one
+/// crate with no sibling to resolve.
+///
+/// Anything else differing is still a failure. This normalises exactly the
+/// entries it can explain and compares the rest verbatim.
+fn lock_differs_only_in_siblings(published: &str, local: &str, siblings: &[String]) -> bool {
+    fn strip(text: &str, siblings: &[String]) -> Vec<String> {
+        let mut out = Vec::new();
+        let mut in_sibling = false;
+        for line in text.lines() {
+            if line.trim() == "[[package]]" {
+                in_sibling = false;
+            }
+            if let Some(rest) = line.trim().strip_prefix("name = ") {
+                let name = rest.trim_matches('"');
+                in_sibling = siblings.iter().any(|s| s == name);
+            }
+            // Inside a sibling's block, the two fields cargo resolves at
+            // packaging time are dropped. The block's presence, its name and
+            // its dependency list are all still compared.
+            if in_sibling {
+                let t = line.trim();
+                if t.starts_with("version = ") || t.starts_with("checksum = ") {
+                    continue;
+                }
+            }
+            out.push(line.to_string());
+        }
+        out
+    }
+    !siblings.is_empty() && strip(published, siblings) == strip(local, siblings)
+}
+
+/// The crates this workspace publishes, read from the tree rather than listed.
+///
+/// A hard-coded list here would be a second enumeration of the six crates, and
+/// this cycle's R3 is about exactly that: two hand-maintained lists of the same
+/// commands, neither checked for completeness.
+fn sibling_crates(root: &Path) -> Vec<String> {
+    let mut out = Vec::new();
+    let Ok(entries) = std::fs::read_dir(root.join("crates")) else {
+        return out;
+    };
+    for e in entries.flatten() {
+        if !e.path().join("Cargo.toml").exists() {
+            continue;
+        }
+        if let Some(name) = e.file_name().to_str() {
+            out.push(name.to_string());
+        }
+    }
+    out.sort();
+    out
+}
+
 fn compare_crate(root: &Path, tmp: &Path, name: &str, version: &str) -> Verdict {
+    let siblings = sibling_crates(root);
     let stem = format!("{name}-{version}");
     let url = format!("https://static.crates.io/crates/{name}/{stem}.crate");
     let downloaded = tmp.join(format!("{stem}.published.crate"));
@@ -388,6 +518,10 @@ fn compare_crate(root: &Path, tmp: &Path, name: &str, version: &str) -> Verdict 
     };
 
     let mut problems = Vec::new();
+    let mut explained: Vec<String> = Vec::new();
+    let read = |label: &str, path: &str| -> Option<String> {
+        std::fs::read_to_string(tmp.join(label).join(format!("{stem}/{path}"))).ok()
+    };
     for (path, hash) in &a {
         if REWRITTEN.contains(&path.as_str()) {
             continue;
@@ -395,6 +529,26 @@ fn compare_crate(root: &Path, tmp: &Path, name: &str, version: &str) -> Verdict 
         match b.get(path) {
             None => problems.push(format!("published, and not produced here: {path}")),
             Some(h) if h != hash => {
+                // R2 — a difference that is understood says so, once, rather
+                // than standing as a failure nobody reads.
+                if path == "Cargo.lock" {
+                    if let (Some(pv), Some(lv)) = (
+                        read(&format!("{stem}.published"), path),
+                        read(&format!("{stem}.local"), path),
+                    ) {
+                        if lock_differs_only_in_siblings(&pv, &lv, &siblings) {
+                            explained.push("Cargo.lock".to_string());
+                            continue;
+                        }
+                    }
+                }
+                if EXPLAINED
+                    .iter()
+                    .any(|(v, f, _)| *v == version && f == path)
+                {
+                    explained.push(path.clone());
+                    continue;
+                }
                 problems.push(format!("differs: {path}"));
                 problems.push(format!("  published {hash}"));
                 problems.push(format!("  here      {h}"));
@@ -417,6 +571,13 @@ fn compare_crate(root: &Path, tmp: &Path, name: &str, version: &str) -> Verdict 
 
     let identical = std::fs::read(&downloaded).ok() == std::fs::read(&local).ok();
     let n = a.len();
+    if !explained.is_empty() {
+        return Verdict::Ok(format!(
+            "{n} files agree; {} understood: {}",
+            explained.len(),
+            explained.join(", ")
+        ));
+    }
     Verdict::Ok(if identical {
         // What actually happens, against the expectation C3 recorded: cargo
         // normalises the mtimes, so the archives match to the byte.
@@ -965,5 +1126,80 @@ mod tests {
             !REWRITTEN.contains(&"Cargo.toml.orig"),
             "Cargo.toml.orig carries the original and is where a substitution would show"
         );
+    }
+
+    // ---- R2 ----
+
+    const LOCK_A: &str = "\
+[[package]]
+name = \"bnum\"
+version = \"0.13.0\"
+checksum = \"aaa\"
+
+[[package]]
+name = \"ucal-core\"
+version = \"1.9.0\"
+source = \"registry+https://github.com/rust-lang/crates.io-index\"
+checksum = \"bbb\"
+dependencies = [
+ \"bnum\",
+]
+";
+
+    fn siblings() -> Vec<String> {
+        vec!["ucal-core".to_string(), "ucal-civil".to_string()]
+    }
+
+    /// A sibling's version moving is the difference cargo makes by design.
+    #[test]
+    fn a_sibling_resolved_to_a_later_release_is_understood() {
+        let later = LOCK_A
+            .replace("version = \"1.9.0\"", "version = \"1.11.0\"")
+            .replace("checksum = \"bbb\"", "checksum = \"ccc\"");
+        assert!(lock_differs_only_in_siblings(LOCK_A, &later, &siblings()));
+    }
+
+    /// A third-party dependency moving is not, and must still fail.
+    ///
+    /// The exemption exists for one cause and would be worthless if it covered
+    /// every version line in the file — a substituted dependency is precisely
+    /// what this whole check is for.
+    #[test]
+    fn a_third_party_version_moving_is_not_understood() {
+        let tampered = LOCK_A.replace("version = \"0.13.0\"", "version = \"0.14.0\"");
+        assert!(!lock_differs_only_in_siblings(LOCK_A, &tampered, &siblings()));
+    }
+
+    /// Nor is a sibling's *dependency list* changing, which is not a version.
+    #[test]
+    fn a_siblings_dependencies_changing_is_not_understood() {
+        let tampered = LOCK_A.replace(" \"bnum\",\n", " \"bnum\",\n \"something-else\",\n");
+        assert!(!lock_differs_only_in_siblings(LOCK_A, &tampered, &siblings()));
+    }
+
+    /// With no siblings known, nothing is explained away.
+    ///
+    /// `sibling_crates` reads the tree, and a read that returned nothing would
+    /// otherwise turn this into a blanket exemption for `Cargo.lock`.
+    #[test]
+    fn no_siblings_means_no_exemption() {
+        let later = LOCK_A.replace("version = \"1.9.0\"", "version = \"1.11.0\"");
+        assert!(!lock_differs_only_in_siblings(LOCK_A, &later, &[]));
+    }
+
+    /// Every enumerated exception names a version, and none is a wildcard.
+    ///
+    /// A blanket entry would let the next release repeat 1.11.0's
+    /// publish-before-merge unnoticed, which is the opposite of recording it.
+    #[test]
+    fn every_explained_difference_is_pinned_to_one_version() {
+        assert!(!EXPLAINED.is_empty(), "the constant exists to be read");
+        for (version, file, why) in EXPLAINED {
+            assert!(
+                version.split('.').count() == 3 && !version.contains('*'),
+                "`{version}` is not a single version"
+            );
+            assert!(!file.is_empty() && why.len() > 40, "{file}: give the reason");
+        }
     }
 }

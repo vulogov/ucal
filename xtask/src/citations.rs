@@ -397,6 +397,163 @@ fn alloc_vec(s: String) -> Vec<String> {
     vec![s]
 }
 
+// ---------------------------------------------------------------------------
+// R3 — how a command reaches the ucal-json/1 promise
+// ---------------------------------------------------------------------------
+
+/// Commands that contribute nothing to `fixtures/json-surface.txt`, and why.
+///
+/// **Every one of these is legitimately absent**, and until this constant
+/// existed nothing said so. A legitimate absence and an oversight looked
+/// identical to every check in the tree — which is how `add --in` shipped
+/// emitting fields outside the surface promise, caught only because a
+/// *different* suite failed on a documented field no command emitted.
+///
+/// The list is checked in both directions: an entry for a command that no
+/// longer exists is an error, and so is an entry for a command that turns out
+/// to contribute after all. Otherwise it becomes the place awkward commands go
+/// to stop being asked about.
+const NOT_A_DOCUMENT: &[(&str, &str)] = &[
+    ("cal", "a parent; its subcommands contribute under their own names"),
+    ("cosmo", "a parent; its subcommands contribute under their own names"),
+    ("events", "a parent; its subcommands contribute under their own names"),
+    ("ephem", "a parent; its subcommands contribute under their own names"),
+    ("completions", "emits a shell script, which is not a document"),
+    ("man", "emits roff, which is not a document"),
+    (
+        "seq",
+        "emits one decimal tick count per line, deliberately, so it composes \
+         with the shell; `--json` does not change that and a JSON array would \
+         stop it being a filter",
+    ),
+    // Found by this check on its first run, which is the answer to whether it
+    // was worth writing.
+    (
+        "cal-export",
+        "emits an HJSON §15.1 body file, because a generator's output is an \
+         input to something else — here `cal validate` and `cal derive`. A \
+         document would not round-trip",
+    ),
+];
+
+/// Every command either contributes to the `ucal-json/1` surface, or says why not.
+///
+/// `crates/ucal/tests/json_surface.rs` holds a hand-maintained list of
+/// invocations, and `manual_fields.rs` holds a second one of the same commands.
+/// `the_baseline_covers_every_command` asserts that every *listed* command
+/// contributes — the weaker half of the question. Nothing asked whether the list
+/// was complete, so a command reached the promise by being remembered.
+///
+/// Read from the source like [`check_cli_docs`], and it checks **subcommands
+/// too**: `cal export` arrived in 1.10.0, and a check that stopped at the
+/// top-level `cal` would have had nothing to say about it.
+pub fn check_json_surface_covers_commands(root: &Path) -> Result<usize, Vec<String>> {
+    let main = root.join("crates/ucal/src/main.rs");
+    let Ok(src) = std::fs::read_to_string(&main) else {
+        return Err(alloc_vec(format!("cannot read {}", main.display())));
+    };
+    let Ok(base) = std::fs::read_to_string(root.join("fixtures/json-surface.txt")) else {
+        return Err(alloc_vec("fixtures/json-surface.txt is missing".into()));
+    };
+
+    // The baseline's prefixes: the first dotted segment of each path.
+    let prefixes: std::collections::BTreeSet<String> = base
+        .lines()
+        .filter(|l| !l.trim_start().starts_with('#') && !l.trim().is_empty())
+        .filter_map(|l| l.split('\t').next())
+        .filter_map(|p| p.split('.').next())
+        .map(str::to_string)
+        .collect();
+    if prefixes.is_empty() {
+        return Err(alloc_vec(
+            "the surface baseline has no field paths, so this check would pass \
+             having examined nothing"
+                .into(),
+        ));
+    }
+
+    let mut wanted: Vec<String> = subcommands(&src);
+    for (parent, enum_name) in [
+        ("cal", "enum CalCommand {"),
+        ("events", "enum EventCommand {"),
+        ("cosmo", "enum CosmoCommand {"),
+        ("ephem", "enum EphemCommand {"),
+    ] {
+        for sub in variants(&src, enum_name) {
+            wanted.push(format!("{parent}-{sub}"));
+        }
+    }
+    if wanted.len() < 10 {
+        return Err(alloc_vec(format!(
+            "only {} commands were parsed out of main.rs, which is too few to be \
+             the whole surface — the parser has stopped matching",
+            wanted.len()
+        )));
+    }
+
+    let mut bad = Vec::new();
+    for c in &wanted {
+        let excused = NOT_A_DOCUMENT.iter().find(|(n, _)| n == c);
+        match (prefixes.contains(c), excused) {
+            (true, None) => {}
+            (false, Some(_)) => {}
+            (false, None) => bad.push(format!(
+                "`ucal {}` contributes nothing to fixtures/json-surface.txt and is \
+                 not listed as emitting no document. Add an invocation to \
+                 crates/ucal/tests/json_surface.rs, or say why it emits none",
+                c.replace('-', " ")
+            )),
+            (true, Some(_)) => bad.push(format!(
+                "`ucal {}` is listed as emitting no document, and contributes to \
+                 the surface baseline. One of the two is wrong",
+                c.replace('-', " ")
+            )),
+        }
+    }
+    for (name, _) in NOT_A_DOCUMENT {
+        if !wanted.iter().any(|c| c == name) {
+            bad.push(format!(
+                "`ucal {name}` is listed as emitting no document, and no such \
+                 command exists"
+            ));
+        }
+    }
+
+    if bad.is_empty() {
+        Ok(wanted.len())
+    } else {
+        bad.sort();
+        bad.dedup();
+        Err(bad)
+    }
+}
+
+/// Variants of a named enum, in kebab-case. The generalisation of
+/// [`subcommands`], which reads `enum Command` alone.
+fn variants(src: &str, header: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let Some(start) = src.find(header) else {
+        return out;
+    };
+    let body = &src[start..];
+    let end = body.find("\n}").map(|e| e + 2).unwrap_or(body.len());
+    for line in body[..end].lines() {
+        let l = line.trim();
+        if !line.starts_with("    ") || line.starts_with("     ") {
+            continue;
+        }
+        let name = l.trim_end_matches(&[' ', '{', ','][..]);
+        if name.is_empty()
+            || !name.chars().next().is_some_and(|c| c.is_ascii_uppercase())
+            || !name.chars().all(|c| c.is_ascii_alphanumeric())
+        {
+            continue;
+        }
+        out.push(kebab(name));
+    }
+    out
+}
+
 /// Subcommand names, from the `enum Command` variants, in kebab-case.
 fn subcommands(src: &str) -> Vec<String> {
     let mut out = Vec::new();

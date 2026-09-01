@@ -26,6 +26,10 @@ pub mod body_file;
 pub mod emit;
 #[cfg(feature = "body")]
 pub mod body_export;
+/// B — declaring an ephemeris in a file. Needs `events` for the type and
+/// `civil` for the Julian Date the epoch is stated as.
+#[cfg(all(feature = "events", feature = "civil"))]
+pub mod ephem_file;
 pub mod clock;
 pub mod style;
 pub mod table;
@@ -1243,6 +1247,522 @@ pub fn cmd_from_civil(date: &str, scale: Scale, cal: CivilCalendar) -> CmdResult
                 ),
             ]),
         ))
+}
+
+/// `ucal lighttime` — how long light takes to cross a distance (E2).
+///
+/// Three units that behave differently on purpose: `m`, `au` and `ly` convert
+/// exactly, and `pc` is bracketed because it is defined as `648000/π` au.
+#[cfg(feature = "civil")]
+pub fn cmd_lighttime(distance: &str, unit: &str, digits: u32) -> CmdResult {
+    use ucal_civil::lighttime as lt;
+    let u = lt::Unit::parse(unit)?;
+    let d = Ratio::from_decimal_str(distance).map_err(|_| {
+        TimeError::with_context(Code::E0001, "a distance is a decimal number")
+    })?;
+    let t = lt::light_time(&d, u)?;
+    let second = Ratio::from_int(UC1::bridge().ticks);
+    let secs = |r: &Ratio| -> Value {
+        match r.div(&second) {
+            Ok(v) => Value::quantity(&v, digits, Rounding::Trunc),
+            Err(_) => Value::text("out of range"),
+        }
+    };
+
+    let mut doc = Doc::new()
+        .title("ucal lighttime")
+        .field("distance", Value::text(format!("{distance} {}", u.key())))
+        .field("exact", Value::Bool(u.is_exact()));
+    if u.is_exact() {
+        doc = doc
+            .field("ticks", Value::number(t.lo().floor().to_dec_string()))
+            .field("seconds", secs(t.lo()))
+            .field("as_ratio_seconds", Value::text(
+                t.lo().div(&second).map(|v| v.to_ratio_string()).unwrap_or_default(),
+            ));
+    } else {
+        doc = doc
+            .field(
+                "seconds",
+                Value::Section(vec![
+                    ("lo".into(), secs(t.lo())),
+                    ("hi".into(), secs(t.hi())),
+                ]),
+            )
+            .note(
+                "A parsec is defined as `648000/π` astronomical units — an exact \
+                 definition of an irrational number — so the answer is a bracket \
+                 and no decimal for it is the value. Two of the three units here \
+                 convert exactly and this one cannot, for a reason about the \
+                 definition rather than about this program.",
+            );
+    }
+    if matches!(u, ucal_civil::lighttime::Unit::LightYear) {
+        doc = doc.note(
+            "A light-year is *defined* as a Julian year times `c`, so its \
+             light-travel time is a Julian year — 31 557 600 s exactly, with no \
+             remainder. A light-year is a time unit wearing a distance's \
+             clothes, and the conversion is the identity.",
+        );
+    }
+    Ok(doc.note(
+        "`c` is exact by definition (the metre is defined from it) and the \
+         astronomical unit has been exact since IAU 2012 Resolution B2. **One \
+         astronomical unit of light-time, 499.004783836… s, is also the largest \
+         a barycentric correction can be** — for any target and any date. The \
+         correction's *value* needs an ephemeris; the bound needs nothing, and \
+         answers whether a measurement is sensitive to it at all.",
+    ))
+}
+
+/// `ucal dilate` — gravitational time dilation, certified.
+///
+/// The ratio may be a decimal or a fraction: `0.5` and `1/2` are the same
+/// input, and a fraction is often how `r_s/r` is actually known.
+#[cfg(feature = "cosmo")]
+pub fn cmd_dilate(ratio: &str, digits: u32, render: u32, orbiting: bool) -> CmdResult {
+    let x = match ratio.split_once('/') {
+        Some((n, d)) => {
+            let parse = |v: &str| {
+                <Ticks as TickInt>::from_dec_str(v.trim()).ok_or_else(|| {
+                    TimeError::with_context(
+                        Code::E0001,
+                        "a fraction is two whole numbers, like `1/2`",
+                    )
+                })
+            };
+            Ratio::new(parse(n)?, parse(d)?)?
+        }
+        None => Ratio::from_decimal_str(ratio).map_err(|_| {
+            TimeError::with_context(
+                Code::E0001,
+                "r_s/r is a dimensionless number in [0, 1). Give it as a decimal \
+                 like `0.35`, or as a fraction like `1/2`",
+            )
+        })?,
+    };
+    let d = if orbiting {
+        ucal_cosmo::dilate::circular_orbit(&x, digits)?
+    } else {
+        ucal_cosmo::dilate::schwarzschild(&x, digits)?
+    };
+    let pair = |i: &ucal_core::num::RatInterval| -> Value {
+        Value::Section(vec![
+            ("lo".into(), Value::quantity(i.lo(), render, Rounding::Trunc)),
+            ("hi".into(), Value::quantity(i.hi(), render, Rounding::Ceil)),
+        ])
+    };
+    Ok(Doc::new()
+        .title("ucal dilate")
+        .field("rs_over_r", Value::text(d.ratio.to_ratio_string()))
+        .field(
+            "observer",
+            Value::text(if orbiting {
+                "in a circular orbit — gravitational and kinematic dilation, √(1 − 3r_s/2r)"
+            } else {
+                "static at r — gravitational dilation only, √(1 − r_s/r)"
+            }),
+        )
+        .field("digits", Value::number(d.digits.to_string()))
+        .field("proper_per_coordinate", pair(&d.factor))
+        .field("coordinate_per_proper", pair(&d.inverse))
+        .field("redshift_z", pair(&d.redshift))
+        .note(
+            "Certified, not iterated: the two ends use `isqrt_floor` and \
+             `isqrt_ceil`, so the interval is **proved** to contain the value \
+             rather than converged to it. The same standard `cosmo` holds its \
+             quadrature to.",
+        )
+        .note(
+            "Exactness earns its keep at the two ends, not in the middle. \
+             `z = 1/√(1−x) − 1` in `f64` keeps about 8 of its 16 digits at the \
+             Sun's surface and about 1 just outside a horizon, both to \
+             cancellation; a neutron star at r_s/r = 0.35 is where a double does \
+             best. The solar and white-dwarf redshifts are measured quantities, \
+             and they sit in the band where the float has already lost half its \
+             digits.",
+        )
+        .note(
+            "This is the ratio between two clocks and not a claim that either is \
+             the one `ucal` keeps. Tick 0 is the FLRW t→0 limit, so absolute \
+             time here is a cosmological coordinate; giving UC-1 a stated frame \
+             is a 2.0 question, because one unsigned integer per instant asserts \
+             there is one time.",
+        ))
+}
+
+/// The ephemeris named by a path, loaded and reported (B).
+#[cfg(all(feature = "events", feature = "civil"))]
+fn ephem_of(path: &str) -> Result<ucal_events::ephem::Ephemeris, TimeError> {
+    let text = std::fs::read_to_string(path).map_err(|e| {
+        TimeError::with_context(
+            Code::E0001,
+            body_file::leak(format!("cannot read `{path}`: {e}")),
+        )
+    })?;
+    ephem_file::load(&text)
+}
+
+/// One prediction, as a section.
+#[cfg(all(feature = "events", feature = "civil"))]
+fn prediction_rows(p: &ucal_events::ephem::Prediction) -> Vec<(String, Value)> {
+    vec![
+        ("cycle".into(), Value::number(p.cycle.to_string())),
+        (
+            "centre_ticks".into(),
+            Value::number(
+                p.window
+                    .lo()
+                    .ticks()
+                    .clone()
+                    .try_add(p.sigma.ticks())
+                    .map(|v| v.to_dec_string())
+                    .unwrap_or_default(),
+            ),
+        ),
+        ("lo".into(), Value::number(p.window.lo().ticks().to_dec_string())),
+        ("hi".into(), Value::number(p.window.hi().ticks().to_dec_string())),
+        (
+            "half_width_ticks".into(),
+            Value::number(p.sigma.ticks().to_dec_string()),
+        ),
+        ("sigmas".into(), Value::number(p.k.to_string())),
+    ]
+}
+
+/// `ucal ephem show` — the declaration, as loaded.
+#[cfg(all(feature = "events", feature = "civil"))]
+pub fn cmd_ephem_show(path: &str) -> CmdResult {
+    let e = ephem_of(path)?;
+    let day = UC1::bridge()
+        .ticks
+        .try_mul(&<Ticks as TickInt>::from_u64(86_400))
+        .ok_or_else(|| TimeError::new(Code::E0021))?;
+    let in_days = |r: &Ratio| -> Value {
+        match r.div(&Ratio::from_int(day.clone())) {
+            Ok(v) => Value::quantity(&v, 9, Rounding::HalfEven),
+            Err(_) => Value::text("out of range"),
+        }
+    };
+    Ok(Doc::new()
+        .title("ucal ephem show")
+        .field("id", Value::text(e.id()))
+        .field("label", Value::text(e.label()))
+        .field(
+            "epoch",
+            Value::Section(vec![
+                ("ticks".into(), Value::number(e.epoch().ticks().to_dec_string())),
+                (
+                    "sigma_ticks".into(),
+                    Value::number(e.epoch_sigma().ticks().to_dec_string()),
+                ),
+            ]),
+        )
+        .field(
+            "period",
+            Value::Section(vec![
+                ("as_published".into(), Value::text(e.as_published())),
+                ("days".into(), in_days(e.period())),
+                ("sigma_days".into(), in_days(e.period_sigma())),
+                (
+                    "pdot".into(),
+                    Value::quantity(e.pdot(), 12, Rounding::HalfEven),
+                ),
+            ]),
+        )
+        .field(
+            "fitted_cycles",
+            Value::text(format!("{} .. {}", e.fitted().0, e.fitted().1)),
+        )
+        .field("citation", Value::text(e.citation().source))
+        .note(
+            "The uncertainties are the source's own. This project carries an \
+             uncertainty when it is cited and never when it is inferred, which \
+             is why `ucal-body`'s parameters have none: the planetary sources do \
+             not uniformly publish one, and a fabricated σ is worse than an \
+             absent one.",
+        ))
+}
+
+/// `ucal ephem at` — the window for one cycle.
+#[cfg(all(feature = "events", feature = "civil"))]
+pub fn cmd_ephem_at(path: &str, cycle: i64, sigmas: u32) -> CmdResult {
+    let e = ephem_of(path)?;
+    let p = e.time_of(cycle, sigmas)?;
+    let mut doc = Doc::new()
+        .title("ucal ephem at")
+        .field("id", Value::text(e.id()))
+        .field("prediction", Value::Section(prediction_rows(&p)))
+        .note(
+            "The window is what the answer is. `half_width_ticks` is \
+             `k·√(σ_T₀² + (E·σ_P)²)`, so a prediction far from the epoch is \
+             wider than one near it — which is the quantity that decides whether \
+             an observation is worth scheduling, and the one most tooling drops.",
+        );
+    if let Some(w) = p.warning {
+        doc = doc.note(window_note(w));
+        doc = doc.note(format!(
+            "Cycle {} is outside the range this fit covers ({} .. {}). Rule C \
+             requires the warning and forbids extrapolating silently; it does \
+             not forbid extrapolating, because that is what a reader is going to \
+             do and the useful thing is to say how far out they have gone.",
+            cycle,
+            e.fitted().0,
+            e.fitted().1
+        ));
+    }
+    Ok(doc)
+}
+
+/// `ucal ephem residuals` — O1, observed minus calculated.
+///
+/// Reads observed instants, one per line, from a file or from `-`. Exact
+/// integer subtraction; **it reports and does not fit**, for the reason
+/// `Ephemeris::residual` records.
+#[cfg(all(feature = "events", feature = "civil"))]
+pub fn cmd_ephem_residuals(path: &str, observed: &str, sigmas: u32) -> CmdResult {
+    let e = ephem_of(path)?;
+    let text = if observed == "-" {
+        use std::io::Read;
+        let mut buf = String::new();
+        std::io::stdin().read_to_string(&mut buf).map_err(|err| {
+            TimeError::with_context(Code::E0001, body_file::leak(format!("stdin: {err}")))
+        })?;
+        buf
+    } else {
+        std::fs::read_to_string(observed).map_err(|err| {
+            TimeError::with_context(
+                Code::E0001,
+                body_file::leak(format!("cannot read `{observed}`: {err}")),
+            )
+        })?
+    };
+
+    let mut rows: Vec<(String, Value)> = Vec::new();
+    let mut outside = 0usize;
+    let mut beyond = 0usize;
+    let mut n = 0usize;
+    for line in text.lines() {
+        let l = line.trim();
+        if l.is_empty() || l.starts_with('#') {
+            continue;
+        }
+        let (t, _) = parse_instant(l)?;
+        let r = e.residual(&t, sigmas)?;
+        n += 1;
+        if r.warning.is_some() {
+            outside += 1;
+        }
+        if !r.within {
+            beyond += 1;
+        }
+        rows.push((
+            r.cycle.to_string(),
+            Value::Section(vec![
+                ("observed".into(), Value::number(r.observed.ticks().to_dec_string())),
+                (
+                    "calculated".into(),
+                    Value::number(r.calculated.ticks().to_dec_string()),
+                ),
+                (
+                    "o_minus_c_ticks".into(),
+                    Value::number(r.magnitude.ticks().to_dec_string()),
+                ),
+                (
+                    "direction".into(),
+                    Value::text(if r.late { "late" } else { "early" }),
+                ),
+                (
+                    "half_width_ticks".into(),
+                    Value::number(r.half_width.ticks().to_dec_string()),
+                ),
+                ("within".into(), Value::Bool(r.within)),
+            ]),
+        ));
+    }
+    if n == 0 {
+        return Err(TimeError::with_context(
+            Code::E0018,
+            "no observations were read, so this would report agreement having \
+             compared nothing. Blank lines and `#` comments are skipped; \
+             everything else must be an instant",
+        ));
+    }
+
+    let mut doc = Doc::new()
+        .title("ucal ephem residuals")
+        .field("id", Value::text(e.id()))
+        .field("observations", Value::number(n.to_string()))
+        .field("outside_the_window", Value::number(beyond.to_string()))
+        .field("residuals", Value::rows("cycle", rows))
+        .note(
+            "`O − C` is exact integer subtraction, and each residual is placed \
+             against the window for its own cycle — which grows with distance \
+             from the epoch, so the same shift can be inside one window and \
+             outside another.",
+        )
+        .note(
+            "**This reports and does not fit.** A quadratic trend in these \
+             residuals is `Ṗ`, and extracting it is least squares — which is \
+             where a reader most needs to know which code produced the number, \
+             so it is not produced here.",
+        );
+    if outside > 0 {
+        doc = doc.note(format!(
+            "{outside} observation(s) fall outside the cycle range this fit \
+             covers ({} .. {}), and carry `UCAL-W0003`.",
+            e.fitted().0,
+            e.fitted().1
+        ));
+    }
+    Ok(doc)
+}
+
+/// `ucal ephem next` — the coming events after an instant.
+#[cfg(all(feature = "events", feature = "civil"))]
+pub fn cmd_ephem_next(path: &str, after: &str, sigmas: u32, count: u32) -> CmdResult {
+    let e = ephem_of(path)?;
+    let (t, _) = parse_instant(after)?;
+    let (now_cycle, phase) = e.cycle_at(&t)?;
+    let ups = e.upcoming(&t, sigmas, count.max(1))?;
+
+    let rows: Vec<(String, Value)> = ups
+        .iter()
+        .map(|p| {
+            (
+                p.cycle.to_string(),
+                Value::Section(prediction_rows(p)),
+            )
+        })
+        .collect();
+    let outside = ups.iter().filter(|p| p.warning.is_some()).count();
+
+    let mut doc = Doc::new()
+        .title("ucal ephem next")
+        .field("id", Value::text(e.id()))
+        .field("after", Value::number(t.ticks().to_dec_string()))
+        .field(
+            "position",
+            Value::Section(vec![
+                ("cycle".into(), Value::number(now_cycle.to_string())),
+                (
+                    "phase".into(),
+                    Value::quantity(&phase, 6, Rounding::Trunc),
+                ),
+            ]),
+        )
+        .field("upcoming", Value::rows("cycle", rows));
+    if outside > 0 {
+        doc = doc.note(format!(
+            "{outside} of these lie outside the cycle range this fit covers \
+             ({} .. {}), and carry `UCAL-W0003`. The window grows with distance \
+             from the epoch whether or not the fit reaches that far; the warning \
+             is about the *fit*, and the width is about the arithmetic.",
+            e.fitted().0,
+            e.fitted().1
+        ));
+    }
+    Ok(doc)
+}
+
+/// `ucal from-jd` — a Julian Date, in a named scale, as absolute time (A1).
+///
+/// **The scale is mandatory.** Every cited parameter in this project is indexed
+/// by JD in its source and J2000.0 *is* JD 2451545.0 TT, so this closes the loop
+/// that made checking a shipped figure against its paper a hand operation.
+///
+/// `TT` and `TAI` convert exactly and the window has zero width. `TDB` reports
+/// the ±1.7 ms bound on a series this project does not evaluate, because Rule E
+/// forbids the float that would evaluate it and a centre without its width would
+/// claim a precision that is not there.
+#[cfg(feature = "civil")]
+pub fn cmd_from_jd(value: &str, scale: &str, mjd: bool) -> CmdResult {
+    use ucal_civil::jd;
+    let scale = jd::JdScale::parse(scale)?;
+    let given = Ratio::from_decimal_str(value).map_err(|_| {
+        TimeError::with_context(
+            Code::E0001,
+            "a Julian Date is a decimal number of days, like `2451545.0`",
+        )
+    })?;
+    let as_jd = if mjd { jd::mjd_to_jd(&given)? } else { given.clone() };
+    let w = jd::from_jd(&as_jd, scale)?;
+
+    let exact = w.lo().ticks() == w.hi().ticks();
+    let mut doc = instant_doc("ucal from-jd", w.lo())
+        .field(
+            "input",
+            Value::Section(vec![
+                (
+                    if mjd { "mjd".into() } else { "jd".into() },
+                    Value::text(value),
+                ),
+                ("jd".into(), Value::text(as_jd.to_ratio_string())),
+                ("scale".into(), Value::text(scale.key())),
+            ]),
+        );
+    if !exact {
+        doc = doc
+            .field(
+                "window",
+                Value::Section(vec![
+                    ("lo".into(), Value::number(w.lo().ticks().to_dec_string())),
+                    ("hi".into(), Value::number(w.hi().ticks().to_dec_string())),
+                    (
+                        "width_ticks".into(),
+                        Value::number(w.width().ticks().to_dec_string()),
+                    ),
+                ]),
+            )
+            .note(
+                "`ticks` above is the low end. TDB differs from TT by a periodic \
+                 series whose evaluation needs floating point, which Rule E \
+                 forbids in a shipped crate — so the answer carries the series' \
+                 bound of ±1.7 ms instead of a centre that would look exact. Rule \
+                 U: the window is the value.",
+            );
+    } else {
+        doc = doc.note(
+            "Exact: a Julian day is a whole number of ticks, so nothing here is \
+             rounded. `TT` is the pivot and `TT = TAI + 32.184 s` exactly. The \
+             scale is required and has no default, because a converter that \
+             defaults is silently wrong by 69 seconds whenever it guesses.",
+        );
+    }
+    Ok(doc)
+}
+
+/// `ucal to-jd` — absolute time as a Julian Date, exactly.
+#[cfg(feature = "civil")]
+pub fn cmd_to_jd(input: &str, scale: &str, mjd: bool, digits: u32) -> CmdResult {
+    use ucal_civil::jd;
+    let scale = jd::JdScale::parse(scale)?;
+    let (t, _) = parse_instant(input)?;
+    let value = jd::to_jd(&t, scale)?;
+    let shown = if mjd { jd::jd_to_mjd(&value)? } else { value.clone() };
+
+    let mut doc = Doc::new()
+        .title("ucal to-jd")
+        .field("ticks", Value::number(t.ticks().to_dec_string()))
+        .field("scale", Value::text(scale.key()))
+        .field(
+            if mjd { "mjd" } else { "jd" },
+            Value::quantity(&shown, digits, Rounding::HalfEven),
+        )
+        .field("exact", Value::text(shown.to_ratio_string()));
+    if scale == jd::JdScale::Tdb {
+        doc = doc.note(
+            "This is the **TT** Julian Date. TDB differs from it by a periodic \
+             series bounded by 1.7 ms, which this crate does not evaluate — the \
+             bound is reported beside the value rather than folded into it, \
+             because a rational carrying a bound it cannot express is worse than \
+             one standing next to a statement of what it is.",
+        );
+    }
+    Ok(doc.note(
+        "The rational is exact; the decimal is a rendering and is the only place \
+         a value may be rounded (Rule R).",
+    ))
 }
 
 /// `ucal to-civil <T>` (§19).

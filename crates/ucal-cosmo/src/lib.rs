@@ -948,5 +948,7 @@ impl LambdaCdm {
     }
 }
 
+pub mod dilate;
+
 #[cfg(test)]
 mod tests;

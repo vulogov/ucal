@@ -86,6 +86,16 @@ fn all_commands() -> Vec<(&'static str, Doc)> {
             concat!(env!("CARGO_MANIFEST_DIR"), "/../../Documentation/examples/earth.hjson"),
             Some(concat!(env!("CARGO_MANIFEST_DIR"), "/../../Documentation/examples/earth-anchor.hjson")),
         ).unwrap()));
+        // A1 — the JD converters emit documents like any other command, and
+        // R3's check caught their absence from this list the day they were
+        // written, which is the answer to whether it was worth building.
+        v.push(("from jd", ucal::cmd_from_jd("2451545.0", "tt", false).unwrap()));
+        v.push(("from jd", ucal::cmd_from_jd("2460000.5", "tdb", false).unwrap()));
+        v.push(("to jd", ucal::cmd_to_jd(T, "tt", false, 6).unwrap()));
+        // And with `--mjd`, because the field is named for the flag: a list that
+        // only ever passes `false` documents a field no command emits, which is
+        // what `manual_fields` reported the first time this was added.
+        v.push(("to jd", ucal::cmd_to_jd(T, "tt", true, 6).unwrap()));
         v.push(("cal from", ucal::cmd_cal_from("mars-d", "82-83").unwrap()));
         v.push((
             "add",
@@ -151,8 +161,43 @@ fn all_commands() -> Vec<(&'static str, Doc)> {
         let g = ucal::wallclock::Face::of(ucal::parse_instant(T).unwrap().0, &d).unwrap();
         v.push(("wallclock-full", ucal::cmd_wallclock_json(&g, "plain").unwrap()));
     }
+    #[cfg(feature = "civil")]
+    {
+        // E2 — both kinds of answer: an exact unit and the bracketed one.
+        v.push(("lighttime", ucal::cmd_lighttime("1", "ly", 9).unwrap()));
+        v.push(("lighttime", ucal::cmd_lighttime("1", "pc", 9).unwrap()));
+    }
+    #[cfg(all(feature = "events", feature = "civil"))]
+    {
+        // B — an ephemeris file, and the certified dilation beside it. The path
+        // is relative to this crate, the way the body-file invocations are.
+        const EPH: &str = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../Documentation/examples/ephemeris.hjson"
+        );
+        v.push(("ephem show", ucal::cmd_ephem_show(EPH).unwrap()));
+        v.push(("ephem at", ucal::cmd_ephem_at(EPH, 5000, 3).unwrap()));
+        v.push(("ephem next", ucal::cmd_ephem_next(EPH, T, 3, 2).unwrap()));
+        // O1 — residuals read observations from a **committed** fixture.
+        //
+        // The first version wrote one into `std::env::temp_dir()` under a fixed
+        // name, and this file and `manual_fields.rs` both did it — two test
+        // binaries, one path, run concurrently. One truncated the file while the
+        // other read it, which produced a residuals run that had read nothing.
+        // It passed locally every time and failed in CI on the cut commit.
+        const OBS: &str = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../Documentation/examples/observations.txt"
+        );
+        v.push((
+            "ephem residuals",
+            ucal::cmd_ephem_residuals(EPH, OBS, 1).unwrap(),
+        ));
+    }
     #[cfg(feature = "cosmo")]
     {
+        v.push(("dilate", ucal::cmd_dilate("0.35", 40, 18, false).unwrap()));
+        v.push(("dilate", ucal::cmd_dilate("0.35", 40, 18, true).unwrap()));
         v.push(("cosmo model", ucal::cmd_cosmo_model().unwrap()));
         v.push(("cosmo age", ucal::cmd_cosmo_age("1100", 4, 8).unwrap()));
         v.push((

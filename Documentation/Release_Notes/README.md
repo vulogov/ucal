@@ -12,6 +12,7 @@ knows only what it did.
 
 | version | date | state |
 |---|---|---|
+| [1.12.0](1.12.0.md) | 2026-08-31 | released — *released* is a claim about the world |
 | [1.11.0](1.11.0.md) | 2026-08-30 | released — the standard that stops at the edge of one build |
 | [1.10.0](1.10.0.md) | 2026-08-28 | **cut, never published** — a requirement with no wire; superseded by 1.11.0 |
 | [1.9.0](1.9.0.md) | 2026-08-27 | released — the artefact, not the repository |
@@ -222,4 +223,26 @@ one-line version and links to it.
     A comparison that could not be performed is reported as `--` and exits 5,
     not 0. A check that could not run has not passed.
 
-13. Open the next file.
+13. `cargo run -p xtask -- check-releases`, **last** — after the tag, the
+    release and the signature, not at step 1.
+
+    Tag on the remote, GitHub release, and every crate on the registry, for
+    every version the Contents table marks `released`.
+
+    **The position is the whole lesson, and it was got wrong first.** Step 1
+    writes `released` into the table; the release becomes true at steps 9–12. Put
+    this at the cut and it fails on the row you have just written — which it
+    duly did, on 1.12.0, the first time anybody ran the procedure as originally
+    numbered. A check placed where its subject is not yet true is a check that
+    teaches its reader to skip it, which is the defect it exists for wearing a
+    different hat.
+
+    It also runs daily on a schedule and opens an issue on failure, for the
+    reason `check-links` does. That schedule is what covers the hours between
+    the cut and the publish; this step covers the release itself.
+
+    **1.10.0's row said `released` and 1.10.0 existed nowhere.** Nothing noticed
+    for three days and nothing would have: every other check in this tree reads
+    files that are in it.
+
+14. Open the next file.

@@ -1,0 +1,44 @@
+# An ephemeris file — the format `ucal ephem` reads.
+#
+# THE FIGURES BELOW ARE ILLUSTRATIVE AND ARE NOT A CITATION.
+#
+# They have the shape of a hot-Jupiter transit ephemeris and are here to
+# exercise the arithmetic, not to predict anything. This project ships no
+# ephemerides at all, and the reason is Rule C rather than effort: a shipped
+# ephemeris must quote T_0, P and both sigma verbatim from a paper (Rule Y.1),
+# and a figure typed from memory is exactly the defect `cal validate` found in
+# this project's own europa.hjson — which cited NASA for a solar day NASA does
+# not publish, wrong in the third decimal, deriving a different calendar.
+#
+# To declare a real one: replace every figure here with the paper's, put the
+# paper in `citation`, and put its DOI in `locator`. `ucal ephem show` will
+# read them back so you can check them against the source.
+
+id: example
+label: an illustrative transit ephemeris — NOT a citation
+
+epoch: {
+  # The published T_0, as a Julian Date. `scale` is required and has no
+  # default: a converter that defaults is silently wrong by 69 seconds
+  # whenever it guesses. Transit papers usually quote BJD_TDB.
+  jd: 2452826.628521
+  scale: tdb
+  # The published 1-sigma on the epoch, in days.
+  sigma_days: 0.000087
+}
+
+period: {
+  days: 3.52474859
+  sigma_days: 0.00000038
+  # Dimensionless (s/s). Omit it for zero, which is the usual case; a pulsar
+  # or a decaying orbit has one.
+  # pdot: 0
+}
+
+# The cycle range the published fit actually covers. NOT optional: a fit with
+# no stated domain is a model with no domain, and this is the only field that
+# makes UCAL-W0003 mean anything here — without it every extrapolation looks
+# exactly like an interpolation.
+fitted_cycles: [-500, 500]
+
+citation: illustrative only; this file is a format example and cites nothing

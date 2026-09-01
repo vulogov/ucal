@@ -148,6 +148,16 @@ pub const MUTATIONS: &[Mutation] = &[
         find: "That key was **retired on 2026-08-31**",
         replace: "That key was **replaced on 2026-08-31**",
     },
+    // R3 — a command that emits no document, and a baseline that says it does.
+    // The other direction is the interesting one: the exemption list must not
+    // become the place a command goes to stop being asked about.
+    Mutation {
+        check: "json-surface-commands",
+        what: "a command excused from the JSON surface, contributing to it after all",
+        file: "fixtures/json-surface.txt",
+        find: "add.calendar\tstring",
+        replace: "seq.calendar\tstring",
+    },
     Mutation {
         check: "signing-key",
         what: "one published copy of the signing key altered",
@@ -403,6 +413,9 @@ pub fn run_check(name: &str, root: &Path) -> bool {
         // noisy inside a corpus run and is the check doing its job.
         "verify-vectors" => crate::run_verify_vectors_at(root) == 0,
         "schema" => crate::schema::check(root).is_ok(),
+        "json-surface-commands" => {
+            crate::citations::check_json_surface_covers_commands(root).is_ok()
+        }
         other => panic!("the corpus names a check that does not exist: `{other}`"),
     }
 }

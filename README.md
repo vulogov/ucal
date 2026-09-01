@@ -100,7 +100,10 @@ cargo build --release
 `--json` gives stable, versioned output for all of them.
 
 Every command, every option and what each output field means:
-[`Documentation/CLI.md`](Documentation/CLI.md).
+[`Documentation/CLI.md`](Documentation/CLI.md). Consuming that output from
+another language — the JSONL streaming contract, why every number is a string,
+and what the versioned surface does and does not promise:
+[`Documentation/INTEROP.md`](Documentation/INTEROP.md).
 
 ## The crates
 

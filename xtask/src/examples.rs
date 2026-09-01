@@ -120,6 +120,31 @@ fn examples() -> Vec<Example> {
             why: "A certified enclosure by integer quadrature. Depth 8 keeps this example fast; `CLI.md` has the cost table.",
         },
         Example {
+            args: &["lighttime", "1", "--unit", "ly"],
+            why: "A light-year is defined as a Julian year times c, so its light-travel time is that year exactly — 31 557 600 s with no remainder. A light-year is a time unit wearing a distance's clothes. One astronomical unit of light-time, 499.004783836 s, is also the largest a barycentric correction can be, for any target and any date.",
+        },
+        Example {
+            args: &["lighttime", "1", "--unit", "pc"],
+            why: "And the unit that cannot convert exactly. A parsec is defined as 648000/pi astronomical units — an exact definition of an irrational number — so the answer is a bracket and no decimal for it is the value.",
+        },
+        Example {
+            args: &["from-jd", "2451545.0", "--scale", "tcb"],
+            why: "Barycentric Coordinate Time, whose offset from TDB is a *defining* constant rather than a measurement — so that step is exact and the answer carries only TDB's own bound, not a tick more. TCB runs ahead of TDB by 0.489 s per Julian year, which reaches a minute inside two centuries.",
+        },
+        Example {
+            args: &["dilate", "--rs-over-r", "0.0000042467", "--show", "18"],
+            why: "The Sun's surface, bracketed to eighteen places by integer square roots. `f64` computing the same redshift keeps about eight of its sixteen digits, because `1/sqrt(1-x) - 1` in the weak field subtracts two numbers that agree to six places. The interval is proved to contain the value rather than converged to it.",
+        },
+        Example {
+            args: &["ephem", "residuals", "Documentation/examples/ephemeris.hjson",
+                    "--observed", "Documentation/examples/observations.txt"],
+            why: "O minus C, the standard instrument of variable-star and pulsar work. The four synthetic observations are the predicted centres of four cycles moved by 0, +3, -7 and +41 seconds, so the residuals are known in advance and the arithmetic can be checked by eye. The last is outside its own window and the others are not — which is the point of carrying a width that grows with the cycle.",
+        },
+        Example {
+            args: &["ephem", "at", "Documentation/examples/ephemeris.hjson", "--cycle", "5000"],
+            why: "A prediction five thousand cycles past a fit that covers five hundred. The window is the answer — it has grown from 7.5 s at the epoch to 164 s here — and `UCAL-W0003` says the fit does not reach this far. The figures in that file are illustrative and cite nothing, which it states.",
+        },
+        Example {
             args: &["verify"],
             why: "The binary re-deriving the constants it ships with, and saying plainly that agreeing with itself is not verification.",
         },
@@ -130,6 +155,14 @@ fn examples() -> Vec<Example> {
         Example {
             args: &["to-civil", T, "--digits", "3"],
             why: "An Earth calendar label. This is an Earth command, so it carries Earth units unasked.",
+        },
+        Example {
+            args: &["from-jd", "2451545.0", "--scale", "tt"],
+            why: "J2000.0, the epoch every parameter in this project is stated at, and the first time this program could convert it. `--scale` is required and has no default: a converter that defaults is silently wrong by 69 seconds whenever it guesses.",
+        },
+        Example {
+            args: &["from-jd", "2460000.5", "--scale", "tdb"],
+            why: "The same conversion in a scale that is not exact. TDB differs from TT by a periodic series whose evaluation needs floating point, which Rule E forbids here — so the answer is a window carrying the series' 1.7 ms bound, rather than a centre that would look exact.",
         },
         Example {
             args: &["from-civil", "2026-08-07"],

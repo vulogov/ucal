@@ -117,6 +117,41 @@ enum Command {
     },
     /// The datum: what tick 0 is, what is claimed about it, and how it was fixed.
     Datum,
+    /// A Julian Date, in a named scale, as absolute time.
+    ///
+    /// **`--scale` is required and has no default.** A converter that defaults
+    /// is silently wrong by 69 seconds whenever it guesses, and the whole value
+    /// of this command is that the scale is something you typed.
+    ///
+    /// `tt` and `tai` are exact. `tdb` reports the ±1.7 ms bound on a series
+    /// this crate does not evaluate. `utc` and `ut1` are refused, with reasons.
+    #[cfg(feature = "civil")]
+    FromJd {
+        /// The date, as a decimal number of days: `2451545.0`.
+        value: String,
+        /// `tt`, `tai` or `tdb`. Required.
+        #[arg(long)]
+        scale: String,
+        /// Read the value as a Modified Julian Date: `JD - 2400000.5`.
+        #[arg(long)]
+        mjd: bool,
+    },
+    /// Absolute time as a Julian Date, exactly.
+    #[cfg(feature = "civil")]
+    ToJd {
+        /// A `UC1` text form, a UCID, or a decimal tick count.
+        instant: String,
+        /// `tt`, `tai` or `tdb`. Required.
+        #[arg(long)]
+        scale: String,
+        /// Emit a Modified Julian Date instead.
+        #[arg(long)]
+        mjd: bool,
+        /// Fractional digits in the rendered decimal. The exact rational is
+        /// emitted beside it either way.
+        #[arg(long, default_value_t = 6)]
+        digits: u32,
+    },
     /// Convert a civil date to absolute time. Exact or an error, never rounded.
     #[cfg(feature = "civil")]
     FromCivil {
@@ -195,6 +230,17 @@ enum Command {
         #[arg(long, default_value = "earth-d,mars-d,earth-civil")]
         calendars: String,
     },
+    /// Published linear ephemerides, with the uncertainty they were published
+    /// with (B).
+    ///
+    /// `T(E) = T_0 + E·P`, and the useful answer is the **window**
+    /// `± k·√(σ_T₀² + (E·σ_P)²)` — which is what decides whether an observation
+    /// is worth scheduling, and what most tooling drops.
+    #[cfg(all(feature = "events", feature = "civil"))]
+    Ephem {
+        #[command(subcommand)]
+        what: EphemCommand,
+    },
     /// Cited, interval-valued milestones (§17).
     #[cfg(feature = "events")]
     Events {
@@ -246,6 +292,43 @@ enum Command {
         /// Step tier: a name, `T<k>`, or `5^e`.
         #[arg(long, default_value = "sweep")]
         step: String,
+    },
+    /// Gravitational time dilation at a radius, as a certified interval.
+    ///
+    /// `dτ/dt = √(1 − r_s/r)`, bracketed by integer square roots — proved to
+    /// contain the value rather than converged to it. Reports the redshift `z`
+    /// too, which is the measured quantity for stars and white dwarfs.
+    #[cfg(feature = "cosmo")]
+    Dilate {
+        /// `r_s/r`, dimensionless, in `[0, 1)`. A decimal or a fraction.
+        #[arg(long = "rs-over-r")]
+        rs_over_r: String,
+        /// Decimal places to bracket to. The cost is quadratic in this.
+        #[arg(long, default_value_t = 40)]
+        digits: u32,
+        /// Decimal places to render.
+        #[arg(long, default_value_t = 18)]
+        show: u32,
+        /// A clock in a **circular orbit** at that radius rather than static:
+        /// `√(1 − 3r_s/2r)`, gravitational and kinematic dilation together.
+        /// Refused at or inside the photon sphere, `r_s/r ≥ 2/3`.
+        #[arg(long)]
+        orbiting: bool,
+    },
+    /// How long light takes to cross a distance.
+    ///
+    /// `m`, `au` and `ly` convert exactly; `pc` is bracketed, because a parsec
+    /// is defined as `648000/π` astronomical units.
+    #[cfg(feature = "civil")]
+    Lighttime {
+        /// The distance, as a decimal.
+        distance: String,
+        /// `m`, `au`, `ly` or `pc`.
+        #[arg(long, default_value = "au")]
+        unit: String,
+        /// Decimal places to render.
+        #[arg(long, default_value_t = 9)]
+        digits: u32,
     },
     /// Flat ΛCDM, by certified integer quadrature (§10).
     #[cfg(feature = "cosmo")]
@@ -394,6 +477,54 @@ enum CosmoCommand {
     },
     /// The parameter set, its provenance, and the measured GE-1/GE-2 outcomes.
     Model,
+}
+
+/// B — the ephemeris subcommands.
+#[cfg(all(feature = "events", feature = "civil"))]
+#[derive(Subcommand)]
+enum EphemCommand {
+    /// The declaration, as loaded from a file.
+    Show {
+        /// Path to an ephemeris file.
+        file: String,
+    },
+    /// The window for one cycle.
+    At {
+        /// Path to an ephemeris file.
+        file: String,
+        /// Which cycle. Signed: negative is before the epoch.
+        #[arg(long, allow_negative_numbers = true)]
+        cycle: i64,
+        /// How many σ the window spans on each side. 1 is the published
+        /// uncertainty; observers usually want 3.
+        #[arg(long, default_value_t = 1)]
+        sigmas: u32,
+    },
+    /// Observed minus calculated, per observation.
+    Residuals {
+        /// Path to an ephemeris file.
+        file: String,
+        /// A file of observed instants, one per line, or `-` for stdin.
+        #[arg(long, default_value = "-")]
+        observed: String,
+        /// How many σ the window spans on each side.
+        #[arg(long, default_value_t = 1)]
+        sigmas: u32,
+    },
+    /// The coming events after an instant.
+    Next {
+        /// Path to an ephemeris file.
+        file: String,
+        /// A `UC1` text form, a UCID, or a decimal tick count.
+        #[arg(long, default_value = "now")]
+        after: String,
+        /// How many σ the window spans on each side.
+        #[arg(long, default_value_t = 3)]
+        sigmas: u32,
+        /// How many events to report.
+        #[arg(long, default_value_t = 3)]
+        count: u32,
+    },
 }
 
 #[cfg(feature = "events")]
@@ -820,6 +951,19 @@ fn main() {
             }
         }
         #[cfg(feature = "cosmo")]
+        Command::Dilate {
+            rs_over_r,
+            digits,
+            show,
+            orbiting,
+        } => ucal::cmd_dilate(rs_over_r, *digits, *show, *orbiting),
+        #[cfg(feature = "civil")]
+        Command::Lighttime {
+            distance,
+            unit,
+            digits,
+        } => ucal::cmd_lighttime(distance, unit, *digits),
+        #[cfg(feature = "cosmo")]
         Command::Cosmo { what } => match what {
             CosmoCommand::Age {
                 z,
@@ -834,6 +978,26 @@ fn main() {
                 scale,
             } => ucal::cmd_cosmo_z(at, *tolerance_years, *depth, *scale),
             CosmoCommand::Model => ucal::cmd_cosmo_model(),
+        },
+        #[cfg(all(feature = "events", feature = "civil"))]
+        Command::Ephem { what } => match what {
+            EphemCommand::Show { file } => ucal::cmd_ephem_show(file),
+            EphemCommand::At {
+                file,
+                cycle,
+                sigmas,
+            } => ucal::cmd_ephem_at(file, *cycle, *sigmas),
+            EphemCommand::Residuals {
+                file,
+                observed,
+                sigmas,
+            } => ucal::cmd_ephem_residuals(file, observed, *sigmas),
+            EphemCommand::Next {
+                file,
+                after,
+                sigmas,
+                count,
+            } => ucal::cmd_ephem_next(file, pick(replacement, after), *sigmas, *count),
         },
         #[cfg(feature = "events")]
         Command::Events { what } => match what {
@@ -1005,6 +1169,17 @@ fn main() {
             }
         }
         Command::Now { precision, form } => run_now(&cli.locale, precision, form),
+        #[cfg(feature = "civil")]
+        Command::FromJd { value, scale, mjd } => {
+            ucal::cmd_from_jd(pick(replacement, value), scale, *mjd)
+        }
+        #[cfg(feature = "civil")]
+        Command::ToJd {
+            instant,
+            scale,
+            mjd,
+            digits,
+        } => ucal::cmd_to_jd(pick(replacement, instant), scale, *mjd, *digits),
         #[cfg(feature = "civil")]
         Command::FromCivil {
             date,

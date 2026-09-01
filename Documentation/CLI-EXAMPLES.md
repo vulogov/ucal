@@ -952,6 +952,214 @@ it. It is not a measurement of the universe — it is what this parameter set
 implies, with the parameter set's own uncertainty carried through (Rule X).
 ```
 
+## `ucal lighttime 1 --unit ly`
+
+A light-year is defined as a Julian year times c, so its light-travel time is that year exactly — 31 557 600 s with no remainder. A light-year is a time unit wearing a distance's clothes. One astronomical unit of light-time, 499.004783836 s, is also the largest a barycentric correction can be, for any target and any date.
+
+```
+ucal lighttime
+──────────────
+distance          1 ly
+exact             true
+ticks             585348807057053493600000000000000000000000000000000
+seconds           31557600.000000000
+as_ratio_seconds  31557600/1
+
+A light-year is *defined* as a Julian year times `c`, so its light-travel time
+is a Julian year — 31 557 600 s exactly, with no remainder. A light-year is a
+time unit wearing a distance's clothes, and the conversion is the identity.
+
+`c` is exact by definition (the metre is defined from it) and the astronomical
+unit has been exact since IAU 2012 Resolution B2. **One astronomical unit of
+light-time, 499.004783836… s, is also the largest a barycentric correction can
+be** — for any target and any date. The correction's *value* needs an
+ephemeris; the bound needs nothing, and answers whether a measurement is
+sensitive to it at all.
+```
+
+## `ucal lighttime 1 --unit pc`
+
+And the unit that cannot convert exactly. A parsec is defined as 648000/pi astronomical units — an exact definition of an irrational number — so the answer is a bracket and no decimal for it is the value.
+
+```
+ucal lighttime
+──────────────
+distance  1 pc
+exact     false
+seconds:
+  lo  102927125.054339001
+  hi  102927125.054339001
+certification:
+  rounded, trunc, 9 digits  lo, hi
+  every other number above is exact: the digits shown are the value
+
+A parsec is defined as `648000/π` astronomical units — an exact definition of
+an irrational number — so the answer is a bracket and no decimal for it is the
+value. Two of the three units here convert exactly and this one cannot, for a
+reason about the definition rather than about this program.
+
+`c` is exact by definition (the metre is defined from it) and the astronomical
+unit has been exact since IAU 2012 Resolution B2. **One astronomical unit of
+light-time, 499.004783836… s, is also the largest a barycentric correction can
+be** — for any target and any date. The correction's *value* needs an
+ephemeris; the bound needs nothing, and answers whether a measurement is
+sensitive to it at all.
+```
+
+## `ucal from-jd 2451545.0 --scale tcb`
+
+Barycentric Coordinate Time, whose offset from TDB is a *defining* constant rather than a measurement — so that step is exact and the answer carries only TDB's own bound, not a tick more. TCB runs ahead of TDB by 0.489 s per Julian year, which reaches a minute inside two centuries.
+
+```
+ucal from-jd
+────────────
+ticks  8070205173569972754741832104732271481136685314812878837890625
+human  UC1 0031·0687·2481·1163·2191·0517:2863·3020·1358·2092·1852·2443·2769·
+       0031·2038·1293·0000·0000
+ucid   0000000000050PM6JSRZ1J9ZF64AZ6N34WEJS3ZXZJGDSSX6VFJ1
+input:
+  jd     2451545.0
+  jd     2451545/1
+  scale  tcb
+window:
+  lo           8070205173569972754741832104732271481136685314812878837890625
+  hi           8070205173569972754804897291691798881136685314812878837890625
+  width_ticks  63065186959527400000000000000000000000000
+
+`ticks` above is the low end. TDB differs from TT by a periodic series whose
+evaluation needs floating point, which Rule E forbids in a shipped crate — so
+the answer carries the series' bound of ±1.7 ms instead of a centre that would
+look exact. Rule U: the window is the value.
+```
+
+## `ucal dilate --rs-over-r 0.0000042467 --show 18`
+
+The Sun's surface, bracketed to eighteen places by integer square roots. `f64` computing the same redshift keeps about eight of its sixteen digits, because `1/sqrt(1-x) - 1` in the weak field subtracts two numbers that agree to six places. The interval is proved to contain the value rather than converged to it.
+
+```
+ucal dilate
+───────────
+rs_over_r  42467/10000000000
+observer   static at r — gravitational dilation only, √(1 − r_s/r)
+digits     40
+proper_per_coordinate:
+  lo  0.999997876647745687
+  hi  0.999997876647745688
+coordinate_per_proper:
+  lo  1.000002123356762946
+  hi  1.000002123356762947
+redshift_z:
+  lo  0.000002123356762946
+  hi  0.000002123356762947
+certification:
+  rounded, trunc, 18 digits  lo
+  rounded, ceil, 18 digits   hi
+  every other number above is exact: the digits shown are the value
+
+Certified, not iterated: the two ends use `isqrt_floor` and `isqrt_ceil`, so
+the interval is **proved** to contain the value rather than converged to it.
+The same standard `cosmo` holds its quadrature to.
+
+Exactness earns its keep at the two ends, not in the middle. `z = 1/√(1−x) − 1`
+in `f64` keeps about 8 of its 16 digits at the Sun's surface and about 1 just
+outside a horizon, both to cancellation; a neutron star at r_s/r = 0.35 is
+where a double does best. The solar and white-dwarf redshifts are measured
+quantities, and they sit in the band where the float has already lost half its
+digits.
+
+This is the ratio between two clocks and not a claim that either is the one
+`ucal` keeps. Tick 0 is the FLRW t→0 limit, so absolute time here is a
+cosmological coordinate; giving UC-1 a stated frame is a 2.0 question, because
+one unsigned integer per instant asserts there is one time.
+```
+
+## `ucal ephem residuals Documentation/examples/ephemeris.hjson --observed Documentation/examples/observations.txt`
+
+O minus C, the standard instrument of variable-star and pulsar work. The four synthetic observations are the predicted centres of four cycles moved by 0, +3, -7 and +41 seconds, so the residuals are known in advance and the arithmetic can be checked by eye. The last is outside its own window and the others are not — which is the point of carrying a width that grows with the cycle.
+
+```
+ucal ephem residuals
+────────────────────
+id                  example
+observations        4
+outside_the_window  1
+residuals:
+  cycle  observed
+  ─────  ─────────────────────────────────────────────────────────────
+  0      8070205175623907873429294080830071880530466139316558837890624
+         calculated  80702051756239078734292940808300718805304661393165588378906
+                     25
+         o_minus_c_ticks  1
+         direction  early
+         half_width_ticks  139457531810354928500000000000000000000000000
+         within  true
+  100    8070205176188783324648635603786425480530466139316558837890624
+         calculated  80702051761887832690028824042034254805304661393165588378906
+                     25
+         o_minus_c_ticks  55645753199582999999999999999999999999999999
+         direction  late
+         half_width_ticks  152174427347804015506965194791676480586918702
+         within  true
+  250    8070205177036096232523174090236455880530466139316558837890624
+         calculated  80702051770360963623632648892634558805304661393165588378906
+                     25
+         o_minus_c_ticks  129840090799027000000000000000000000000000001
+         direction  early
+         half_width_ticks  206464247337428117497454246549902820677142135
+         within  true
+  500    8070205178448285611789196091997839880530466139316558837890624
+         calculated  80702051784482848512972356976968398805304661393165588378906
+                     25
+         o_minus_c_ticks  760491960394300999999999999999999999999999999
+         direction  late
+         half_width_ticks  334910035947766581224283466812573678432981384
+         within  false
+
+`O − C` is exact integer subtraction, and each residual is placed against the
+window for its own cycle — which grows with distance from the epoch, so the
+same shift can be inside one window and outside another.
+
+**This reports and does not fit.** A quadratic trend in these residuals is `Ṗ`,
+and extracting it is least squares — which is where a reader most needs to know
+which code produced the number, so it is not produced here.
+```
+
+## `ucal ephem at Documentation/examples/ephemeris.hjson --cycle 5000`
+
+A prediction five thousand cycles past a fit that covers five hundred. The window is the answer — it has grown from 7.5 s at the epoch to 164 s here — and `UCAL-W0003` says the fit does not reach this far. The figures in that file are illustrative and cite nothing, which it states.
+
+```
+ucal ephem at
+─────────────
+id  example
+prediction:
+  cycle             5000
+  centre_ticks      807020520386767765210871024949775188053046613931655883789062
+                    4
+  lo                807020520386767460398120255424865432871303364528914287047265
+                    0
+  hi                807020520386768070023621794474684943234789863334397480530860
+                    0
+  half_width_ticks  3048127507695249097551817432494027415967417974
+  sigmas            1
+
+The window is what the answer is. `half_width_ticks` is `k·√(σ_T₀² +
+(E·σ_P)²)`, so a prediction far from the epoch is wider than one near it —
+which is the quantity that decides whether an observation is worth scheduling,
+and the one most tooling drops.
+
+UCAL-W0003: body parameter evaluated outside its validity window. Rule C makes
+a parameter valid over a stated interval and forbids silent extrapolation, so
+this instant lies outside the window at least one of this body's figures was
+published for. The fields above are computed from the values at the epoch — see
+`ucal cal show <id>` for the windows themselves
+
+Cycle 5000 is outside the range this fit covers (-500 .. 500). Rule C requires
+the warning and forbids extrapolating silently; it does not forbid
+extrapolating, because that is what a reader is going to do and the useful
+thing is to say how far out they have gone.
+```
+
 ## `ucal verify`
 
 The binary re-deriving the constants it ships with, and saying plainly that agreeing with itself is not verification.
@@ -1095,6 +1303,54 @@ fields:
 rounding     halfeven
 lossy        false
 warning      UCAL-W0005: value produced by a legacy (non-derived) calendar
+```
+
+## `ucal from-jd 2451545.0 --scale tt`
+
+J2000.0, the epoch every parameter in this project is stated at, and the first time this program could convert it. `--scale` is required and has no default: a converter that defaults is silently wrong by 69 seconds whenever it guesses.
+
+```
+ucal from-jd
+────────────
+ticks  8070205173569972963515184424835637180530466139316558837890625
+human  UC1 0031·0687·2481·1163·2191·0758:1924·0749·2247·0012·1174·0800·0000·
+       0000·0000·0000·0000·0000
+ucid   0000000000050PM6JSRZ1JEN8CJ8JG0H3SXHYWVS2CY7KBM29FJ1
+input:
+  jd     2451545.0
+  jd     2451545/1
+  scale  tt
+
+Exact: a Julian day is a whole number of ticks, so nothing here is rounded.
+`TT` is the pivot and `TT = TAI + 32.184 s` exactly. The scale is required and
+has no default, because a converter that defaults is silently wrong by 69
+seconds whenever it guesses.
+```
+
+## `ucal from-jd 2460000.5 --scale tdb`
+
+The same conversion in a scale that is not exact. TDB differs from TT by a periodic series whose evaluation needs floating point, which Rule E forbids here — so the answer is a window carrying the series' 1.7 ms bound, rather than a centre that would look exact.
+
+```
+ucal from-jd
+────────────
+ticks  8070205187120737749440984658555873480530466139316558837890625
+human  UC1 0031·0687·2481·2763·1541·0134:0558·2432·0156·0826·0630·0023·0035·
+       0000·0000·0000·0000·0000
+ucid   0000000000050PM6K2TPVFCTBADGEDG60D4QW3N7DZB7MXT29FJ1
+input:
+  jd     2460000.5
+  jd     4920001/2
+  scale  tdb
+window:
+  lo           8070205187120737749440984658555873480530466139316558837890625
+  hi           8070205187120737749504049845515400880530466139316558837890625
+  width_ticks  63065186959527400000000000000000000000000
+
+`ticks` above is the low end. TDB differs from TT by a periodic series whose
+evaluation needs floating point, which Rule E forbids in a shipped crate — so
+the answer carries the series' bound of ±1.7 ms instead of a centre that would
+look exact. Rule U: the window is the value.
 ```
 
 ## `ucal from-civil 2026-08-07`

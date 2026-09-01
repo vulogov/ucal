@@ -33,6 +33,7 @@ shows what they *look like*.
 - [Global options](#global-options)
 - [Reading a timestamp](#reading-a-timestamp)
 - [Exit codes](#exit-codes)
+- [Consuming this from another language](INTEROP.md)
 - Commands: [`now`](#ucal-now) · [`datum`](#ucal-datum) ·
   [`explain`](#ucal-explain) · [`between`](#ucal-between) ·
   [`from-civil`](#ucal-from-civil) ·
@@ -267,6 +268,89 @@ exactly representable at spark granularity.
 **Why no SI unless asked.** A second is an Earth unit, and the interval between
 two absolute instants is not an Earth quantity. `--bridge` converts on request
 (Rule A.5, D-A16).
+
+---
+
+## `ucal from-jd`
+
+```
+ucal from-jd <VALUE> --scale <tt|tai|tdb> [--mjd]
+```
+
+A Julian Date, in a named scale, as absolute time.
+
+**Every cited parameter in this project is indexed by JD in its source**, and
+J2000.0 — the epoch the body layer hangs on — *is* JD 2451545.0 TT. Until 1.12.0
+checking a shipped figure against the paper it came from was a hand operation.
+
+```
+ucal from-jd 2451545.0 --scale tt        # J2000.0, exactly
+ucal from-jd 51544.5   --scale tt --mjd  # the same instant
+ucal from-jd 2460000.5 --scale tdb       # a window, not a point
+```
+
+**`--scale` is required and has no default.** A converter that defaults is
+silently wrong by 69 seconds whenever it guesses, and the entire value of this
+command is that the scale is something you typed. `TT − TAI` is 32.184 s exactly;
+`TT − UTC` is 69.184 s today and changes without warning.
+
+| | answer |
+|---|---|
+| `--scale tt` | Exact. Terrestrial Time is the pivot. |
+| `--scale tai` | Exact. The same numeral in TAI names an instant 32.184 s later than in TT. |
+| `--scale tdb` | A **window** of ±1.7 ms — the bound on a periodic series this crate does not evaluate. |
+| `--scale tcg` | **Exact.** `TCG − TT` is a *defining* linear rate, `L_G = 6.969290134 × 10⁻¹⁰` (IAU 2000 B1.9). |
+| `--scale tcb` | Exact relative to `TDB`, `L_B = 1.550519768 × 10⁻⁸` (IAU 2006 B3) — so it carries `TDB`'s ±1.7 ms and **not a tick more**. |
+| `--scale utc` | Refused: a UTC day containing a leap second has 86401 s, so `JD(UTC)` is not a uniform day count. Use [`from-civil --scale utc`](#ucal-from-civil), which has the leap table. |
+| `--scale ut1` | Refused: needs ΔUT1, an observed IERS quantity this repository does not carry and Rule C will not let it invent. |
+
+**`TCG` and `TCB` are exactly what `TDB` is not.** Their offsets from `TT` and
+`TDB` are *defining constants* — decisions the IAU took, not quantities anybody
+measured — and both are terminating decimals, so both conversions are exact
+rationals. And the difference is large: **`TCB` runs ahead of `TDB` by 0.489 s
+per Julian year** and `TCG` ahead of `TT` by 0.022 s, reaching a minute inside
+two centuries. Confusing them is a linear drift, not a rounding.
+
+**Why TDB is a window.** The difference from TT is a periodic series whose
+evaluation is floating point, which Rule E forbids in a shipped crate. Reporting
+its centre without its width would claim a precision that is not here, and
+ignoring it would be a 1.7 ms error stated as exact. Rule U: the window is the
+value, and a zero-width window and a ±1.7 ms one are the same kind of answer.
+
+| field | meaning |
+|---|---|
+| `input.jd` | The date as an exact rational, after any `--mjd` offset. |
+| `input.scale` | The scale you named. There is no default. |
+| `window.lo` / `window.hi` / `window.width_ticks` | Present only when the scale is not exact. |
+
+A date needing more decimal places than a tick can express — about 34 — is
+`UCAL-E0043` rather than a rounding.
+
+---
+
+## `ucal to-jd`
+
+```
+ucal to-jd <INSTANT> --scale <tt|tai|tdb> [--mjd] [--digits <N>]
+```
+
+The inverse. A tick count is an integer and a Julian day is a whole number of
+ticks, so the quotient is an exact rational; `exact` carries it and the decimal
+beside it is a rendering (Rule R).
+
+```
+ucal to-jd $(ucal now --json | jq -r .ticks) --scale tt
+```
+
+| field | meaning |
+|---|---|
+| `ticks` | The instant, as given. |
+| `scale` | The scale you named. |
+| `jd` / `mjd` | The date, rendered to `--digits` places. A rendering, and the only place a value may be rounded (Rule R). |
+| `exact` | The same value as an exact rational, which is what the conversion actually produced. |
+
+For `tdb` the value is the **TT** Julian Date, with the ±1.7 ms bound stated
+beside it rather than folded into a number that would then look exact.
 
 ---
 
@@ -669,6 +753,12 @@ Write a shipped calendar out as the §15.1 body file that declares it — HJSON 
 stdout, because a generator's output is an input to something else, here
 `cal validate` and `cal derive`.
 
+`--json` does not apply: the output is a body file, and a document would not
+round-trip into `cal derive`. Like [`seq`](#ucal-seq), [`man`](#ucal-man) and
+[`completions`](#ucal-completions), this command contributes nothing to the
+`ucal-json/1` surface, and since 1.12.0 a check requires it to say so rather
+than leaving a deliberate absence indistinguishable from an oversight.
+
 ```
 ucal cal export mars > mars.hjson
 ucal cal validate mars.hjson
@@ -1011,6 +1101,209 @@ ucal ruler --from <INSTANT> --to <INSTANT> --step <TIER>
 | `step` | The tier between marks. |
 | `whole_steps` | How many whole steps fit between the bounds. |
 | `marks.<n>` | Each mark, rendered at the step tier. |
+
+---
+
+## `ucal ephem`
+
+```
+ucal ephem show <FILE>
+ucal ephem at   <FILE> --cycle <E> [--sigmas <K>]
+ucal ephem next <FILE> [--after <T>] [--sigmas <K>] [--count <N>]
+ucal ephem residuals <FILE> [--observed <FILE|->] [--sigmas <K>]
+```
+
+A published linear ephemeris, **carrying the uncertainty it was published with**.
+
+Nearly every repeating astronomical event is published as `T(E) = T₀ + E·P`, and
+the useful answer is not `T(E)`. It is the window `± k·√(σ_T₀² + (E·σ_P)²)`,
+because that is what decides whether an observation is worth scheduling. Most
+tooling computes the centre and drops the width, so an observer books thirty
+minutes for an event predicted to ±forty.
+
+```
+ucal ephem show Documentation/examples/ephemeris.hjson
+ucal ephem at   Documentation/examples/ephemeris.hjson --cycle 5000
+ucal ephem next Documentation/examples/ephemeris.hjson --after now --count 5
+```
+
+**The window grows, and that is the feature.** On the example file the half-width
+runs 7.5 s at the epoch, 34 s at cycle 1000, and 164 s at cycle 5000.
+
+**`UCAL-W0003` when the cycle is outside the fitted range.** `fitted_cycles` is
+required in the file, because it is the only field that makes the warning mean
+anything — without it every extrapolation looks exactly like an interpolation.
+Rule C forbids extrapolating *silently*, not extrapolating: a reader is going to
+do it, and the useful thing is to say how far out they have gone.
+
+| field | meaning |
+|---|---|
+| `epoch.ticks` / `epoch.sigma_ticks` | `T₀` and its published 1σ. A `tdb` epoch's own ±1.7 ms is added to σ rather than reported as if it were the source's measurement. |
+| `period.as_published` | The period exactly as the source printed it (Rule Y.1). |
+| `period.days` / `period.sigma_days` | `P` and its published 1σ, converted to days for reading. The tick value is what the arithmetic uses. |
+| `after` | The instant `next` counted from, echoed so the answer carries its own question. |
+| `period.pdot` | `Ṗ`, dimensionless. Acts through `E²`, so it pushes past and future cycles the same way. |
+| `fitted_cycles` | The range the published fit covers. |
+| `prediction.centre_ticks` | The predicted instant. |
+| `prediction.half_width_ticks` | `k·√(σ_T₀² + (E·σ_P)²)`. **The answer.** |
+| `prediction.sigmas` | The `k` asked for. `1` is the published uncertainty; observers usually want `3`. |
+| `position.cycle` / `position.phase` | Where `--after` falls. |
+| `upcoming.<cycle>` | One row per coming event. |
+
+**`residuals` is `O − C`**, the standard instrument of variable-star and pulsar
+work: observed minus calculated, per observation, as exact integer subtraction.
+Each residual is placed against the window for **its own cycle**, which grows
+with distance from the epoch — so the same shift can be inside one window and
+outside another, which is invisible to anything that compares only centres.
+Observations are read one per line from a file or from `-`; blank lines and `#`
+comments are skipped, and reading none is an error rather than a report of
+agreement having compared nothing.
+
+The cycle is the **nearest**, not the containing one: an eclipse seen three
+seconds early is an observation of the cycle it was early *for*, not a very late
+observation of the one before.
+
+**It reports and does not fit.** A quadratic trend in the residuals is `Ṗ`, and
+extracting it is least squares — which is where a reader most needs to know which
+code produced the number, so it is not produced here.
+
+| field | meaning |
+|---|---|
+| `observations` | How many were read. |
+| `outside_the_window` | How many residuals exceed their own `k`σ half-width. |
+| `residuals.<cycle>.observed` | The instant read in. |
+| `residuals.<cycle>.calculated` | What the ephemeris predicts for that cycle, with no uncertainty applied. |
+| `residuals.<cycle>.o_minus_c_ticks` | `\|O − C\|`, exactly. |
+| `residuals.<cycle>.direction` | `late` or `early`. The count is unsigned (Rule B). |
+| `residuals.<cycle>.within` | Whether it is inside the window for that cycle. |
+
+**Quadrature assumes independence.** From a joint fit `σ_T₀` and `σ_P` are
+correlated and the covariance is usually not published; the convention of placing
+`T₀` near the centre of the data span exists precisely to minimise it. Where a
+source states a covariance, this is an underestimate and the source's window
+should be used instead.
+
+**This release ships no ephemerides**, and the reason is Rule C rather than
+effort. A shipped one must quote `T₀`, `P` and both σ verbatim from a paper, and
+a figure typed from memory is the defect `cal validate` found in this project's
+own `europa.hjson`. [`ephemeris.hjson`](examples/ephemeris.hjson) is a **format
+example whose figures are illustrative and cite nothing**, and it says so.
+
+---
+
+## `ucal lighttime`
+
+```
+ucal lighttime <DISTANCE> [--unit <m|au|ly|pc>] [--digits <N>]
+```
+
+How long light takes to cross a distance. **Three units, three kinds of answer**,
+because `c` and the astronomical unit are exact *by definition* and the parsec is
+not:
+
+| | light-travel time | kind |
+|---|---|---|
+| `--unit ly` | **31 557 600 s exactly** | an integer |
+| `--unit au` | `1024642950/2053373` s = 499.004783836… s | an exact rational |
+| `--unit m` | `d/c` | an exact rational |
+| `--unit pc` | `648000/π` au | **bracketed** |
+
+```
+ucal lighttime 1 --unit ly     # a Julian year, exactly
+ucal lighttime 1 --unit au     # 499.004783836… s
+ucal lighttime 1 --unit pc     # a bracket, not a number
+```
+
+**A light-year is a time unit wearing a distance's clothes.** It is *defined* as
+a Julian year times `c`, so its light-travel time is that year with no remainder
+at all, and the conversion is the identity.
+
+**A parsec cannot convert exactly**, for a reason about its definition rather
+than about this program: `648000/π` au is an exact definition of an irrational
+number, so the answer is a bracket and no decimal for it is the value.
+
+**One astronomical unit of light-time is also the largest a barycentric
+correction can be** — for any target, any date. The correction's *value* needs an
+ephemeris, which this project deliberately does not carry; the bound needs
+nothing, and answers the question most people asking actually have: *is my
+measurement even sensitive to this?*
+
+| field | meaning |
+|---|---|
+| `distance` | The input, with its unit. |
+| `exact` | Whether this unit converts exactly. |
+| `ticks` / `seconds` / `as_ratio_seconds` | The answer, for an exact unit. |
+| `seconds.lo` / `seconds.hi` | The bracket, for a parsec. |
+
+---
+
+## `ucal dilate`
+
+```
+ucal dilate --rs-over-r <X> [--digits <N>] [--show <N>]
+```
+
+Gravitational time dilation at a radius, as a **certified** interval:
+
+```
+dτ/dt = √(1 − r_s/r)          proper time per unit coordinate time
+z     = 1/√(1 − r_s/r) − 1    the gravitational redshift
+```
+
+Bracketed by `isqrt_floor` and `isqrt_ceil` in exact rationals — **proved** to
+contain the value, not converged to it. `--rs-over-r` takes a decimal or a
+fraction; `1/2` and `0.5` are the same input.
+
+```
+ucal dilate --rs-over-r 0.0000042467      # the Sun's surface
+ucal dilate --rs-over-r 0.35              # a neutron star
+ucal dilate --rs-over-r 999999/1000000    # just outside a horizon
+```
+
+**Exactness earns its keep at the two ends, not in the middle.** Computing
+`z = 1/√(1−x) − 1` in `f64`, against the exact value:
+
+| | `r_s/r` | correct digits in `f64` |
+|---|---|---|
+| the Sun | 4.25 × 10⁻⁶ | **~8** of 16 |
+| Sirius B, a white dwarf | 1.15 × 10⁻⁴ | ~11 |
+| a neutron star | 0.35 | ~14 |
+| just outside a horizon | 0.999999 | **~1** |
+
+In the weak field `1/√(1−x)` is a hair above 1 and subtracting 1 throws away half
+the mantissa; near the horizon `1 − x` is itself the cancellation. The neutron
+star — the case that *sounds* like it needs care — is where a double does best.
+So this is **not only a black-hole tool**: the solar gravitational redshift is a
+measured quantity, white dwarf redshifts are how their masses are checked, and
+both sit where `f64` has already lost half its digits.
+
+| field | meaning |
+|---|---|
+| `rs_over_r` | The input, as an exact fraction. |
+| `observer` | Static, or in a circular orbit — which formula was used. |
+| `digits` | Places the bracketing was carried to. Cost is quadratic in this. |
+| `proper_per_coordinate` | `√(1 − r_s/r)`, as `lo`/`hi`. |
+| `coordinate_per_proper` | Its reciprocal. |
+| `redshift_z` | `1/√(1 − r_s/r) − 1`. |
+
+**`--orbiting` is the other case.** A *static* observer at `r` runs at
+`√(1 − r_s/r)`; one in a **circular orbit** runs at `√(1 − 3r_s/(2r))`, combining
+gravitational and kinematic dilation. That is the GPS case, the S2-star case and
+every binary pulsar. It is refused at `r_s/r ≥ 2/3` — the **photon sphere**,
+where a circular orbit would need the speed of light and inside which none
+exists. A different radius from the horizon, and the message says so, because a
+caller who reaches it has confused the two.
+
+**`r_s/r ≥ 1` is refused.** At `r = r_s` the factor is zero, and inside, the
+Schwarzschild radial coordinate is not a clock at all — the coordinate that was
+time outside the horizon is not time inside it. That is a change in what the
+question means, not a larger number.
+
+**It reports a ratio between two clocks and does not claim either is the one
+`ucal` keeps.** Tick 0 is the FLRW `t → 0` limit, so absolute time here is a
+cosmological coordinate. Giving `UC-1` a stated frame is a 2.0 question, because
+one unsigned integer per instant asserts there is one time — which is the thing
+general relativity denies.
 
 ---
 
