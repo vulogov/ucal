@@ -227,6 +227,47 @@ pub fn circular_orbit(ratio: &Ratio, digits: u32) -> Result<Dilation> {
     Ok(out)
 }
 
+/// **V3 — kinematic dilation: a clock that is moving, in flat spacetime.**
+///
+/// `dτ/dt = √(1 − β²)`, `β = v/c`. The case every physicist meets first, and the
+/// one this module was missing: [`schwarzschild`] is a clock deep in a well and
+/// [`circular_orbit`] is a clock in a well *and* moving, so this is the third
+/// corner and the only one with no gravity in it at all.
+///
+/// # It is the weak-field cancellation case again
+///
+/// At `β = 10⁻⁴` — a fast spacecraft — `1 − √(1−β²)` is `5.0 × 10⁻⁹`, and an
+/// `f64` computing it by that expression subtracts two numbers agreeing to eight
+/// places. The bracket here does not: it works in `1 − β²` throughout and never
+/// forms the difference at all.
+///
+/// # `β ≥ 1` is refused
+///
+/// Not because the arithmetic breaks — `1 − β²` would go negative and `Ratio` is
+/// unsigned, so it breaks too — but because it is a different question. A clock
+/// at or above `c` is not a slow clock; it is not a clock.
+pub fn kinematic(beta: &Ratio, digits: u32) -> Result<Dilation> {
+    if beta.cmp_exact(&Ratio::one()) != core::cmp::Ordering::Less {
+        return Err(TimeError::with_context(
+            Code::E0018,
+            "β = v/c must be below 1. At β = 1 the factor is zero and above it \
+             there is no factor: a clock at or beyond the speed of light is not \
+             a slow clock, it is not a clock, and that is a change in the \
+             question rather than a larger number",
+        ));
+    }
+    // `√(1 − β²)` shares every line below with the gravitational case once the
+    // argument is formed, so it is formed and handed over rather than a second
+    // square root being written. `β²` is exact; `1 − β²` is exact; the root is
+    // the only bracketed step, in one place.
+    let b2 = beta.mul(beta)?;
+    let mut out = schwarzschild(&b2, digits)?;
+    // `schwarzschild` reports the `r_s/r` it was given, which here is `β²`. The
+    // caller asked about `β`.
+    out.ratio = beta.clone();
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -366,6 +407,53 @@ mod tests {
         }
         // And just inside the bound it still answers.
         assert!(circular_orbit(&r(66, 100), 20).is_ok());
+    }
+
+    // ---- V3 ----
+
+    /// The textbook values, bracketed.
+    ///
+    /// `β = 3/5` gives exactly `4/5`, and `β = 12/13` gives exactly `5/13` —
+    /// the Pythagorean triples, which are the one place this function has an
+    /// exact rational answer and the bracket must therefore pin it.
+    #[test]
+    fn a_pythagorean_beta_brackets_an_exact_answer() {
+        for (bn, bd, wn, wd) in [(3u64, 5u64, 4u64, 5u64), (12, 13, 5, 13)] {
+            let out = kinematic(&r(bn, bd), 30).expect("in range");
+            let want = r(wn, wd);
+            assert!(
+                out.factor.contains(&want),
+                "{bn}/{bd}: bracket does not contain {wn}/{wd}"
+            );
+            assert_eq!(out.ratio.cmp_exact(&r(bn, bd)), core::cmp::Ordering::Equal);
+        }
+    }
+
+    /// A faster clock runs slower, monotonically.
+    #[test]
+    fn more_speed_is_more_dilation() {
+        let mut last: Option<Ratio> = None;
+        for (n, d) in [(1u64, 100u64), (1, 10), (1, 2), (9, 10), (99, 100)] {
+            let out = kinematic(&r(n, d), 30).expect("in range");
+            if let Some(prev) = last {
+                assert_eq!(
+                    out.factor.hi().cmp_exact(&prev),
+                    core::cmp::Ordering::Less,
+                    "{n}/{d} must be slower than the one before"
+                );
+            }
+            last = Some(out.factor.lo().clone());
+        }
+    }
+
+    /// `β ≥ 1` is refused, and says why it is a different question.
+    #[test]
+    fn light_speed_and_beyond_are_refused() {
+        for (n, d) in [(1u64, 1u64), (3, 2)] {
+            let e = kinematic(&r(n, d), 20).expect_err("not a clock");
+            assert_eq!(e.code, Code::E0018);
+            assert!(format!("{e}").contains("not a clock"), "{e}");
+        }
     }
 
     /// Zero digits is refused rather than answering `[0, 1]`.

@@ -1212,6 +1212,65 @@ example whose figures are illustrative and cite nothing**, and it says so.
 
 ---
 
+## `ucal from-epoch`
+
+```
+ucal from-epoch <EPOCH> --scale <tt|tai|tcg|tcb|tdb>
+```
+
+A Julian or Besselian epoch as absolute time. `J2000.0`, `B1950.0`, `J1991.25`
+(Hipparcos), `J2016.0` (Gaia DR3).
+
+**The `J` or `B` prefix is required.** `B1950.0` is `JD 2433282.42346` and
+`J1950.0` is `JD 2433282.50000` — **1.84 hours apart**, because a Julian epoch
+counts Julian years of exactly 365.25 days from J2000.0 while a Besselian epoch
+counts *tropical* years of 365.242198781 days from a 1900 origin. Older catalogue
+positions are published against B1950, and a bare figure does not say which is
+meant. Gaia DR3's `2016.0` is Julian: write `J2016.0`.
+
+Same reasoning as `--scale`: a default here is silently wrong by an amount that
+looks like nothing.
+
+| field | meaning |
+|---|---|
+| `input.epoch` | What you wrote. |
+| `input.kind` | Julian or Besselian, and which year length that is. |
+| `input.jd` | The Julian Date it comes to, as an exact rational. |
+
+---
+
+## `ucal figure`
+
+```
+ucal figure <VALUE> --sigma <SIGMA>
+```
+
+Does a value's **written precision** agree with its **stated uncertainty**?
+
+```
+ucal figure 3.52 --sigma 0.00000038      # INCONSISTENT
+```
+
+`3.52 ± 0.00000038` says two things that disagree: σ is 26 000 times finer than
+the value's last decimal place, so the value is written to fewer digits than its
+own uncertainty claims. `ephem validate` asks this of a period and `cal validate`
+of a body's parameters; this asks it of a number you have in your hand.
+
+Written places are a claim (Rule Y.1) — `3.52` and `3.520` are the same number
+and not the same statement. This compares the claim against the σ beside it and
+says nothing about whether either is right, only whether they agree.
+
+| field | meaning |
+|---|---|
+| `value` / `sigma` | The two figures, as given. |
+| `places.value_decimals` / `places.sigma_decimals` | How many were written. |
+| `places.value_exact` | The value as an exact rational, so you can see what was parsed. |
+| `places.value_last_place` | The unit of the value's last digit. |
+| `places.sigma_over_last_place` | The ratio between them. |
+| `consistent` / `verdict` | The answer. |
+
+---
+
 ## `ucal lighttime`
 
 ```
@@ -1300,8 +1359,8 @@ both sit where `f64` has already lost half its digits.
 
 | field | meaning |
 |---|---|
-| `rs_over_r` | The input, as an exact fraction. |
-| `observer` | Static, or in a circular orbit — which formula was used. |
+| `rs_over_r` / `beta` | The input, as an exact fraction. Named for which question was asked. |
+| `observer` | Static, in a circular orbit, or moving — which formula was used. |
 | `digits` | Places the bracketing was carried to. Cost is quadratic in this. |
 | `proper_per_coordinate` | `√(1 − r_s/r)`, as `lo`/`hi`. |
 | `coordinate_per_proper` | Its reciprocal. |
@@ -1314,6 +1373,13 @@ every binary pulsar. It is refused at `r_s/r ≥ 2/3` — the **photon sphere**,
 where a circular orbit would need the speed of light and inside which none
 exists. A different radius from the horizon, and the message says so, because a
 caller who reaches it has confused the two.
+
+**`--moving` is the third case**, and the one every physicist meets first: read
+the argument as `β = v/c` and get `√(1 − β²)`, a clock moving in flat spacetime
+with no gravity in it at all. It is a cancellation case too — at `β = 10⁻⁴` the
+quantity `1 − √(1−β²)` is `5 × 10⁻⁹`, where an `f64` subtracting two numbers that
+agree to eight places loses half its mantissa. `β ≥ 1` is refused: a clock at or
+beyond `c` is not a slow clock, it is not a clock.
 
 **`r_s/r ≥ 1` is refused.** At `r = r_s` the factor is zero, and inside, the
 Schwarzschild radial coordinate is not a clock at all — the coordinate that was
@@ -1453,6 +1519,78 @@ limit is not the step budget: the bisection midpoints leave the 512-bit domain
 at around step 125, with the bracket still some `7.8 × 10^26` ticks wide.
 
 ---
+
+### `cosmo distance`
+
+```
+ucal cosmo distance --z <Z> [--depth <N>] [--scale <N>]
+```
+
+The **comoving distance**, as a certified enclosure — the most-used number in
+observational cosmology, and one every calculator produces as a float with no
+error bound at all.
+
+`D_C/c = t_H ∫ du/√(Ω_r + Ω_m u + Ω_Λ u⁴)`, by the same quadrature `age` uses:
+with `u = 1/(1+z)` the two integrals **share a radicand exactly** and differ only
+in a numerator and their limits.
+
+**The answer is a light-travel time**, because that is what this crate can
+certify; metres follow from a `c` that is exact by definition, and a light-year
+is exactly a Julian year of it.
+
+```
+ucal cosmo distance --z 1.0 --depth 10
+  comoving_light_time  10 926 526 675 .. 11 225 919 237 light-years
+```
+
+**Read `arithmetic` against `parameter`** (Rule X). Measured at `z = 1`:
+
+| depth | arithmetic | parameter | ratio |
+|---|---|---|---|
+| 6 | 8.3 × 10⁵⁸ | 1.70 × 10⁵⁹ | 2.1 |
+| 10 | 6.1 × 10⁵⁷ | 1.69 × 10⁵⁹ | 27.5 |
+| 12 | 2.3 × 10⁵⁷ | 1.69 × 10⁵⁹ | 73.0 |
+
+Deeper quadrature narrows the arithmetic and leaves the parameters where they
+are, so **beyond about depth 10 the limit is Planck 2018's error bars rather than
+this program's arithmetic**. That does not remove the point of certifying — the
+enclosure is still proved rather than converged — it settles how deep is worth
+going.
+
+**Flatness is assumed, and here it is load-bearing.** For an age that is an
+assumption about the model; for a distance it also decides the integral's form,
+since curvature would make the transverse distance a `sinh` or a `sin` of this.
+
+| field | meaning |
+|---|---|
+| `comoving_light_time.lo_ticks` / `.hi_ticks` | The enclosure, in ticks. This is the certified quantity. |
+| `comoving_light_time.lo_light_years` / `.hi_light_years` | The same, in the unit astronomers read. A light-year is exactly a Julian year of light-travel time. |
+| `comoving_distance_metres.lo` / `.hi` | Multiplied by a `c` that is exact by definition. |
+| `width.arithmetic_ticks` | The quadrature's own contribution, with the parameters pinned. |
+| `width.parameter_ticks` | The rest: Planck 2018's error bars. |
+| `width.depth` / `width.scale` | What was asked for. |
+
+### `cosmo stretch`
+
+```
+ucal cosmo stretch --z <Z> --ticks <DURATION> [--observed]
+```
+
+A distant event's observed duration is `(1 + z)` times its emitted one —
+**exactly**, by the definition of redshift, with no integral, no model and no
+parameters. It is why supernova light curves are stretched, and that stretch is a
+*measured confirmation* of expansion rather than a consequence of assuming it.
+
+The one quantity in this section a reader can check by hand. `--observed` runs it
+the other way.
+
+| field | meaning |
+|---|---|
+| `factor` | `1 + z`, as an exact fraction. |
+| `given.emitted_ticks` / `given.observed_ticks` | What you supplied, named for which end it is. |
+| `answer.observed_ticks` / `answer.emitted_ticks` | The other end. |
+| `answer.whole_ticks` | Whether the product landed on a tick boundary. |
+| `answer.exact_ratio` | The value as an exact rational, when it did not. |
 
 ## `ucal verify`
 

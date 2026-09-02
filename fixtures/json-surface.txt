@@ -202,6 +202,21 @@ cosmo-age.widths.parameter_ticks	string
 cosmo-age.widths.parameter_years	string (--bridge)
 cosmo-age.year	string (--bridge)
 cosmo-age.z	string
+cosmo-distance.comoving_distance_metres	object
+cosmo-distance.comoving_distance_metres.hi	string
+cosmo-distance.comoving_distance_metres.lo	string
+cosmo-distance.comoving_light_time	object
+cosmo-distance.comoving_light_time.hi_light_years	string
+cosmo-distance.comoving_light_time.hi_ticks	string
+cosmo-distance.comoving_light_time.lo_light_years	string
+cosmo-distance.comoving_light_time.lo_ticks	string
+cosmo-distance.model	string
+cosmo-distance.width	object
+cosmo-distance.width.arithmetic_ticks	string
+cosmo-distance.width.depth	string
+cosmo-distance.width.parameter_ticks	string
+cosmo-distance.width.scale	string
+cosmo-distance.z	string
 cosmo-model.as_published	object
 cosmo-model.as_published.H0	string
 cosmo-model.as_published.Omega_Lambda	string
@@ -219,6 +234,14 @@ cosmo-model.monotonicity	object
 cosmo-model.monotonicity.note	string
 cosmo-model.monotonicity.turns_at_u	string
 cosmo-model.year	string (--bridge)
+cosmo-stretch.answer	object
+cosmo-stretch.answer.exact_ratio	string
+cosmo-stretch.answer.observed_ticks	string
+cosmo-stretch.answer.whole_ticks	bool
+cosmo-stretch.factor	string
+cosmo-stretch.given	object
+cosmo-stretch.given.emitted_ticks	string
+cosmo-stretch.z	string
 cosmo-z.citation	string
 cosmo-z.instant_ticks	string
 cosmo-z.model	string
@@ -260,6 +283,7 @@ datum.rounding.residual_rendered	string
 datum.rounding.residual_ticks	string
 datum.rounding.to	string
 datum.tick_zero	string
+dilate.beta	string
 dilate.coordinate_per_proper	object
 dilate.coordinate_per_proper.hi	string
 dilate.coordinate_per_proper.lo	string
@@ -431,6 +455,16 @@ explain.tiers.T3 span	string
 explain.tiers.T4 drift	string
 explain.tiers.T5 deep	string
 explain.ucid	string
+figure.consistent	bool
+figure.places	object
+figure.places.sigma_decimals	string
+figure.places.sigma_over_last_place	string
+figure.places.value_decimals	string
+figure.places.value_exact	string
+figure.places.value_last_place	string
+figure.sigma	string
+figure.value	string
+figure.verdict	string
 from-civil.human	string
 from-civil.input	object
 from-civil.input.calendar	string
@@ -439,6 +473,17 @@ from-civil.input.label	string
 from-civil.input.scale	string
 from-civil.ticks	string
 from-civil.ucid	string
+from-epoch.human	string
+from-epoch.input	object
+from-epoch.input.epoch	string
+from-epoch.input.jd	string
+from-epoch.input.kind	string
+from-epoch.input.scale	string
+from-epoch.ticks	string
+from-epoch.ucid	string
+from-epoch.window	object
+from-epoch.window.hi	string
+from-epoch.window.lo	string
 from-jd.human	string
 from-jd.input	object
 from-jd.input.jd	string

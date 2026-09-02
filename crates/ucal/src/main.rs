@@ -136,6 +136,19 @@ enum Command {
         #[arg(long)]
         mjd: bool,
     },
+    /// A Julian or Besselian epoch as absolute time.
+    ///
+    /// The `J` or `B` prefix is **required**: `B1950.0` and `J1950.0` are
+    /// 1.84 hours apart, because they count different years from different
+    /// origins. Gaia DR3's `2016.0` is Julian — write `J2016.0`.
+    #[cfg(feature = "civil")]
+    FromEpoch {
+        /// `J2000.0`, `B1950.0`, `J1991.25`, `J2016.0`.
+        epoch: String,
+        /// `tt`, `tai`, `tcg`, `tcb` or `tdb`. Required.
+        #[arg(long)]
+        scale: String,
+    },
     /// Absolute time as a Julian Date, exactly.
     #[cfg(feature = "civil")]
     ToJd {
@@ -312,8 +325,23 @@ enum Command {
         /// A clock in a **circular orbit** at that radius rather than static:
         /// `√(1 − 3r_s/2r)`, gravitational and kinematic dilation together.
         /// Refused at or inside the photon sphere, `r_s/r ≥ 2/3`.
-        #[arg(long)]
+        #[arg(long, conflicts_with = "moving")]
         orbiting: bool,
+        /// Read the argument as **β = v/c** and give the kinematic dilation
+        /// `√(1 − β²)` — a moving clock in flat spacetime, no gravity at all.
+        #[arg(long)]
+        moving: bool,
+    },
+    /// Does a value's written precision agree with its stated uncertainty?
+    ///
+    /// `3.52 ± 0.00000038` says two things that disagree: the value is written
+    /// to fewer digits than its own σ claims. This says so.
+    Figure {
+        /// The value, as a decimal. Its written places are the claim.
+        value: String,
+        /// The stated 1σ uncertainty, as a decimal.
+        #[arg(long)]
+        sigma: String,
     },
     /// How long light takes to cross a distance.
     ///
@@ -443,6 +471,35 @@ enum Command {
 #[cfg(feature = "cosmo")]
 #[derive(Subcommand)]
 enum CosmoCommand {
+    /// The comoving distance to a redshift, as a certified enclosure.
+    #[cfg(feature = "civil")]
+    Distance {
+        /// Redshift, as an exact decimal.
+        #[arg(long)]
+        z: String,
+        /// Subdivision depth: 2^depth panels.
+        #[arg(long, default_value_t = 8)]
+        depth: u32,
+        /// Decimal places the roots are bracketed to.
+        #[arg(long, default_value_t = 4)]
+        scale: u32,
+    },
+    /// How much a distant event's duration is stretched, exactly.
+    ///
+    /// An observed duration is `(1 + z)` times the emitted one, by the
+    /// definition of redshift — no integral, no model and no parameters.
+    Stretch {
+        /// Redshift, as an exact decimal.
+        #[arg(long)]
+        z: String,
+        /// A duration in ticks. `between --json` emits one.
+        #[arg(long)]
+        ticks: String,
+        /// Read `--ticks` as the **observed** duration and give the emitted one,
+        /// rather than the other way round.
+        #[arg(long)]
+        observed: bool,
+    },
     /// The age of the universe at a redshift, as a certified enclosure.
     #[command(allow_negative_numbers = true)]
     Age {
@@ -965,7 +1022,20 @@ fn main() {
             digits,
             show,
             orbiting,
-        } => ucal::cmd_dilate(rs_over_r, *digits, *show, *orbiting),
+            moving,
+        } => ucal::cmd_dilate(
+            rs_over_r,
+            *digits,
+            *show,
+            if *moving {
+                ucal::DilateMode::Moving
+            } else if *orbiting {
+                ucal::DilateMode::Orbiting
+            } else {
+                ucal::DilateMode::Static
+            },
+        ),
+        Command::Figure { value, sigma } => ucal::cmd_figure(value, sigma),
         #[cfg(feature = "civil")]
         Command::Lighttime {
             distance,
@@ -986,6 +1056,13 @@ fn main() {
                 depth,
                 scale,
             } => ucal::cmd_cosmo_z(at, *tolerance_years, *depth, *scale),
+            #[cfg(feature = "civil")]
+            CosmoCommand::Distance { z, depth, scale } => {
+                ucal::cmd_cosmo_distance(z, *depth, *scale)
+            }
+            CosmoCommand::Stretch { z, ticks, observed } => {
+                ucal::cmd_cosmo_stretch(z, ticks, !*observed)
+            }
             CosmoCommand::Model => ucal::cmd_cosmo_model(),
         },
         #[cfg(all(feature = "events", feature = "civil"))]
@@ -1185,6 +1262,8 @@ fn main() {
         Command::FromJd { value, scale, mjd } => {
             ucal::cmd_from_jd(pick(replacement, value), scale, *mjd)
         }
+        #[cfg(feature = "civil")]
+        Command::FromEpoch { epoch, scale } => ucal::cmd_from_epoch(epoch, scale),
         #[cfg(feature = "civil")]
         Command::ToJd {
             instant,

@@ -385,11 +385,12 @@ calendar  earth-d
 kind      derived — Rule K
 body      earth
 ladder_placement:
-  unit       rung      above_rung
-  ─────────  ────────  ──────────
-  solar_day  T1 arc    591.3
-  year       T2 sweep  69.1
-  cycle      T2 sweep  5.6
+  unit             rung      above_rung
+  ───────────────  ────────  ──────────
+  rotation_period  T1 arc    589.6
+  solar_day        T1 arc    591.3
+  year             T2 sweep  69.1
+  cycle            T2 sweep  5.6
 anchor:
   phase         mean solar midnight
   revision      1

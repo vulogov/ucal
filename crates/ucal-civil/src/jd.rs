@@ -210,6 +210,93 @@ pub fn j2000() -> Result<Instant<UC1>> {
     )
 }
 
+/// **V2 — the Besselian epoch's two constants.**
+///
+/// `B = 1900.0 + (JD − 2415020.31352) / 365.242198781`
+///
+/// The origin is `JD 2415020.31352` and the year is the *tropical* year at 1900,
+/// `365.242198781` days — **not** the Julian year of exactly 365.25 that a
+/// `J` epoch counts. Both are terminating decimals, so both are exact rationals
+/// and the conversion loses nothing.
+const BESSELIAN_ORIGIN: (u64, u64) = (241_502_031_352, 100_000);
+const BESSELIAN_YEAR: (u64, u64) = (365_242_198_781, 1_000_000_000);
+
+/// The Julian epoch's constants: `J = 2000.0 + (JD − 2451545.0) / 365.25`.
+const JULIAN_YEAR_DAYS: (u64, u64) = (36_525, 100);
+
+/// Which epoch notation a figure like `1950.0` is written in.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
+pub enum EpochKind {
+    /// `J` — Julian years of exactly 365.25 days from J2000.0.
+    Julian,
+    /// `B` — tropical years of 365.242198781 days from a 1900 origin.
+    Besselian,
+}
+
+/// A Julian or Besselian epoch, as a Julian Date in TT.
+///
+/// # Why the prefix is required
+///
+/// `B1950.0` and `J1950.0` are **1.84 hours apart** — `JD 2433282.42346` against
+/// `JD 2433282.50000` — because they count different years from different
+/// origins. Catalogue positions are still published against B1950 in the older
+/// literature, and a bare `1950.0` does not say which is meant.
+///
+/// So the prefix is required, exactly as `--scale` is required for a Julian
+/// Date, and for the same reason: a default here is silently wrong by an amount
+/// that looks like nothing. Gaia DR3's `2016.0` is a *Julian* epoch and must be
+/// written `J2016.0`.
+pub fn epoch_to_jd(text: &str) -> Result<(Ratio, EpochKind)> {
+    let t = text.trim();
+    let (kind, rest) = match t.as_bytes().first() {
+        Some(b'J') | Some(b'j') => (EpochKind::Julian, &t[1..]),
+        Some(b'B') | Some(b'b') => (EpochKind::Besselian, &t[1..]),
+        _ => {
+            return Err(TimeError::with_context(
+                Code::E0001,
+                "an epoch needs its `J` or `B` prefix. `B1950.0` and `J1950.0` \
+                 are 1.84 hours apart, because they count different years from \
+                 different origins, and a bare figure does not say which is \
+                 meant. Gaia DR3's `2016.0` is Julian: write `J2016.0`",
+            ))
+        }
+    };
+    let year = Ratio::from_decimal_str(rest.trim()).map_err(|_| {
+        TimeError::with_context(
+            Code::E0001,
+            "an epoch is a decimal year after its prefix, like `J2000.0`",
+        )
+    })?;
+
+    let (origin_year, origin_jd, year_days) = match kind {
+        EpochKind::Julian => (
+            Ratio::from_u64(2000),
+            Ratio::from_u64(J2000_JD),
+            ratio(JULIAN_YEAR_DAYS)?,
+        ),
+        EpochKind::Besselian => (
+            Ratio::from_u64(1900),
+            ratio(BESSELIAN_ORIGIN)?,
+            ratio(BESSELIAN_YEAR)?,
+        ),
+    };
+
+    // `Ratio` is unsigned (Rule B), so an epoch before the origin is a branch.
+    let forward = year.cmp_exact(&origin_year) != core::cmp::Ordering::Less;
+    let elapsed = if forward {
+        year.sub(&origin_year)?
+    } else {
+        origin_year.sub(&year)?
+    };
+    let days = elapsed.mul(&year_days)?;
+    if forward {
+        Ok((origin_jd.add(&days)?, kind))
+    } else {
+        Ok((origin_jd.sub(&days)?, kind))
+    }
+}
+
 /// A rational from a `(numerator, denominator)` pair of `u64`.
 fn ratio(p: (u64, u64)) -> Result<Ratio> {
     Ratio::new(
@@ -757,6 +844,67 @@ mod tests {
                 "{scale:?}: {us} µs per Julian year, expected about {want_us}"
             );
         }
+    }
+
+    // ---- V2 ----
+
+    /// J2000.0 is JD 2451545.0 by construction, which is the whole point of it.
+    #[test]
+    fn j2000_is_the_epoch_it_is_named_for() {
+        let (jd, kind) = epoch_to_jd("J2000.0").expect("an epoch");
+        assert_eq!(kind, EpochKind::Julian);
+        assert_eq!(
+            jd.cmp_exact(&Ratio::from_u64(J2000_JD)),
+            core::cmp::Ordering::Equal
+        );
+    }
+
+    /// **The trap, measured.** `B1950.0` and `J1950.0` are 1.84 hours apart.
+    ///
+    /// Not eighteen, which is what a first draft of the proposal said. The
+    /// figures are `JD 2433282.42346` and `JD 2433282.50000`, and the difference
+    /// is `0.07654` days.
+    #[test]
+    fn besselian_and_julian_1950_are_not_the_same_instant() {
+        let (b, _) = epoch_to_jd("B1950.0").expect("an epoch");
+        let (j, _) = epoch_to_jd("J1950.0").expect("an epoch");
+        assert_eq!(
+            b.to_decimal_string(5, ucal_core::Rounding::HalfEven).expect("rendered"),
+            "2433282.42346"
+        );
+        assert_eq!(
+            j.to_decimal_string(5, ucal_core::Rounding::HalfEven).expect("rendered"),
+            "2433282.50000"
+        );
+        let gap_hours = j
+            .sub(&b)
+            .expect("J is later")
+            .mul(&Ratio::from_u64(24))
+            .expect("in range");
+        assert_eq!(
+            gap_hours.to_decimal_string(2, ucal_core::Rounding::HalfEven).expect("rendered"),
+            "1.84"
+        );
+    }
+
+    /// A bare figure is refused, and the message names the case that motivates it.
+    #[test]
+    fn an_epoch_without_its_prefix_is_refused() {
+        let e = epoch_to_jd("2016.0").expect_err("J or B, not neither");
+        assert_eq!(e.code, Code::E0001);
+        assert!(format!("{e}").contains("J2016.0"), "{e}");
+    }
+
+    /// Epochs before the origin work, since `Ratio` is unsigned and this is a
+    /// branch rather than a sign.
+    #[test]
+    fn an_epoch_before_its_origin_converts() {
+        let (early, _) = epoch_to_jd("J1900.0").expect("an epoch");
+        let (late, _) = epoch_to_jd("J2000.0").expect("an epoch");
+        assert_eq!(early.cmp_exact(&late), core::cmp::Ordering::Less);
+        // A century of Julian years is exactly 36525 days.
+        let gap = late.sub(&early).expect("later");
+        assert_eq!(gap.cmp_exact(&Ratio::from_u64(36_525)), core::cmp::Ordering::Equal);
     }
 
     /// The scales that are refused are refused with reasons, not silently.

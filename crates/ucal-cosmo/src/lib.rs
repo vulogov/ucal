@@ -402,7 +402,43 @@ impl<T> CosmoResult<T> {
 /// documentation: on `[a, b]`, `f ∈ [a/√g(b), b/√g(a)]`. The lower sum uses an
 /// **upper** bound on each root and the upper sum a **lower** one, so both
 /// directions round outward and the enclosure is rigorous.
+/// **V1 — which integral is being enclosed.**
+///
+/// The age and the comoving distance share a radicand exactly. With
+/// `u = 1/(1+z)`:
+///
+/// ```text
+/// t(z)   = t_H ∫_0^{u₀}  u du / √(Ω_r + Ω_m u + Ω_Λ u⁴)
+/// D_C/c  = t_H ∫_{u₀}^1    du / √(Ω_r + Ω_m u + Ω_Λ u⁴)
+/// ```
+///
+/// The **only** differences are the numerator — `u` against `1` — and the
+/// limits. Everything else is the same quadrature, the same outward snapping and
+/// the same separation of arithmetic width from parameter width, so it is the
+/// same code with a selector rather than a second copy of a rule.
+///
+/// **`D_C/c` is a duration**, which is why this crate can hold it at all: the
+/// comoving distance in light-travel time is a tick count, and metres come from
+/// multiplying by an exactly-defined `c`.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Integrand {
+    /// `u/√g` over `[0, u₀]` — the age.
+    Age,
+    /// `1/√g` over `[u₀, 1]` — the comoving distance, in light-travel time.
+    ComovingDistance,
+}
+
 fn integral_enclosure(model: &LambdaCdm, u0: &Ratio, depth: u32, scale: u32) -> Result<RatInterval> {
+    integral_over(model, u0, depth, scale, Integrand::Age)
+}
+
+fn integral_over(
+    model: &LambdaCdm,
+    u0: &Ratio,
+    depth: u32,
+    scale: u32,
+    which: Integrand,
+) -> Result<RatInterval> {
     if depth > 30 {
         return Err(TimeError::with_context(
             Code::E0071,
@@ -412,7 +448,20 @@ fn integral_enclosure(model: &LambdaCdm, u0: &Ratio, depth: u32, scale: u32) -> 
     }
     let panels: u64 = 1u64 << depth;
     let n = Ratio::from_u64(panels);
-    let h = u0.div(&n)?;
+    // The age integrates up from 0; the distance integrates from u0 up to 1,
+    // which is the present. Same panels, different span.
+    let (start, span) = match which {
+        Integrand::Age => (Ratio::zero(), u0.clone()),
+        Integrand::ComovingDistance => {
+            let one = Ratio::one();
+            if u0.cmp_exact(&one) != core::cmp::Ordering::Less {
+                // z = 0: the distance is zero and the integral is empty.
+                return Ok(RatInterval::exact(Ratio::zero()));
+            }
+            (u0.clone(), one.sub(u0)?)
+        }
+    };
+    let h = span.div(&n)?;
 
     // Widest densities: the lower sum wants the largest g, the upper the smallest.
     let om_hi = model.omega_m.hi();
@@ -441,8 +490,8 @@ fn integral_enclosure(model: &LambdaCdm, u0: &Ratio, depth: u32, scale: u32) -> 
     let mut hi_sum = Ratio::zero();
 
     for i in 0..panels {
-        let a = h.mul(&Ratio::from_u64(i))?;
-        let b = h.mul(&Ratio::from_u64(i + 1))?;
+        let a = start.add(&h.mul(&Ratio::from_u64(i))?)?;
+        let b = start.add(&h.mul(&Ratio::from_u64(i + 1))?)?;
 
         // Lower bound on the panel: smallest numerator over largest root.
         let g_b = g(&b, or_hi, om_hi, ol_hi)?;
@@ -453,7 +502,15 @@ fn integral_enclosure(model: &LambdaCdm, u0: &Ratio, depth: u32, scale: u32) -> 
             // forced, not chosen -- this is the *lower* sum, so it truncates
             // down and can only widen the enclosure. Audit step 8 states it and
             // `the_quadrature_snaps_outward` checks it.
-            let term = h.mul(&a)?.div(root_b.hi())?.snap(grid, Rounding::Trunc)?;
+            // The numerator at its panel *minimum* over the root at its panel
+            // *maximum*: a lower bound however the integrand varies, which is
+            // why this needs no monotonicity argument. The distance's numerator
+            // is 1 and has no minimum to take.
+            let numer = match which {
+                Integrand::Age => a.clone(),
+                Integrand::ComovingDistance => Ratio::one(),
+            };
+            let term = h.mul(&numer)?.div(root_b.hi())?.snap(grid, Rounding::Trunc)?;
             // ucal-lint-allow-end(rounding-is-declared)
             lo_sum = lo_sum.add(&term)?;
         }
@@ -469,7 +526,11 @@ fn integral_enclosure(model: &LambdaCdm, u0: &Ratio, depth: u32, scale: u32) -> 
         }
         // ucal-lint-allow-begin(rounding-is-declared): the *upper* sum, so it ceils
         // up. Same reasoning as its counterpart above, opposite direction.
-        let term = h.mul(&b)?.div(root_a.lo())?.snap(grid, Rounding::Ceil)?;
+        let numer = match which {
+            Integrand::Age => b.clone(),
+            Integrand::ComovingDistance => Ratio::one(),
+        };
+        let term = h.mul(&numer)?.div(root_a.lo())?.snap(grid, Rounding::Ceil)?;
         // ucal-lint-allow-end(rounding-is-declared)
         hi_sum = hi_sum.add(&term)?;
     }
@@ -498,7 +559,102 @@ fn integral_at_central_parameters(
     integral_enclosure(&central, u0, depth, scale)
 }
 
+/// The distance integral with the parameters pinned, for the same split.
+fn distance_at_central_parameters(
+    model: &LambdaCdm,
+    u0: &Ratio,
+    depth: u32,
+    scale: u32,
+) -> Result<RatInterval> {
+    let mid = |iv: &RatInterval| -> Result<Ratio> {
+        iv.lo().add(iv.hi())?.div(&Ratio::from_u64(2))
+    };
+    let central = LambdaCdm {
+        omega_m: RatInterval::exact(mid(&model.omega_m)?),
+        omega_l: RatInterval::exact(mid(&model.omega_l)?),
+        omega_r: RatInterval::exact(mid(&model.omega_r)?),
+        hubble_time: RatInterval::exact(mid(&model.hubble_time)?),
+        ..model.clone()
+    };
+    integral_over(&central, u0, depth, scale, Integrand::ComovingDistance)
+}
+
 impl LambdaCdm {
+    /// The age of the universe at redshift `z`, as a certified enclosure (§16).
+    ///
+    /// Returns a [`Window`] provably containing the true value under this model,
+    /// with the arithmetic and parameter widths reported separately (Rule X).
+    /// **V1 — the comoving distance to redshift `z`, in light-travel time.**
+    ///
+    /// `D_C/c = t_H ∫_{u₀}^1 du/√(Ω_r + Ω_m u + Ω_Λ u⁴)`, by the same certified
+    /// quadrature [`t_of_z`](Self::t_of_z) uses — proved to contain the answer
+    /// rather than converged to it.
+    ///
+    /// # Why the answer is a duration
+    ///
+    /// Because that is what this crate can hold. `D_C/c` is a time, and metres
+    /// come from multiplying by a `c` that is **exact by definition**. Returning
+    /// light-travel time keeps the certified part free of any unit that is not
+    /// already exact, and hands the conversion to a caller who can see it.
+    ///
+    /// # This is the most-used number in observational cosmology
+    ///
+    /// And every calculator that produces it produces a float with no error
+    /// bound. The enclosure here separates the **arithmetic** width from the
+    /// **parameter** width, exactly as the age does (Rule X), so a reader can
+    /// see which of the two is limiting them.
+    ///
+    /// # It assumes flatness, and that assumption is now load-bearing
+    ///
+    /// `ucal-cosmo` has always assumed flat ΛCDM, and for an *age* that is an
+    /// assumption about the model. For a **distance** it also decides the
+    /// integral's form: with curvature, `D_M` is a `sinh` or a `sin` of this,
+    /// and neither is something integer interval arithmetic reaches cheaply.
+    /// `cosmo model` names the parameter set; this method is where the naming
+    /// starts to matter more.
+    pub fn comoving_light_time(
+        &self,
+        z: &Ratio,
+        depth: u32,
+        scale: u32,
+    ) -> Result<CosmoResult<RatInterval>> {
+        let u0 = Ratio::one().add(z)?.recip()?;
+        let full = integral_over(self, &u0, depth, scale, Integrand::ComovingDistance)?;
+        let central = distance_at_central_parameters(self, &u0, depth, scale)?;
+
+        let lo = full.lo().mul(self.hubble_time.lo())?;
+        let hi = full.hi().mul(self.hubble_time.hi())?;
+        let value = RatInterval::new(lo, hi)?;
+
+        let arithmetic = central
+            .hi()
+            .mul(self.hubble_time.lo())?
+            .abs_diff(&central.lo().mul(self.hubble_time.lo())?)?;
+        let arithmetic_width = Delta::from_ticks(arithmetic.floor());
+        let total = Delta::from_ticks(value.width()?.floor());
+        let parameter_width = total
+            .checked_sub(&arithmetic_width)
+            .unwrap_or_else(|_| Delta::zero());
+
+        let mut warnings = Vec::new();
+        if total.ticks() > &<Ticks as TickInt>::one() {
+            warnings.push(Warning::W0004);
+        }
+        Ok(CosmoResult {
+            value,
+            arithmetic_width,
+            parameter_width,
+            // A redshift given as an exact rational has no width of its own;
+            // `t_of_z_interval` is where an input interval enters.
+            input_width: Delta::zero(),
+            depth,
+            scale,
+            model: self.model,
+            citation: self.citation,
+            warnings,
+        })
+    }
+
     /// The age of the universe at redshift `z`, as a certified enclosure (§16).
     ///
     /// Returns a [`Window`] provably containing the true value under this model,

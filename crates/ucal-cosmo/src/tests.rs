@@ -691,3 +691,99 @@ fn the_audit_declares_its_own_rounding() {
     assert!(first.contains("truncated"), "the audit does not say: {first}");
     assert!(first.contains("12 digits") || first.contains("12"), "no digit count");
 }
+
+// ---- V1 ----
+
+/// **The comoving distance to z = 1 brackets the accepted value.**
+///
+/// Planck 2018 puts it near 3.4 Gpc, which is about 11.1 billion light-years.
+/// The enclosure must contain that — an interval that excluded a good float
+/// estimate would have found a defect in itself, which is the whole relationship
+/// between this crate and its oracle.
+#[test]
+fn the_comoving_distance_to_z_one_contains_the_accepted_value() {
+    let m = LambdaCdm::planck2018();
+    let out = m
+        .comoving_light_time(&Ratio::from_u64(1), 10, 4)
+        .expect("in range");
+    let year = Ratio::from_int(UC1::bridge().ticks)
+        .mul(&Ratio::from_u64(31_557_600))
+        .expect("a year");
+    // ucal-lint-allow-begin(float-free): Rule E permits a float reference in
+    // test code, marked as such. This one exists only to compare an enclosure
+    // against a value a reader can recognise — 11.1 billion light-years — and
+    // the enclosure is the result.
+    let gly = |t: &Ratio| -> f64 {
+        t.div(&year)
+            .expect("in range")
+            .to_decimal_string(0, Rounding::Trunc)
+            .expect("rendered")
+            .parse::<f64>()
+            .expect("a number")
+            / 1e9
+    };
+    // ucal-lint-allow-end(float-free)
+    let (lo, hi) = (gly(out.value.lo()), gly(out.value.hi()));
+    assert!(lo < 11.1 && hi > 11.1, "{lo} .. {hi} does not contain 11.1 Gly");
+}
+
+/// z = 0 is zero distance, and the integral is empty rather than degenerate.
+#[test]
+fn zero_redshift_is_zero_distance() {
+    let m = LambdaCdm::planck2018();
+    let out = m
+        .comoving_light_time(&Ratio::zero(), 8, 4)
+        .expect("in range");
+    assert!(out.value.hi().is_zero(), "z = 0 is here, and here is no distance");
+}
+
+/// More redshift is more distance.
+#[test]
+fn the_distance_grows_with_redshift() {
+    let m = LambdaCdm::planck2018();
+    let mut last = Ratio::zero();
+    for z in [1u64, 2, 5] {
+        let out = m
+            .comoving_light_time(&Ratio::from_u64(z), 8, 4)
+            .expect("in range");
+        assert_eq!(
+            out.value.lo().cmp_exact(&last),
+            core::cmp::Ordering::Greater,
+            "z = {z} must be further than the one before"
+        );
+        last = out.value.lo().clone();
+    }
+}
+
+/// **V1's stop condition, measured.** The parameters dominate, and quickly.
+///
+/// Deeper quadrature narrows the arithmetic width and leaves the parameter width
+/// where it was. At depth 6 the parameters are twice the arithmetic; by depth 12
+/// they are seventy times it. So certification is *not* what limits this number —
+/// Planck 2018's error bars are — and the honest reading of `cosmo distance` is
+/// that depth beyond about 10 buys nothing a reader can use.
+///
+/// The stop condition asked for exactly this measurement. It does not kill the
+/// feature: the enclosure is still proved rather than converged, which no float
+/// calculator offers. It settles how deep is worth going.
+#[test]
+fn deeper_quadrature_stops_helping_once_the_parameters_dominate() {
+    let m = LambdaCdm::planck2018();
+    let mut ratios = Vec::new();
+    for depth in [6u32, 10] {
+        let out = m
+            .comoving_light_time(&Ratio::from_u64(1), depth, 4)
+            .expect("in range");
+        let a = out.arithmetic_width.ticks().clone();
+        let p = out.parameter_width.ticks().clone();
+        assert!(!a.is_zero_ticks());
+        ratios.push((a, p));
+    }
+    // The arithmetic width shrinks with depth; the parameter width does not.
+    assert!(ratios[1].0 < ratios[0].0, "deeper must narrow the arithmetic");
+    // And by depth 10 the parameters are the larger share by a wide margin.
+    assert!(
+        ratios[1].1 > ratios[1].0,
+        "the parameters should dominate by depth 10"
+    );
+}

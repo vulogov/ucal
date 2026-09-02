@@ -1385,12 +1385,282 @@ pub fn cmd_lighttime(distance: &str, unit: &str, digits: u32) -> CmdResult {
     ))
 }
 
+/// `ucal cosmo distance` — V1, the comoving distance as a certified enclosure.
+///
+/// Reported as **light-travel time in ticks** first, because that is what the
+/// certified part actually is, and in metres beside it because `c` is exact by
+/// definition. Every other calculator for this number produces a float with no
+/// error bound at all.
+#[cfg(all(feature = "cosmo", feature = "civil"))]
+pub fn cmd_cosmo_distance(z: &str, depth: u32, scale: u32) -> CmdResult {
+    let zr = Ratio::from_decimal_str(z).map_err(|_| {
+        TimeError::with_context(Code::E0001, "a redshift is a decimal, like `1.0`")
+    })?;
+    let m = ucal_cosmo::LambdaCdm::planck2018();
+    let out = m.comoving_light_time(&zr, depth, scale)?;
+
+    let second = Ratio::from_int(UC1::bridge().ticks);
+    let c = Ratio::from_u64(ucal_civil::lighttime::C_M_PER_S);
+    let metres = |t: &Ratio| -> Value {
+        match t.div(&second).and_then(|s| s.mul(&c)) {
+            Ok(v) => Value::quantity(&v, 0, Rounding::Trunc),
+            Err(_) => Value::text("out of range"),
+        }
+    };
+    let years = |t: &Ratio| -> Value {
+        let yr = Ratio::from_int(UC1::bridge().ticks)
+            .mul(&Ratio::from_u64(31_557_600))
+            .unwrap_or_else(|_| Ratio::one());
+        match t.div(&yr) {
+            Ok(v) => Value::quantity(&v, 3, Rounding::Trunc),
+            Err(_) => Value::text("out of range"),
+        }
+    };
+
+    Ok(Doc::new()
+        .title("ucal cosmo distance")
+        .field("z", Value::text(zr.to_ratio_string()))
+        .field("model", Value::text(m.describe()))
+        .field(
+            "comoving_light_time",
+            Value::Section(vec![
+                ("lo_ticks".into(), Value::number(out.value.lo().floor().to_dec_string())),
+                ("hi_ticks".into(), Value::number(out.value.hi().ceil().to_dec_string())),
+                ("lo_light_years".into(), years(out.value.lo())),
+                ("hi_light_years".into(), years(out.value.hi())),
+            ]),
+        )
+        .field(
+            "comoving_distance_metres",
+            Value::Section(vec![
+                ("lo".into(), metres(out.value.lo())),
+                ("hi".into(), metres(out.value.hi())),
+            ]),
+        )
+        .field(
+            "width",
+            Value::Section(vec![
+                (
+                    "arithmetic_ticks".into(),
+                    Value::number(out.arithmetic_width.ticks().to_dec_string()),
+                ),
+                (
+                    "parameter_ticks".into(),
+                    Value::number(out.parameter_width.ticks().to_dec_string()),
+                ),
+                ("depth".into(), Value::number(out.depth.to_string())),
+                ("scale".into(), Value::number(out.scale.to_string())),
+            ]),
+        )
+        .note(
+            "A **certified enclosure**: proved to contain the value under this \
+             model, not an iterate that stopped moving. The same quadrature the \
+             age uses — the two integrals share a radicand exactly and differ \
+             only in a numerator and their limits.",
+        )
+        .note(
+            "The answer is a **light-travel time**, because that is what this \
+             crate can certify: metres follow from a `c` that is exact by \
+             definition. A light-year is exactly a Julian year of it, so \
+             `lo_light_years` is the same number in the unit astronomers read.",
+        )
+        .note(
+            "**`arithmetic` against `parameter` is the number to read** (Rule X). \
+             If the parameter width dominates, deeper quadrature buys nothing and \
+             the limit is Planck 2018's error bars rather than this program's.",
+        )
+        .note(
+            "**Flatness is assumed, and here it is load-bearing.** For an age \
+             that is an assumption about the model; for a distance it also \
+             decides the integral's form, since curvature would make the \
+             transverse distance a `sinh` or a `sin` of this one.",
+        ))
+}
+
+/// `ucal cosmo stretch` — V4, the one exact quantity in this area.
+///
+/// A distant event's observed duration is `(1 + z)` times its emitted one.
+/// **Exactly**: no integral, no model, no parameters, and no cosmology beyond
+/// the definition of redshift. It is why supernova light curves are stretched,
+/// and that stretch is a *measured confirmation* of expansion rather than a
+/// derivation from one.
+///
+/// If `z` is rational the answer is exact and the arithmetic is integer, so this
+/// is the one thing on this subject a reader can check by hand.
+#[cfg(feature = "cosmo")]
+pub fn cmd_cosmo_stretch(z: &str, duration: &str, emitted: bool) -> CmdResult {
+    let z = Ratio::from_decimal_str(z).map_err(|_| {
+        TimeError::with_context(Code::E0001, "a redshift is a decimal, like `1.5`")
+    })?;
+    let ticks = <Ticks as TickInt>::from_dec_str(duration.trim()).ok_or_else(|| {
+        TimeError::with_context(
+            Code::E0001,
+            "a duration is a decimal count of ticks; `between --json` emits one",
+        )
+    })?;
+    let factor = Ratio::one().add(&z)?;
+    let given = Ratio::from_int(ticks);
+
+    // Emitted → observed multiplies; observed → emitted divides. Both are exact
+    // in the rationals, and both are floored to a whole tick at the end because
+    // an instant is one — the loss is under 5.39e-44 s and is named rather than
+    // silent.
+    let other = if emitted {
+        given.mul(&factor)?
+    } else {
+        given.div(&factor)?
+    };
+    let exact = other.is_integer();
+
+    Ok(Doc::new()
+        .title("ucal cosmo stretch")
+        .field("z", Value::text(z.to_ratio_string()))
+        .field("factor", Value::text(format!("1 + z = {}", factor.to_ratio_string())))
+        .field(
+            "given",
+            Value::Section(vec![
+                (
+                    if emitted { "emitted_ticks".into() } else { "observed_ticks".into() },
+                    Value::number(given.floor().to_dec_string()),
+                ),
+            ]),
+        )
+        .field(
+            "answer",
+            Value::Section(vec![
+                (
+                    if emitted { "observed_ticks".into() } else { "emitted_ticks".into() },
+                    Value::number(other.floor().to_dec_string()),
+                ),
+                ("whole_ticks".into(), Value::Bool(exact)),
+                ("exact_ratio".into(), Value::text(other.to_ratio_string())),
+            ]),
+        )
+        .note(
+            "Exact. An observed duration is `(1 + z)` times the emitted one by \
+             the definition of redshift — no integral, no model and no \
+             parameters, which makes this the one quantity here a reader can \
+             check by hand. The stretch of a supernova light curve is a measured \
+             confirmation of expansion rather than a consequence of assuming it.",
+        )
+        .note(if exact {
+            "`ticks` is the whole answer: the product landed on a tick boundary."
+        } else {
+            "`ticks` is the floor; `exact_ratio` is the value. The difference is \
+             under one tick, which is 5.39e-44 s, and it is named here rather \
+             than rounded away silently (Rule R)."
+        }))
+}
+
+/// `ucal figure` — V5, does a value's precision agree with its uncertainty?
+///
+/// `ephem validate` asks this of a period and `cal validate` of a body's
+/// parameters. Neither was available for a number somebody has in their hand,
+/// and [`S4`] found metrology the strongest use for this project outside
+/// astronomy — of which this is the smallest useful piece.
+///
+/// It is arithmetic on decimal places and carries no time at all, which is
+/// either an argument that it belongs here (the discipline is the product) or an
+/// argument that it does not. Shipped, and the question left open in `S5`.
+///
+/// [`S4`]: https://github.com/vulogov/ucal/blob/main/Documentation/Proposals/S4-outside-astronomy.md
+pub fn cmd_figure(value: &str, sigma: &str) -> CmdResult {
+    let places = |s: &str| -> usize { s.split_once('.').map_or(0, |(_, f)| f.len()) };
+    let v = Ratio::from_decimal_str(value).map_err(|_| {
+        TimeError::with_context(Code::E0001, "the value must be a decimal number")
+    })?;
+    let sd = Ratio::from_decimal_str(sigma).map_err(|_| {
+        TimeError::with_context(Code::E0001, "the uncertainty must be a decimal number")
+    })?;
+    if sd.is_zero() {
+        return Err(TimeError::with_context(
+            Code::E0018,
+            "an uncertainty of zero is not an uncertainty. If the value is exact \
+             by definition — like `c`, or the astronomical unit — it has no σ and \
+             this question does not apply to it",
+        ));
+    }
+    let vp = places(value);
+    // The value's last place, as a quantity: 10^-vp.
+    let last_place = if vp == 0 {
+        Ratio::one()
+    } else {
+        Ratio::from_decimal_str(&format!("0.{}1", "0".repeat(vp - 1)))?
+    };
+
+    // σ finer than the last place means the value is written to fewer digits
+    // than its own uncertainty claims. σ coarser by a lot means the opposite:
+    // digits are being carried that the uncertainty does not support.
+    let sigma_finer = sd.cmp_exact(&last_place) == core::cmp::Ordering::Less;
+    let ratio = if sigma_finer {
+        last_place.div(&sd)?
+    } else {
+        sd.div(&last_place)?
+    };
+
+    let verdict = if sigma_finer {
+        "INCONSISTENT — σ is finer than the value's last place, so the value \
+         is written to fewer digits than its own uncertainty claims"
+    } else {
+        "consistent — the value's last place is at least as fine as σ"
+    };
+
+    Ok(Doc::new()
+        .title("ucal figure")
+        .field("value", Value::text(value))
+        .field("sigma", Value::text(sigma))
+        .field(
+            "places",
+            Value::Section(vec![
+                ("value_decimals".into(), Value::number(vp.to_string())),
+                ("sigma_decimals".into(), Value::number(places(sigma).to_string())),
+                ("value_exact".into(), Value::text(v.to_ratio_string())),
+                (
+                    "value_last_place".into(),
+                    Value::text(last_place.to_ratio_string()),
+                ),
+                (
+                    "sigma_over_last_place".into(),
+                    Value::quantity(&ratio, 3, Rounding::HalfEven),
+                ),
+            ]),
+        )
+        .field("consistent", Value::Bool(!sigma_finer))
+        .field("verdict", Value::text(verdict))
+        .note(
+            "Written places are a claim (Rule Y.1): `3.52` and `3.520` are the \
+             same number and not the same statement. This compares the claim \
+             against the σ beside it and says nothing about whether either is \
+             right — only whether they agree with each other.",
+        ))
+}
+
 /// `ucal dilate` — gravitational time dilation, certified.
 ///
 /// The ratio may be a decimal or a fraction: `0.5` and `1/2` are the same
 /// input, and a fraction is often how `r_s/r` is actually known.
 #[cfg(feature = "cosmo")]
-pub fn cmd_dilate(ratio: &str, digits: u32, render: u32, orbiting: bool) -> CmdResult {
+/// Which clock `dilate` is describing.
+///
+/// Named rather than a pair of booleans: a reader who takes one case for another
+/// has a wrong answer that looks right, and the output says which was computed.
+#[cfg(feature = "cosmo")]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum DilateMode {
+    /// Static at radius `r`. `√(1 − r_s/r)`.
+    Static,
+    /// In a circular orbit at `r`. `√(1 − 3r_s/2r)`.
+    Orbiting,
+    /// Moving at `β = v/c` in flat spacetime. `√(1 − β²)`.
+    Moving,
+}
+
+/// `ucal dilate` — time dilation at a radius or a speed, certified.
+///
+/// The ratio may be a decimal or a fraction: `0.5` and `1/2` are the same input,
+/// and a fraction is often how `r_s/r` or `β` is actually known.
+#[cfg(feature = "cosmo")]
+pub fn cmd_dilate(ratio: &str, digits: u32, render: u32, mode: DilateMode) -> CmdResult {
     let x = match ratio.split_once('/') {
         Some((n, d)) => {
             let parse = |v: &str| {
@@ -1411,10 +1681,10 @@ pub fn cmd_dilate(ratio: &str, digits: u32, render: u32, orbiting: bool) -> CmdR
             )
         })?,
     };
-    let d = if orbiting {
-        ucal_cosmo::dilate::circular_orbit(&x, digits)?
-    } else {
-        ucal_cosmo::dilate::schwarzschild(&x, digits)?
+    let d = match mode {
+        DilateMode::Static => ucal_cosmo::dilate::schwarzschild(&x, digits)?,
+        DilateMode::Orbiting => ucal_cosmo::dilate::circular_orbit(&x, digits)?,
+        DilateMode::Moving => ucal_cosmo::dilate::kinematic(&x, digits)?,
     };
     let pair = |i: &ucal_core::num::RatInterval| -> Value {
         Value::Section(vec![
@@ -1424,13 +1694,18 @@ pub fn cmd_dilate(ratio: &str, digits: u32, render: u32, orbiting: bool) -> CmdR
     };
     Ok(Doc::new()
         .title("ucal dilate")
-        .field("rs_over_r", Value::text(d.ratio.to_ratio_string()))
+        .field(
+            if mode == DilateMode::Moving { "beta" } else { "rs_over_r" },
+            Value::text(d.ratio.to_ratio_string()),
+        )
         .field(
             "observer",
-            Value::text(if orbiting {
-                "in a circular orbit — gravitational and kinematic dilation, √(1 − 3r_s/2r)"
-            } else {
-                "static at r — gravitational dilation only, √(1 − r_s/r)"
+            Value::text(match mode {
+                DilateMode::Static => "static at r — gravitational dilation only, √(1 − r_s/r)",
+                DilateMode::Orbiting => {
+                    "in a circular orbit — gravitational and kinematic together, √(1 − 3r_s/2r)"
+                }
+                DilateMode::Moving => "moving in flat spacetime — kinematic only, √(1 − β²)",
             }),
         )
         .field("digits", Value::number(d.digits.to_string()))
@@ -1939,6 +2214,60 @@ pub fn cmd_from_jd(value: &str, scale: &str, mjd: bool) -> CmdResult {
         );
     }
     Ok(doc)
+}
+
+/// `ucal from-epoch` — V2, a Julian or Besselian epoch as absolute time.
+///
+/// The prefix is required for the reason `--scale` is required: `B1950.0` and
+/// `J1950.0` are 1.84 hours apart, and a default is silently wrong by an amount
+/// that looks like nothing.
+#[cfg(feature = "civil")]
+pub fn cmd_from_epoch(epoch: &str, scale: &str) -> CmdResult {
+    use ucal_civil::jd;
+    let scale = jd::JdScale::parse(scale)?;
+    let (as_jd, kind) = jd::epoch_to_jd(epoch)?;
+    let w = jd::from_jd(&as_jd, scale)?;
+    let exact = w.lo().ticks() == w.hi().ticks();
+
+    let mut doc = instant_doc("ucal from-epoch", w.lo()).field(
+        "input",
+        Value::Section(vec![
+            ("epoch".into(), Value::text(epoch)),
+            (
+                "kind".into(),
+                Value::text(match kind {
+                    jd::EpochKind::Julian => "Julian — 365.25-day years from J2000.0",
+                    jd::EpochKind::Besselian => {
+                        "Besselian — 365.242198781-day tropical years from a 1900 origin"
+                    }
+                    // `EpochKind` is `#[non_exhaustive]`, so this arm is
+                    // required. It names the gap rather than guessing a
+                    // description, because a wrong one here would describe the
+                    // wrong year length — which is the entire thing this command
+                    // exists to keep straight.
+                    _ => "an epoch kind this build has no description for",
+                }),
+            ),
+            ("jd".into(), Value::text(as_jd.to_ratio_string())),
+            ("scale".into(), Value::text(scale.key())),
+        ]),
+    );
+    if !exact {
+        doc = doc.field(
+            "window",
+            Value::Section(vec![
+                ("lo".into(), Value::number(w.lo().ticks().to_dec_string())),
+                ("hi".into(), Value::number(w.hi().ticks().to_dec_string())),
+            ]),
+        );
+    }
+    Ok(doc.note(
+        "**The `J` or `B` prefix is required.** `B1950.0` is JD 2433282.42346 \
+         and `J1950.0` is JD 2433282.50000 — 1.84 hours apart, because they \
+         count different years from different origins. Older catalogue positions \
+         are published against B1950, and a bare figure does not say which is \
+         meant. Gaia DR3's `2016.0` is Julian and must be written `J2016.0`.",
+    ))
 }
 
 /// `ucal to-jd` — absolute time as a Julian Date, exactly.
@@ -2611,6 +2940,15 @@ fn cal_show_of(c: &ucal_body::calendar::BodyCalendar, id: &str, input: &str) -> 
 
     // Y1: where this body's own units sit on the universal grid.
     let mut ladder: Vec<(String, Value)> = Vec::new();
+    // **V6** — the spin and the day, side by side. `ucal-body` has held both
+    // since the beginning and `cal show` showed only one, which is the
+    // distinction every planetary-science undergraduate gets wrong once: a
+    // body's rotation period is how long it takes to turn, and its solar day is
+    // how long until the Sun comes back, and on Venus they differ by months.
+    if let Some(r) = ladder_row("rotation_period", c.body().rotation_period().value_at_epoch())
+    {
+        ladder.push(r);
+    }
     if let Some(r) = ladder_row("solar_day", c.body().solar_day().value_at_epoch()) {
         ladder.push(r);
     }

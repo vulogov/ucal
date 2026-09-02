@@ -166,6 +166,9 @@ fn all_commands() -> Vec<(&'static str, Doc)> {
         // E2 — both kinds of answer: an exact unit and the bracketed one.
         v.push(("lighttime", ucal::cmd_lighttime("1", "ly", 9).unwrap()));
         v.push(("lighttime", ucal::cmd_lighttime("1", "pc", 9).unwrap()));
+        // V2 — both epoch kinds, since `input.kind` describes which.
+        v.push(("from epoch", ucal::cmd_from_epoch("J2000.0", "tt").unwrap()));
+        v.push(("from epoch", ucal::cmd_from_epoch("B1950.0", "tdb").unwrap()));
     }
     #[cfg(all(feature = "events", feature = "civil"))]
     {
@@ -204,10 +207,25 @@ fn all_commands() -> Vec<(&'static str, Doc)> {
             ucal::cmd_ephem_validate(EPH, 1).unwrap(),
         ));
     }
+    // V5 — both verdicts, because `consistent` is a bool.
+    v.push(("figure", ucal::cmd_figure("3.52", "0.00000038").unwrap()));
+    v.push(("figure", ucal::cmd_figure("3.52474859", "0.00000038").unwrap()));
     #[cfg(feature = "cosmo")]
     {
-        v.push(("dilate", ucal::cmd_dilate("0.35", 40, 18, false).unwrap()));
-        v.push(("dilate", ucal::cmd_dilate("0.35", 40, 18, true).unwrap()));
+        v.push(("dilate", ucal::cmd_dilate("0.35", 40, 18, ucal::DilateMode::Static).unwrap()));
+        v.push(("dilate", ucal::cmd_dilate("0.35", 40, 18, ucal::DilateMode::Orbiting).unwrap()));
+        v.push(("dilate", ucal::cmd_dilate("3/5", 40, 18, ucal::DilateMode::Moving).unwrap()));
+        // V1 — at depth 4, because this list runs on every build and the
+        // quadrature's cost is exponential in depth. The number is not the
+        // point here; the field names are.
+        v.push((
+            "cosmo distance",
+            ucal::cmd_cosmo_distance("1.0", 4, 4).unwrap(),
+        ));
+        v.push((
+            "cosmo stretch",
+            ucal::cmd_cosmo_stretch("1.5", "1000000", true).unwrap(),
+        ));
         v.push(("cosmo model", ucal::cmd_cosmo_model().unwrap()));
         v.push(("cosmo age", ucal::cmd_cosmo_age("1100", 4, 8).unwrap()));
         v.push((
