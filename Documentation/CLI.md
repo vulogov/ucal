@@ -148,14 +148,14 @@ ucal now [--precision <TIER>] [--form human|digit5|named]
 | option | default | notes |
 |---|---|---|
 | `--precision` | `T-12` | The tier to render to. `T-12` is the tick — exact. |
-| `--form` | `human` | Which text form the `rendered` field uses. |
+| `--form` | `human` | Which text form the `rendered` field uses. The human form anchors at T0 (D-A8) and cannot state a coarser `--precision`; asking for one is `UCAL-E0006`, naming `digit5` and `named`, which can. Until 1.12.0 that combination exited 0 with `rendered` silently absent. |
 
 | field | meaning |
 |---|---|
 | `ticks` | The instant as an unsigned decimal count of Planck ticks since the datum. This is the value; everything else is a rendering of it. |
 | `human` | The `UC1` text form at full precision: base-5 digits grouped in fives, with `:` marking the beat (T0) boundary. |
 | `ucid` | The sortable 52-character identifier. **Contains no randomness** — it is a pure function of the instant, so two events at the same tick get the same UCID (Rule I). |
-| `rendered` | The instant at `--precision`, in `--form`. Coarser precision **truncates**; it does not pad, so a shorter string means a coarser value. |
+| `rendered` | The instant at `--precision`, in `--form`. Always present: a form that cannot state the precision is refused rather than left out. Coarser precision **truncates**; it does not pad, so a shorter string means a coarser value. |
 | `precision` | The tier `rendered` was cut to. A value stated to tier `e` denotes the interval `[v, v + 5^e − 1]` (Rule T). |
 | `source.clock` | Where the reading came from. |
 | `source.leap_table` | The bundled IERS table version used to convert it. |
@@ -217,7 +217,7 @@ ucal explain <INSTANT> [--claim]
 |---|---|
 | `ticks` | The instant, exactly. |
 | `precision` | `tick (exact)` when the input determined every digit, otherwise the tier it was stated to. |
-| `human` / `digit5` | The two text forms. `digit5` is **fixed-width** so that lexicographic order equals chronological order (Rule S) — which is why it opens with 27 groups of zeros at the present epoch. |
+| `human` / `digit5` | The two text forms. `digit5` is **fixed-width** so that lexicographic order equals chronological order (Rule S) — which is why it opens with 27 groups of zeros at the present epoch. Both use the one group separator, `--sep` or its default `·`; until 1.12.0 this field printed `.` while `now --form digit5` printed `·`. |
 | `ucid` | The sortable identifier, or `— (outside 2^256, UCAL-E0031)` for an instant beyond UCID's range. |
 | `tiers.T<k> <name>` | The instant decomposed onto the ladder: how many of each tier, from T5 down to T0. Reassembles to `ticks` exactly. |
 | `beats_since_datum.whole` | How many whole **beats** — universe seconds, `5^60` ticks — have elapsed. |

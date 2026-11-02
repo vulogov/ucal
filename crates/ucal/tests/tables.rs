@@ -292,12 +292,12 @@ fn wrapping_a_value_breaks_at_a_separator_not_mid_group() {
     let text = doc.render(&Render::PLAIN.width(BASELINE_WIDTH));
     let wrapped: Vec<&str> = text
         .lines()
-        .filter(|l| l.trim_start().starts_with("00000.") || l.contains("UC1/5"))
+        .filter(|l| l.trim_start().starts_with("00000·") || l.contains("UC1/5"))
         .collect();
     assert!(wrapped.len() > 1, "digit5 did not wrap at 80 columns");
     for l in &wrapped[..wrapped.len() - 1] {
         assert!(
-            l.ends_with('.'),
+            l.ends_with('·'),
             "a base-5 line broke inside a group:\n{l}"
         );
     }

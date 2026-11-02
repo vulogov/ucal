@@ -592,9 +592,16 @@ pub fn cmd_explain(input: &str, show_claim: bool) -> CmdResult {
             "human",
             Value::form(codec::render(&t, &Fmt::human()).unwrap_or_default()),
         )
+        // `Fmt::digit5()` prints §6.2's `.`; `now --form digit5` printed §6.3's
+        // default `·`, so the same form left this binary with two separators
+        // depending on which command produced it. The CLI prints every base-5
+        // form with one separator — `--sep`, or `·` without it — and the
+        // library preset keeps its own documented choice.
         .field(
             "digit5",
-            Value::form(codec::render(&t, &Fmt::digit5()).unwrap_or_default()),
+            Value::form(
+                codec::render(&t, &Fmt::digit5().with_sep(codec::SEP)).unwrap_or_default(),
+            ),
         )
         .field(
             "ucid",
@@ -2439,10 +2446,24 @@ pub fn cmd_now(precision: Tier, form: Form) -> CmdResult {
             Precision::Tier(precision)
         })
         .with_pad(matches!(form, Form::Digit5));
-    let mut doc = instant_doc("ucal now", &t);
-    if let Ok(r) = codec::render(&t, &fmt) {
-        doc = doc.field("rendered", Value::form(r));
-    }
+    // The human form anchors at T0 and cannot state a coarser tier (D-A8). This
+    // used to be `if let Ok(r) = render(..)`, which turned that refusal into a
+    // document with no `rendered` field and nothing to say why — the manual
+    // documents the field as always present, and a caller who asked for
+    // `--precision T4` got back a reading that looked complete and was not. A
+    // precision the form cannot express is refused, and the refusal names the
+    // two forms that can.
+    let r = codec::render(&t, &fmt).map_err(|e| match form {
+        Form::HumanGroups if !precision.is_tick() && precision.index() > 0 => {
+            TimeError::with_context(
+                Code::E0006,
+                "the human form anchors at T0 and cannot render a coarser --precision \
+                 (D-A8); pass --form digit5 or --form named",
+            )
+        }
+        _ => e,
+    })?;
+    let doc = instant_doc("ucal now", &t).field("rendered", Value::form(r));
     // `precision` keeps its name and its value: it is a path in `ucal-json/1`
     // and removing or repurposing one is a breaking change. What it has never
     // meant is *how precisely this instant is known* — `--precision` is
