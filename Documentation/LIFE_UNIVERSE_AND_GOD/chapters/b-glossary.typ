@@ -33,6 +33,12 @@ and will be taken for them.
   approximation at its denominator. Intercalation rules are derived by walking
   them. Chs. 8, 10, 15.
 
+/ compile-fail test: A small program kept beside the library together with the
+  exact complaint the compiler must make about it. The test passes only while the
+  compiler goes on refusing the program with that complaint; if the refused
+  operation is ever added, the program builds and the test fails. Three such
+  programs guard `SignedWindow`. Preface, ch. 12.
+
 / datum: Tick 0. A *stipulated* reference point, conventionally identified with
   the FLRW $t arrow.r 0$ limit; not a measurement and not an observed event.
   Chs. 3, 11.

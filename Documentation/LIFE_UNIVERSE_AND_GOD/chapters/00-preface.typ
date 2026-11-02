@@ -41,7 +41,18 @@ are not. Someone who thinks the distinction is pedantic sits down, writes the
 line of code that ignores it, and is stopped in under a second by something with
 no interest in whether they agree.
 
-#v(2mm)
+#callout(label: "For the reader who does not write software")[
+  Three terms recur in this book and are not explained again. A *compiler* is the
+  program that turns source text into a program that can run. Before it produces
+  anything it checks the text, and one of the things it checks is the *type* of every
+  value — a point in time is not a span of time, and a program that adds one to the
+  other is refused before it ever runs. A *compile-fail test* turns that refusal into
+  evidence. It is a small program kept beside the real one, together with the exact
+  complaint the compiler must make about it; the test suite passes only while the
+  compiler goes on refusing the program with that complaint. Add the operation the
+  program tries to use, and the program builds, the complaint disappears, and the
+  suite fails. That is the whole mechanism. Chapter 12 shows the three programs.
+]
 
 The other reason to keep reading is that the machinery answered back.
 

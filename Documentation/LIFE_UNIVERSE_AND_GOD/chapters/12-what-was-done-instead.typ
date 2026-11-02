@@ -48,7 +48,9 @@ An absence is hard to test. You cannot write an assertion that a method does not
 exist, because the file would not compile if you named it.
 
 So the project uses compile-fail tests: programs that are *required to fail to
-build*, checked on every run.
+build*, checked on every run. Each sits in the repository beside the exact complaint
+the compiler must make about it, and the test passes only while that complaint is
+still produced.
 
 #terminal(caption: "tests/compile_fail/signed_window_arithmetic.rs")[
 ```rust
