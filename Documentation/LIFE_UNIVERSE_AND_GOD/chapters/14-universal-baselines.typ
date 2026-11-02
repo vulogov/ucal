@@ -48,23 +48,35 @@ matters for this part is that there is exactly *one* implementation of that shap
 
 There is no Earth path and no Mars path. There is no `if body == earth`. There is no
 crate named after a body — the crate is `ucal-body`, and Earth, Mars, Titan, the
-Moon, Mercury, Venus and Jupiter are entries in a data table it reads.
+Moon, Mercury, Venus, Jupiter, Uranus, Neptune, Pluto and five of the outer moons —
+Io, Europa, Ganymede, Callisto and Enceladus — are entries in a data table it reads.
 
-#terminal(caption: "ucal cal list — seven calendars, one mechanism")[
+#terminal(caption: "ucal cal list — fifteen calendars, one mechanism; the first line of each row")[
 ```
-earth-d:    kind  derived — Rule K    body  earth
-mars-d:     kind  derived — Rule K    body  mars
-titan-d:    kind  derived — Rule K    body  titan
-luna-d:     kind  derived — Rule K    body  luna
-mercury-d:  kind  derived — Rule K    body  mercury
-venus-d:    kind  derived — Rule K    body  venus
-jupiter-d:  kind  derived — Rule K    body  jupiter
+calendar      kind              body       anchor_revision
+────────────  ────────────────  ─────────  ───────────────
+earth-d       derived — Rule K  earth      1
+mars-d        derived — Rule K  mars       1
+titan-d       derived — Rule K  titan      —
+luna-d        derived — Rule K  luna       —
+mercury-d     derived — Rule K  mercury    —
+venus-d       derived — Rule K  venus      —
+jupiter-d     derived — Rule K  jupiter    —
+io-d          derived — Rule K  io         —
+europa-d      derived — Rule K  europa     —
+ganymede-d    derived — Rule K  ganymede   —
+callisto-d    derived — Rule K  callisto   —
+enceladus-d   derived — Rule K  enceladus  —
+uranus-d      derived — Rule K  uranus     —
+neptune-d     derived — Rule K  neptune    —
+pluto-d       derived — Rule K  pluto      —
 ```
 ]
 
-The list grew from three to seven without the mechanism changing, which is the
-only kind of evidence this claim can have. Adding a body is adding a row of cited
-parameters; nothing else moved.
+The list grew from three to fifteen without the mechanism changing — five of the
+rows arrived in one release and three more in another, each time as rows and no
+code — which is the only kind of evidence this claim can have. Adding a body is adding a row of cited parameters;
+nothing else moved.
 
 The test that matters here constructs `earth-d` and `mars-d` through the identical
 generic path, from data alone, and asserts that neither required a special case. If

@@ -89,6 +89,57 @@ remembering anything.
   reader, permanently.
 ]
 
+#section("What the rendering path can do")
+
+The obvious reply is that the number should not be shown like that — that an
+instrument which knows its origin is uncertain by 141 drifts should decline to print
+the digits below that tier, or dim them, so that a reader is never offered precision the
+datum cannot support. The reply deserves an answer, because the design considered it
+and did something narrower on purpose.
+
+Two things exist. Under Rule T, a form cut to a coarser tier denotes an interval and not
+a point. Ask for the present epoch at the drift — the tier at which the claim's
+half-width lives — and the digit form of chapter 6 ends where the datum's
+identification does:
+
+#terminal(caption: "ucal now --precision T4 --form digit5")[
+```
+rendered   UC1/5 00000·00000·00000· … ·00000·00000·00111·10222
+precision  T4
+```
+]
+
+Thirty-one deeps and 687 drifts, one drift wide. Anyone who wants the count stated no
+more finely than the origin is identified can ask for it in that form, and the
+notation says what they are holding. And where a quantity is itself comparable to the
+claim — the first 141 drifts of absolute time, which is where recombination falls — the
+system attaches a warning to the answer rather than trusting the reader to notice:
+
+#terminal(caption: "ucal cosmo age --z 1100 — recombination, and the warning")[
+```
+enclosure:
+  at_drift  2 drift
+warning     UCAL-W0006: quantity comparable to or smaller than
+            BIG_BANG_CLAIM
+```
+]
+
+#claim("interpretation")[
+  What the design would not do is strip or dim the digits by default, and the reason is
+  the one that keeps `BIG_BANG_CLAIM` out of the arithmetic. The sixty-one digits are
+  not false precision. They are exactly right *about the count*, and a renderer that
+  blurred them to the claim's width would be letting the claim decide what a tick count
+  looks like — the claim as an operand of the display, which is the forbidden move in a
+  typographic coat. It would also teach the reader the wrong lesson: that the count is
+  uncertain, when the count is the one thing here that is not.
+
+  So the rendering path offers a coarser statement on request and a warning where the
+  scale demands one, and otherwise prints the integer. That is the most it can do
+  without misreporting which of the two things is uncertain. It is also, plainly, not a
+  cure: the full number is one flag away, and the reader who asks for it will see it as
+  the astronomer sees the moon.
+]
+
 #section("Florensky, one last time")
 
 Chapter 13 said the rule protects the arithmetic and does not protect the reading, and

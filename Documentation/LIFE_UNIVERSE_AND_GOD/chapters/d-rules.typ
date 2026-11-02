@@ -5,7 +5,7 @@
 All twenty-four, with the chapters that use them. Subject lines are taken from
 `spec/RULES.md`, which is the normative statement; the glosses are this book's.
 
-The fourteen the book actually cites are marked. The other ten govern parts of
+The fifteen the book actually cites are marked. The other nine govern parts of
 the software the book does not discuss, and are listed so that the set is
 complete rather than curated.
 
@@ -37,7 +37,7 @@ complete rather than curated.
     [*Q*], [the datum is stipulated], [Tick 0 is declared, not measured or observed. The physical claim about it is recorded separately and cannot be computed with.], [3],
     [R], [rounding only on rendering], [Values round when displayed, never when constructed, and always under a mode the caller names.], [—],
     [*S*], [sort order], [Lexicographic order equals chronological order for the fixed-width forms — and not for text.], [6],
-    [T], [truncation is uncertainty], [A value printed to a coarser tier *is* an interval, not a point padded with zeros.], [—],
+    [*T*], [truncation is uncertainty], [A value printed to a coarser tier *is* an interval, not a point padded with zeros.], [6],
     [U], [interval arithmetic], [Operations on intervals return intervals. A midpoint is a rendering choice, not a measurement.], [—],
     [W], [one domain across backends], [The fixed-width and arbitrary-precision integers enforce one identical domain.], [—],
     [*X*], [certified enclosures], [An interval that provably contains the answer, with quadrature error and parameter uncertainty reported separately.], [5],

@@ -5,9 +5,9 @@
 Part I established what is counted. This part is about how the counting is
 implemented, and it starts with the number that holds the count.
 
-Three properties, and the third is the one that turns out to have consequences all
-the way into the cosmology: the domain is *unsigned*, it is *closed*, and every
-operation on it is *checked*.
+Four properties. The domain is *unsigned*, it is *closed*, every operation on it is
+*checked*, and nothing in it is a floating-point number. The fourth is the one with
+consequences all the way into the cosmology.
 
 #section("Unsigned, and why that is not a saving")
 
@@ -35,9 +35,10 @@ system will print for you:
 
 #terminal(caption: "ucal doctor — the domain")[
 ```
-domain_max_ticks  13407807929942597099574024998205846127479365820592393377
-                  72356144372176403007354697680187429816690342769003185818
-                  6486050853753882811946569946433649006084095
+domain_max_ticks  13407807929942597099574024998205846127479365820592
+                  39337772356144372176403007354697680187429816690342
+                  76900318581864860508537538828119465699464336490060
+                  84095
 domain_bits       512
 ```
 ]
@@ -68,7 +69,7 @@ still at zero.
 #v(3mm)
 #align(center, image("../assets/images/scale-plate.png", height: 104mm))
 #v(1mm)
-#figcap[12][
+#figcap[3][
   The domain, as a scale. From a burst at the Planck tick, through an atom's
   vibration, a heartbeat, the day, a human life, recorded history, the
   stratigraphic record and a galaxy's turning, to a single point of light in

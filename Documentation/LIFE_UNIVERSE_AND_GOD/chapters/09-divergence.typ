@@ -33,7 +33,9 @@ UC-P0 constants harness — RFC UCAL-1, profile UC-1
 ]
 
 It produced fifteen findings. Fourteen stand; one was withdrawn, and the withdrawal is
-the most instructive of the lot.
+the most instructive of the lot. Two more arrived after the pass had closed, from
+running the program rather than rereading the document, which brings the standing
+count to sixteen.
 
 #section("The map")
 
@@ -69,7 +71,7 @@ Twenty-four named rules. Six were amended by contact with the implementation.
   content((4.7, -3.32), anchor: "west", text(size: 8pt, "amended — 6"))
 }))
 #v(1mm)
-#figcap[10][
+#figcap[6][
   The twenty-four rules by fate. None was dropped; six changed, and four of the six
   changed because the implementation proved the original could not be built as
   written.
@@ -182,7 +184,7 @@ Appendix C is eight for eight.
   checked — that when the specification and the harness disagreed, the harness was not
   automatically believed.
 
-  It is the smallest of the fifteen entries and it does the most work.
+  It is the smallest entry in the record and it does the most work.
 ]
 
 #section("Did it diverge enough?")
@@ -192,7 +194,7 @@ implementation turned out to follow the specification closely, this part would
 collapse into two pages inside Part II, because a book claiming that implementation
 talks back has to show that it did.
 
-The answer is yes, and here is the count. Fourteen standing findings. Six of
+The answer is yes, and here is the count. Sixteen standing findings. Six of
 twenty-four rules amended. Six places where the specification was simply wrong. One
 where its central method could not be executed as written. And separately from the
 rules, four of the project's six gated experiments hit their kill criteria — including
@@ -211,7 +213,7 @@ specification named changed its API mid-build.
 
 #recap((
   [Every constant and derivation was recomputed by two independent routes *before* the library was written; the harness still runs, 96 checks.],
-  [Fifteen findings: five editorial, six corrections, three amendments — and one withdrawal.],
+  [Seventeen findings in the record: five editorial, six corrections, five amendments — and one withdrawal, which leaves sixteen standing.],
   [Six of twenty-four rules were amended. None was dropped.],
   [The amendments were not forced. D-A5 replaced a working rule because implementing it revealed an Earth constant inside the mechanism built to exclude Earth.],
   [Each change cost something, and the costs are recorded next to the corrections.],

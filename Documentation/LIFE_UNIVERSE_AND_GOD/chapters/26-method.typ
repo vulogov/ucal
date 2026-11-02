@@ -115,17 +115,52 @@ of chapter 18 as versions of one position rather than as unrelated coincidences.
 
 #subsection("What the reverse book would find")
 
-Worth sketching, since naming a limitation without indicating its shape is cheap.
+Worth sketching, since naming a limitation without indicating its shape is cheap —
+and since the eight conflict sections already contain its first pages, written from
+the wrong side.
 
 A book with a tradition as the fixed point would ask whether the artifact is *adequate*
-to that tradition's account of time — not merely whether the two converge. Chapter 22
-would become: does an interval-measure built on διάστημα actually respect the
-essence/energies distinction, or does it flatten it? Chapter 20 would become: what
-would a calendar built on *ʿāda* look like, and would it have drift bounds at all?
+to that tradition's account of time — not merely whether the two converge. The
+question changes shape with the fixed point, and in each case the chapter above
+already shows where the artifact would be found wanting:
+
+/ From Aristotle: an instrument whose finest unit is a tick addresses only a countable
+  subset of a continuum. The reverse book would ask what a calendar built on *Physics*
+  VI looks like — intervals as primitive, instants as their limits — and whether the
+  tick could be derived from it rather than declared beneath it.
+/ From Ghazālī: a calendar built on *ʿāda* would have no drift bound at all, because a
+  bound presupposes a nature. The reverse book would ask what replaces the convergent
+  walk when the only honest guarantee is *until God wills otherwise* — and whether the
+  validity window, which chapter 20 found Ghazālian, is the whole of such a calendar or
+  only its edge.
+/ From Augustine and Aquinas: not whether `UCAL-E0020` matches *Confessions* XI, but
+  whether a count that begins at a stipulated zero respects the difference between a
+  beginning and a first member. Chapter 21's conflict says UC-Θ fails that test; the
+  reverse book would ask whether UC-1 passes it or merely declines to sit it.
+/ From Palamas and Nyssa: does an interval-measure respect the essence/energies
+  distinction, or flatten it by treating *what cannot be measured* as one more
+  quantity with a large error bar? `BIG_BANG_CLAIM` is the test case, and it is not
+  obvious which way it falls.
+/ From Losev: the reverse book would deny the premise of Rule M. If number and name are
+  constitutive, the line between a structure and a reading of it is not there to be
+  marked, and the deletion test is checking a distinction the tradition does not
+  grant.
+/ From Kant: whether a 61-digit integer can be *presented* at all without inducing the
+  illusion the type system contains — which is chapter 32's question, and the one
+  place where this book already stands on the other side.
 
 Those are better questions than this book asks, and they are unreachable from here.
 They are unreachable because the artifact is fixed, and asking them would require
-letting it vary.
+letting it vary — redesigning it from inside each tradition and seeing what survives.
+
+#claim("interpretation")[
+  What can be said from this side is that the conflict sections are the reverse book's
+  table of contents. Each is the point at which a tradition, held constant for a page,
+  found the artifact inadequate; the reverse book would hold it constant for a chapter
+  and find out how inadequate. That the material for it exists is the best evidence
+  that Part VI read the traditions rather than quarried them. A quarry does not yield
+  the argument against the quarrying.
+]
 
 #callout(label: "Why the choice was still right")[
   Because the alternative book cannot be written honestly by this author.
@@ -136,7 +171,8 @@ letting it vary.
   artifact constant is the only frame in which he is competent across the whole survey.
 
   That is a reason. It is not a justification of the frame as neutral, and it should not
-  be read as one.
+  be read as one. The reverse book is left as an invitation rather than attempted
+  badly, and the list above is what it would be invited to.
 ]
 
 #recap((
@@ -145,5 +181,5 @@ letting it vary.
   [Sorabji turns four literatures into one conversation, which is why Kalām and Epicurean atomism could be read as versions of one position.],
   [*Conflict:* the method makes the code the invariant and the traditions the variables. That is a metaphysical choice, adopted without argument — the third such in this part.],
   [*What changes:* the book must disclose its procedure as a position rather than a neutral frame. The last and most self-referential application of Rule M, and a correction as much as a conclusion.],
-  [The reverse book — tradition as fixed point — would ask whether the artifact is *adequate* to an account of time, not merely whether it converges. Better questions, unreachable from here.],
+  [The reverse book — tradition as fixed point — would ask whether the artifact is *adequate* to an account of time, not merely whether it converges. Its first pages are the conflict sections, read from the other side; the rest is unreachable from here.],
 ))

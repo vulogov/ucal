@@ -30,6 +30,7 @@ when a chapter leans on one — that is what this page is for.
     [*Z*], [time is unsigned], [the domain begins at the datum; earlier is not representable], [3],
     [*G*], [the tier grid], [units are powers of five; a timestamp is base 5], [4],
     [*N*], [names are display only], [a tier's identity is its exponent, not its name], [4],
+    [*T*], [truncation is uncertainty], [a coarser value is an interval, not a padded point], [6],
     [*P*], [profiles are tagged and type-bound], [two profiles' values cannot be compared], [6],
     [*K*], [one mechanism; Earth is an instance], [every calendar is built by the same path], [8],
     [*J*], [the anchor is declared and required], [phase is supplied per body; absence is an error], [8],
@@ -45,7 +46,7 @@ when a chapter leans on one — that is what this page is for.
 
 #v(3mm)
 
-Ten further rules govern parts of the software the book does not discuss.
+Nine further rules govern parts of the software the book does not discuss.
 Appendix D lists all twenty-four, together with the non-goals, failure modes
 and specification corrections cited in the text. The normative statements are
 in `spec/RULES.md` in the source tree.

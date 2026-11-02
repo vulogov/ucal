@@ -254,8 +254,19 @@
         text(font: body_family, size: 8.5pt, style: "italic", fill: ink_paper, caption)
       })
     block(fill: ink_code_bg, stroke: 0.5pt + ink_rule, inset: 8pt, width: 100%,
-      radius: (bottom-left: 2pt, bottom-right: 2pt),
-      text(font: mono_family, size: 8pt, body))
+      radius: (bottom-left: 2pt, bottom-right: 2pt), {
+        // The body is a raw block, and the document-wide raw rule below would
+        // wrap it in a second bordered box at 8.5pt — inside this one, with a
+        // second inset — which left about 65 characters of width instead of the
+        // 72 this box is sized for. Rendered plainly here, at the size the
+        // terminal declares. The lines are joined by hand because a rule that
+        // returned the raw element itself would be matched by the outer rule
+        // again, and the outer rule's size would win.
+        set par(first-line-indent: 0pt, justify: false)
+        show raw.where(block: true): it => text(font: mono_family, size: 8pt,
+          it.lines.join(linebreak()))
+        body
+      })
   })
   v(2mm)
 }

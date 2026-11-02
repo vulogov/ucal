@@ -31,7 +31,7 @@ Every calendar in the system is the same shape:
 #v(2mm)
 
 Three of the four are computed. One is not, and the one that is not is the interesting
-one — it gets flagged here and gets a full treatment in chapter 16.
+one. It is flagged here and treated in full in chapter 16.
 
 #section("Units, as rationals of ticks")
 
@@ -60,6 +60,10 @@ fractional part as a continued fraction and reading off the convergents — the
 sequence of best rational approximations, in the precise sense that no fraction with a
 smaller denominator comes closer.
 
+`cal show` takes a calendar and an instant and prints the whole derivation. The
+instant throughout this part is the one chapter 6 used; only the `fields` section,
+the local date itself, depends on it.
+
 #terminal(caption: "ucal cal show earth-d — the derivation")[
 ```
 intercalation:
@@ -73,6 +77,7 @@ intercalation:
     4: 31/128     — 1 day slips in 400000 local years   <- chosen
     5: 752/3105   — 1 day slips in 62100000 local years
     6: 4543/18758 — 1 day slips in 937900000 local years
+    …
 ```
 ]
 
@@ -107,40 +112,53 @@ periods alone.
 If a calendar names no grouping satellite, it has no months. Not a default month, not
 a synthesised one, not a fallback to Earth's. None.
 
-#terminal(caption: "ucal cal list — twelve derived calendars, two of them anchored")[
+#terminal(caption: "ucal cal list — fifteen derived calendars, two of them anchored")[
 ```
-earth-d      earth    anchor 1   31/128 (convergent 4)   cycles from moon
-mars-d       mars     anchor 1   45/76  (convergent 6)   no grouping satellite
-titan-d      titan    —          88/117 (convergent 3)   no anchor
-luna-d       luna     —          31/84  (convergent 5)   no anchor
-mercury-d    mercury  —          1/2    (convergent 1)   no anchor
-venus-d      venus    —          135/146 (convergent 5)  no anchor
-jupiter-d    jupiter  —          68/81  (convergent 4)   no anchor
-io-d         io       —          58/59  (convergent 2)   no anchor
-europa-d     europa   —          1/24   (convergent 2)   no anchor
-ganymede-d   ganymede —          149/261 (convergent 4)  no anchor
-callisto-d   callisto —          17/28  (convergent 6)   no anchor
-enceladus-d  enceladus —         28/151 (convergent 5)   no anchor
-
-  no anchor: complete in units, intercalation and cycles, incomplete in
-  phase. Asking for local fields is UCAL-E0062.
+calendar      kind              body       anchor_revision
+────────────  ────────────────  ─────────  ───────────────
+earth-d       derived — Rule K  earth      1
+              leap_rule  31/128 (convergent 4)
+              cycles  from moon
+mars-d        derived — Rule K  mars       1
+              leap_rule  45/76 (convergent 6)
+              cycles  none — the calendar names no grouping satellite
+titan-d       derived — Rule K  titan      —
+              leap_rule  88/117 (convergent 3)
+              status  no anchor: complete in units,
+                      intercalation and cycles, incomplete in phase.
+                      Asking for local fields is UCAL-E0062
+                      (Rule J.3).
+luna-d        derived — Rule K  luna       —
+              leap_rule  31/84 (convergent 5)
+              status  no anchor: …
+…
+uranus-d      derived — Rule K  uranus     —
+              leap_rule  42/85 (convergent 2)
+              status  no anchor: …
+neptune-d     derived — Rule K  neptune    —
+              leap_rule  7/179 (convergent 4)
+              status  no anchor: …
+pluto-d       derived — Rule K  pluto      —
+              leap_rule  53/149 (convergent 5)
+              status  no anchor: …
 ```
 ]
 
-#callout(label: "Ten of the twelve have no anchor, and that is the ordinary case")[
-  It would be easy to read that table as ten failures beside two successes. It is
+#callout(label: "Thirteen of the fifteen have no anchor, and that is the ordinary case")[
+  It would be easy to read that table as thirteen failures beside two successes. It is
   the other way round.
 
   Earth and Mars have anchors because they have had landers, orbiters, and
-  centuries of argument about where their prime meridians are. The other ten have
-  not. That is a fact about where the instruments are, not about the mechanism —
-  and every one of the twelve derives its intercalation from its own periods by the
-  identical code path.
+  centuries of argument about where their prime meridians are. The other thirteen
+  have not. That is a fact about where the instruments are, not about the mechanism
+  — and every one of the fifteen derives its intercalation from its own periods by
+  the identical code path.
 
-  The ratio moved once already. It was five of seven until 1.5.0 added Io, Europa,
-  Ganymede, Callisto and Enceladus, and adding them moved no code: they are five
-  more rows in one list. The sentence you are reading had to be edited and the
-  derivation did not, which is the distinction the whole chapter is about.
+  The ratio has moved twice already. It was five of seven until 1.5.0 added Io,
+  Europa, Ganymede, Callisto and Enceladus, and ten of twelve until 1.12.0 added
+  Uranus, Neptune and Pluto. Neither addition moved code, because a body is a row in
+  one list. The sentence you are reading had to be edited twice and the derivation
+  did not, which is the distinction the whole chapter is about.
 
   Mercury is the one worth staring at. Its solar day is about twice its year, so
   the derived rule is `1/2`: a Mercurian year is *half a Mercurian day*. Nothing in
@@ -183,13 +201,18 @@ revision number and an uncertainty window.
 anchor:
   phase         mean solar midnight
   revision      1
-  method        mean solar midnight at the prime meridian on 2000-01-01,
-                i.e. 00:00:00 UT1, converted through TT = UT1 + Delta-T
-                with Delta-T(2000.0) = 63.8285 s
-  uncertainty   dominated by the resolution of the published Delta-T series
+  method        mean solar midnight at the prime meridian on
+                2000-01-01, i.e. 00:00:00 UT1, converted through
+                TT = UT1 + Delta-T with Delta-T(2000.0) = 63.8285 s
+  uncertainty   dominated by the resolution of the published Delta-T
+                series, which is quoted to 0.0001 s near 2000.0; the
+                window is widened to 1 ms to cover the series' own
+                stated scatter
   window_ticks  37097168799722000000000000000000000000000
-  citation      IERS Conventions (2010) and the IERS Earth Orientation
-                Centre's published Delta-T series
+  citation      IERS Conventions (2010) and the IERS Earth
+                Orientation Centre's published Delta-T series;
+                iers.org no longer answers — the original document
+                is available in the Internet Archive
 ```
 ]
 
@@ -213,14 +236,13 @@ The Gregorian calendar is in this system, and it is not a derived calendar.
 
 #terminal(caption: "ucal cal list — the legacy entries")[
 ```
-earth-civil:
-  kind       legacy — declared tables (§8.6)
-  arbitrary  4
-  leap_rule  97/400 (NOT a convergent — declared, not derived)
-
-earth-julian:
-  kind       legacy — declared tables (§8.6)
-  arbitrary  4
+earth-civil   legacy — declared tables (§8.6)  —          —
+              leap_rule  97/400 (NOT a convergent — declared,
+                         not derived)
+              arbitrary  4
+earth-julian  legacy — declared tables (§8.6)  —          —
+              leap_rule  1/4 (a convergent)
+              arbitrary  4
 ```
 ]
 

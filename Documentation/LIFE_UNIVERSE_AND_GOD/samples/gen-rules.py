@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate the rule reference — the front-matter card and Appendix D.
 
-The book cites rule letters 123 times across 14 rules, starting in chapter 4,
+The book cites rule letters across fifteen of the twenty-four, starting in chapter 3,
 and until now defined none of them. A reader meeting "Rule N" on page 22 had
 nowhere to look.
 
@@ -23,6 +23,10 @@ import subprocess
 import sys
 
 BOOK = pathlib.Path(__file__).resolve().parent.parent
+
+# Counts in the prose are derived from the citation scan, so adding a rule
+# citation to a chapter cannot leave the card saying "ten further" when it is nine.
+WORDS = {9: "nine", 10: "ten", 11: "eleven", 12: "twelve", 13: "thirteen", 14: "fourteen", 15: "fifteen", 16: "sixteen"}
 ROOT = BOOK.parents[1]
 RULES_MD = ROOT / "spec" / "RULES.md"
 CH = BOOK / "chapters"
@@ -138,8 +142,9 @@ def card(used: set) -> str:
             continue
         name, short, _long, ch = GLOSS[r]
         L.append(f"    [*{r}*], [{name}], [{short}], [{ch}],")
+    rest = WORDS[24 - len(used)].capitalize()
     L += ["  )", "]", "", "#v(3mm)", "",
-          "Ten further rules govern parts of the software the book does not discuss.",
+          f"{rest} further rules govern parts of the software the book does not discuss.",
           "Appendix D lists all twenty-four, together with the non-goals, failure modes",
           "and specification corrections cited in the text. The normative statements are",
           "in `spec/RULES.md` in the source tree.", "",
@@ -162,7 +167,7 @@ def appendix(used: set) -> str:
          "All twenty-four, with the chapters that use them. Subject lines are taken from",
          "`spec/RULES.md`, which is the normative statement; the glosses are this book's.",
          "",
-         "The fourteen the book actually cites are marked. The other ten govern parts of",
+         f"The {WORDS[len(used)]} the book actually cites are marked. The other {WORDS[24 - len(used)]} govern parts of",
          "the software the book does not discuss, and are listed so that the set is",
          "complete rather than curated.", "",
          "#section(\"The twenty-four rules\")", "",

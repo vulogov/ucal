@@ -14,7 +14,7 @@ measurement exists. It is very good. Why not use it?
 The published age is 13.787 billion years, plus or minus 0.020 billion.
 
 The plus-or-minus is not a formality. Converted into ticks it is a number with
-fifty-eight digits — about 0.145% of the entire span from the datum to now, or 141.53
+fifty-nine digits — about 0.145% of the entire span from the datum to now, or 141.53
 drifts on the ladder of chapter 4. If tick zero were *defined* as the measured age,
 every timestamp would be an offset from a foundation that wobbles by that much, and
 the exactness of the integer arithmetic would be decoration over a guess.

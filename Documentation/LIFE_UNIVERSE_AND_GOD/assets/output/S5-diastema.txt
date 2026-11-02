@@ -19,7 +19,8 @@ on the tier ladder:
 in beats — the universe second:
   whole            9304313109135981143
   remainder_ticks  216453223532315359877956032752990722656250
-  note             the beat is the universe second (§0.5), 5^60 ticks; this                      count carries no Earth content
+  note             the beat is the universe second (§0.5), 5^60 ticks; this
+                   count carries no Earth content
 
 Chapter 22 supplies the word for what this measures: diastema, the
 interval that is the mark of createdness. That is why the instrument

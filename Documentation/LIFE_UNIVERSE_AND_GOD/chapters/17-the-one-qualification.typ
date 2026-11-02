@@ -63,7 +63,7 @@ A conditional about a situation that does not exist is not a use case.
   book would be more comfortable to write and would have quietly abandoned its thesis.
 
   The thesis is that this is research conducted in the medium of a working program, and
-  that the rigor is the medium rather than a preliminary to a payoff. A rescue of the
+  that the rigour is the medium rather than a preliminary to a payoff. A rescue of the
   practicality question would not strengthen that. It would replace it.
 ]
 

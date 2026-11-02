@@ -121,7 +121,7 @@ acknowledging the condition under which it works at all.
 
 #claim("interpretation")[
   Chapter 13 read *Мнимости* as precedent and cautionary tale in one text, and said the
-  distance between §7 and §9 is exactly one move. This chapter supplies what that
+  distance between the Dante reading and §9 is exactly one move. This chapter supplies what that
   reading was missing: the context in which the move was not obviously a move.
 
   For Losev — and Florensky agreed with him, publicly, at cost — a formal structure

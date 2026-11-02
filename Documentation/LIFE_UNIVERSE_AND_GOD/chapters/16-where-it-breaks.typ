@@ -2,7 +2,7 @@
 
 #chapter(number: 16, title: "Where it breaks")
 
-Chapter 15 showed the mechanism working on seven bodies. This chapter is the same
+Chapter 15 showed the mechanism working on fifteen bodies. This chapter is the same
 length, and that is a rule rather than a coincidence: a book whose capability section
 outruns its limits section is selling something.
 
@@ -29,12 +29,18 @@ So every calendar carries one declared, cited, interval-valued constant:
 anchor:
   phase         mean solar midnight
   revision      1
-  method        mean solar midnight at the prime meridian on 2000-01-01,
-                i.e. 00:00:00 UT1, converted through TT = UT1 + Delta-T
-                with Delta-T(2000.0) = 63.8285 s
+  method        mean solar midnight at the prime meridian on
+                2000-01-01, i.e. 00:00:00 UT1, converted through
+                TT = UT1 + Delta-T with Delta-T(2000.0) = 63.8285 s
   uncertainty   dominated by the resolution of the published Delta-T
-                series, quoted to 0.0001 s near 2000.0; widened to 1 ms
-  citation      IERS Conventions (2010), IERS Earth Orientation Centre
+                series, which is quoted to 0.0001 s near 2000.0; the
+                window is widened to 1 ms to cover the series' own
+                stated scatter
+  window_ticks  37097168799722000000000000000000000000000
+  citation      IERS Conventions (2010) and the IERS Earth
+                Orientation Centre's published Delta-T series;
+                iers.org no longer answers — the original document
+                is available in the Internet Archive
 ```
 ]
 
@@ -47,7 +53,8 @@ anchor:
   the rotation period beside it — both are cited measurements with uncertainty windows
   — and it is no less necessary. The design does not pretend the anchor is derived,
   does not hide it among the computed fields, and does not default it. Its absence is
-  an error rather than a fallback, which is the whole of chapter 16's second half.
+  an error rather than a fallback, which is what the second half of chapter 8 was
+  about.
 ]
 
 #section("2. A body with no qualifying satellite has no month")
@@ -135,21 +142,92 @@ are the same relationship.
 There is no relativistic model here at all.
 
 No time dilation. No worldline. No transformation between frames. The profile declares
-a single comoving frame and every quantity is counted within it.
+a single comoving frame — FLRW cosmological time, in the rest frame of the microwave
+background — and every quantity is counted within it. That is the frame in which the
+age of the universe is quoted, so for the cosmological use the choice costs nothing a
+cosmologist has not already paid.
+
+The one place the frame touches the arithmetic's edge is the bridge. Terrestrial Time
+is a clock on Earth's geoid, and the geoid is not comoving with the microwave
+background: the solar system moves against it at about 370 kilometres a second, and
+sits in the Galaxy's potential. So the datum output carries a second piece of
+metadata beside `BIG_BANG_CLAIM`: a *frame-bridge claim*, a declared bound of five
+parts in a million on the rate difference between the profile's frame and its bridge
+scale. Over the whole span that is about 69,000 years, 290 times smaller than the
+claim's half-width, and like the claim it is held in a type no arithmetic may consume.
+It is a rate, so it cancels exactly in any difference of two instants carried through
+the same bridge — which is every interval this program computes. It bears only on
+reading an absolute tick count as elapsed cosmological time.
 
 #claim("interpretation")[
-  For the uses this system is aimed at — deep time, cosmological scales, comparing
-  epochs — that is defensible, because the frame is declared and the differences it
-  ignores are small against the intervals it measures.
+  It is tempting to call the missing physics a missing feature, and the honest
+  description is harder: it is the price of the central data structure. One unsigned
+  integer per instant asserts that there is one time, and that assertion is the thing
+  general relativity denies. A clock on Earth's surface, a clock in orbit, and a clock
+  in the comoving frame do not agree on how many ticks have elapsed, and no single
+  column of integers can hold all three.
 
-  For a body deep in a gravity well, or for two clocks that need to agree to a
-  precision where dilation matters, this system is simply the wrong instrument. It
-  would give an answer, and the answer would be wrong in a way it could not detect,
-  which is the worst kind.
+  For deep time — comparing epochs, dating recombination, measuring διάστημα across
+  the span — the declared frame is the right one, and the disagreement between clocks
+  is small against the intervals measured. For a body deep in a gravity well, or for
+  two clocks that must agree to a precision where dilation matters, this system is
+  the wrong instrument. It would give an answer, and the answer would be wrong in a
+  way it could not detect, which is the worst kind.
+
+  What an extension would look like is known, and saying so keeps the limit from
+  being mistaken for a refusal to think about it. The relativistic content belongs at
+  the bridge, not in the arithmetic. A second frame is a second *profile*, declaring
+  its own frame under Rule F and kept from mixing with UC-1 by Rule P; the conversion
+  between them is a declared, certified ratio at a boundary you can point at — the
+  same localisation chapter 7 performed on the SI second. Inside each profile the
+  tick count remains a coordinate in its declared frame, which is what Rule F already
+  says it is. The frame-bridge claim above is that design's first line, written
+  before the second profile exists: the gap between frames is on the record, as a
+  bound, in a place the compiler can reach. `ucal dilate`, below, is its second: the
+  ratio between two clocks, computed and certified, before the profile that would
+  consume it exists.
 
   Rule F is what makes this a limit rather than a hazard: the frame is *declared*, so
   the assumption is visible rather than implicit. That does not make the system usable
   outside the frame. It makes the boundary findable.
+]
+
+The pinned tree carries one command that touches this limit, and saying exactly what
+it does keeps the limit honest in both directions. `ucal dilate` computes gravitational
+time dilation at a radius as a certified interval — `√(1 − r_s/r)` for a static clock,
+`√(1 − 3r_s/2r)` for one in circular orbit — bracketed by integer square roots in exact
+rationals, so the interval is proved to contain the value rather than converged to it.
+At the Sun's surface:
+
+#terminal(caption: "ucal dilate --rs-over-r 0.0000042467 — the Sun's surface")[
+```
+rs_over_r  42467/10000000000
+observer   static at r — gravitational dilation only, √(1 − r_s/r)
+digits     40
+proper_per_coordinate:
+  lo  0.999997876647745687
+  hi  0.999997876647745688
+redshift_z:
+  lo  0.000002123356762946
+  hi  0.000002123356762947
+certification:
+  rounded, trunc, 18 digits  lo
+  rounded, ceil, 18 digits   hi
+```
+]
+
+It reports a ratio between two clocks and does not claim that either of them is the
+one `ucal` keeps; its own closing note says so, and gives the reason this chapter gave
+— one unsigned integer per instant asserts there is one time. It refuses `r_s/r ≥ 1`,
+where the Schwarzschild coordinate stops being a clock at all, rather than returning a
+larger number.
+
+#claim("interpretation")[
+  So `dilate` is not the missing relativistic model, and it is not nothing. It is the
+  conversion this chapter says would have to live at the bridge — computed, certified,
+  and kept apart from the tick count — built before the profile that would consume it.
+  The limit stands as stated: one column of integers, one declared frame, and the ratio
+  to any other clock computed beside the count rather than folded into it.
 ]
 
 #section("6. Body parameters are wrong outside their validity windows")

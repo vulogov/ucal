@@ -118,7 +118,7 @@ not knowing it.
   firmly, argued for repeatedly, and defined against precisely the alternative that
   chapter 12's unbuilt profile assumes.
 
-  UC-Θ posits a datum at *organization* — matter arranged rather than created from
+  UC-Θ posits a datum at *organisation* — matter arranged rather than created from
   nothing, with an origin of ordering that is not an origin of existence. That is,
   in the terms Augustine and Aquinas use, the Platonic opinion: pre-existent material
   shaped by a demiurge. It is the position these authors spent centuries refuting.
@@ -164,6 +164,6 @@ not knowing it.
   [`UCAL-E0020` is Augustine's move — a malformed question refused, not answered with a value on the far side of an origin.],
   [Aquinas' *ST* I.13.7 removes what would otherwise be fatal: dating a terminus in the created order commits you to nothing about how a timeless act relates to time.],
   [Cusanus states this book's thesis first. The contribution is not the thesis but the second clause — that the declaration can be enforced mechanically.],
-  [*Conflict:* UC-Θ assumes organization rather than creation from nothing, which is the position this direction was built to refute. It is heterodox by this standard and the book says so.],
+  [*Conflict:* UC-Θ assumes organisation rather than creation from nothing, which is the position this direction was built to refute. It is heterodox by this standard and the book says so.],
   [*What changes:* Rule P was written for versioning and turns out to be what keeps two cosmologies apart — doing theological work nobody designed it for, and insufficient for the job, since it never requires a profile to declare what it assumes.],
 ))

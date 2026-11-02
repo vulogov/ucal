@@ -86,7 +86,7 @@ this book to state properly and that Part IV is entirely about.
 The short version, so you can carry it through Parts II and III: *the age of the universe
 is a measurement, and measurements have error bars, and an error bar cannot be the origin
 of an exact integer count.* The published figure is 13.787 billion years give or take
-0.020 billion. That uncertainty, converted to ticks, is a number with fifty-eight digits.
+0.020 billion. That uncertainty, converted to ticks, is a number with fifty-nine digits.
 If the datum inherited it, every timestamp in the system would inherit it too, and the
 exactness the whole design exists to protect would be theatre.
 

@@ -71,7 +71,7 @@ base-5 digits wide. Rung $k$ is $5^(60 + 5k)$ ticks, indexed from the beat at $k
   content((0, y + 0.06), text(size: 7.5pt, fill: luma(110), "finer"))
 }))
 #v(1mm)
-#figcap[2][
+#figcap[1][
   The named rungs of the tier ladder. Each is 3125 of the one below. The ladder continues
   in both directions; only the named tiers are shown.
 ]
@@ -99,9 +99,9 @@ Here is one real instant, at full precision and then at three coarser tiers:
 
 #terminal(caption: "ucal explain — one instant, four precisions")[
 ```
-ticks     8070205189128471254993117657693008777530466139316558837890625
+ticks   8070205189128471254993117657693008777530466139316558837890625
 
-human     UC1 0031·0687·2481·3000·1638·3018:0779·2671·2006·1837·…
+human   UC1 0031·0687·2481·3000·1638·3018:0779·2671·2006·1837·…
 tiers:
   T5 deep   31
   T4 drift  687
@@ -196,7 +196,7 @@ The project's own mark is a diagram of this chapter, and it is worth reading as 
   line((-2.5, 0.05), (-0.19, 0.0), stroke: 0.4pt)
 }))
 #v(1mm)
-#figcap[4][
+#figcap[2][
   The mark, read as a diagram. Five heavy divisions on the tick band, not twelve — the
   base is visible at a glance. The centre is negative space.
 ]

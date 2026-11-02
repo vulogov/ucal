@@ -5,7 +5,7 @@
 A negative inventory. Every item is a sentence this book was in a position to write and
 did not, and each is listed with what would have made it writable.
 
-It is here because a book that surveys nine traditions alongside a Rust workspace will
+It is here because a book that surveys eight traditions alongside a Rust workspace will
 be quoted, and the quoting will not always be careful. This chapter is what the author
 can point at.
 
@@ -79,6 +79,12 @@ alone — a Rushdian ontology in chapter 20, a clean structure/reading line in c
 the comparative frame in chapter 26. All three were discovered by reading the artifact
 against traditions, and none is declared in the specification.
 
+*Not claimed: that the absence of a relativistic model is a theorem rather than a
+scope decision.* Chapter 16 says what an extension would be — a second profile, a
+declared frame, a certified ratio at the bridge — and that it was not built. One
+integer per instant asserts one time. The book says so, and does not pretend the
+assertion was forced on it.
+
 #section("About the medium")
 
 *Not claimed: that mechanical enforcement is a better argument.* Chapter 29 says the
@@ -93,6 +99,11 @@ either.
 *Not claimed: that the instrument reaches God.* It measures διάστημα, which chapter 22
 establishes is the mark of the created order by definition. That is not a limitation
 being confessed; it is what an interval-measure is.
+
+*Not claimed: that the rendering path can make the 61-digit integer safe to read.* It
+can state the count no more finely than the datum is identified, and it warns when a
+quantity is comparable to that uncertainty. Chapter 32 says why that contains the
+illusion and does not cure it.
 
 #section("The one thing that is claimed")
 
@@ -123,7 +134,7 @@ that did not establish it.
   distinction between what a system computes and what it merely records can be made
   mechanical, and until it is mechanical it depends on someone remembering.*
 
-  Everything else here — the nine traditions, the six samples, the sixteen deltas, the
+  Everything else here — the eight traditions, the six samples, the sixteen deltas, the
   convergent ladders — is either evidence for that or an honest account of what failed
   to be.
 ]

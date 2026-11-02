@@ -44,7 +44,7 @@ and will be taken for them.
 / derived: Of a rule: produced by the mechanism from cited parameters. The Julian
   leap rule is derived; the Gregorian is not. Chs. 8, 10.
 
-/ díastēma: See the traditions below. The term chapter 22 supplies for what every
+/ diastema: See the traditions below. The term chapter 22 supplies for what every
   quantity in this system measures.
 
 / digit form: The base-5 notation, five digits to a group, anchored at T32.

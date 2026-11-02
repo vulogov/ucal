@@ -6,7 +6,7 @@ Chapter 27 reported what the six samples produced. This chapter reports what the
 not, because a demonstration reports only the first and this book is trying not to be
 one.
 
-It runs eight pages against chapter 27's ten. That is stated rather than corrected: the
+It runs nine pages against chapter 27's ten. That is stated rather than corrected: the
 remedy for a short chapter is not padding, and a book that criticises the gap between
 *this ran* and *this established something* should not close a page gap by writing more
 words about it. The proportion is what it is.
@@ -195,7 +195,9 @@ criteria, and chapter 9 said so. The book's own experiments deserve the same tre
   in `GE-A4-reader-test.md` — who reads what, the five questions in order, the scoring,
   and the consequence if it fails. Designing the test was the part the author could do.
 
-  The dual-audience claim in the preface is, as of this chapter, untested.
+  The dual-audience claim in the preface is, as of this chapter, untested — and the
+  preface now says so where the claim is made, which is the most an author can do
+  about an experiment he is disqualified from administering.
 ]
 
 #section("What the null results have in common")

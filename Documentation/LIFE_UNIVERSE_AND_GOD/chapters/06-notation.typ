@@ -8,13 +8,13 @@ redundancy, and about what each form is for.
 
 #terminal(caption: "ucal explain — one instant, four notations")[
 ```
-ticks     8070205189128471254993117657693008777530466139316558837890625
+ticks   8070205189128471254993117657693008777530466139316558837890625
 
-human     UC1 0031·0687·2481·3000·1638·3018:0779·2671·2006·1837·…
+human   UC1 0031·0687·2481·3000·1638·3018:0779·2671·2006·1837·…
 
-digit5    UC1/5 00000.00000. … .00111.10222.34411.44000.23023. …
+digit5  UC1/5 00000.00000. … .00111.10222.34411.44000.23023. …
 
-ucid      0000000000050PM6K45MKCAVY5MPYAMHCJQ142JHE26A2ZAJ9FJ1
+ucid    0000000000050PM6K45MKCAVY5MPYAMHCJQ142JHE26A2ZAJ9FJ1
 ```
 ]
 
@@ -29,6 +29,15 @@ A person reading `0031·0687·2481` can see at a glance that this is 31 deeps, 6
 drifts, 2481 spans — three quantities in a unit system, each written the way people
 write numbers. The same prefix in the digit form is `00111.10222.34411`, which is
 correct, canonical, and unreadable.
+
+#callout(label: "After the pin")[
+  The two forms above are separated differently — `·` in the human form, `.` in the
+  digit form — because at the pinned commit `explain` rendered the digit form through
+  the library's preset, which follows the RFC's printed example (§6.2), while every
+  other command used the §6.3 default. Both separators parse, so the value was never
+  in doubt. In the tree since, the command line prints every base-5 form with one
+  separator, and the block above is what the pinned binary printed.
+]
 
 #claim("interpretation")[
   The temptation is to call the human form a convenience wrapper and the digit form
@@ -138,7 +147,7 @@ character encodes a single significant bit and is always `0` or `1`.
   bar(-1.5, 13, luma(60), "13 characters", "2^64, for scale")
 }))
 #v(1mm)
-#figcap[3][
+#figcap[4][
   UCID length against range. Five bits per character, so width is linear in bits —
   and the domain is twice the bits.
 ]

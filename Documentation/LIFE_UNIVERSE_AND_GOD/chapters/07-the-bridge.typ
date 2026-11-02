@@ -12,7 +12,7 @@ Earth enters the system through exactly one number.
 
 #terminal(caption: "the bridge constant")[
 ```
-SECOND = 18 548 584 399 861 000 000 000 000 000 000 000 000 000 000 ticks
+SECOND = 18 548 584 399 861 000 000 000 000 000 000 000 000 000 000
 ```
 ]
 
@@ -77,7 +77,7 @@ by the caller.
     "and never sees a second"))
 }))
 #v(1mm)
-#figcap[9][
+#figcap[5][
   The bridge. Earth enters and leaves at one declared constant; the arithmetic in
   between is integer operations on tick counts.
 ]
@@ -162,8 +162,8 @@ leap_seconds:
   table_version     IERS Bulletin C 70 (no leap second to 2026-06-30)
   entries           27
   complete_through  2026-06-30
-  pre_1972          the 1961-1972 rubber-second era is modelled exactly;
-                    UTC before 1961-01-01 is UCAL-E0041
+  pre_1972          the 1961-1972 rubber-second era is modelled
+                    exactly; UTC before 1961-01-01 is UCAL-E0041
   network           never; the table is bundled and offline
 ```
 ]
@@ -194,7 +194,8 @@ handle this and starts its UTC support in 1972.
 
 #section("What the bridge costs")
 
-Honesty, since Part III is about what implementation refused.
+Part III is about what implementation refused, so the cost belongs here, stated
+before anyone has to ask for it.
 
 The bridge is where the claim "no Earth content" is at its weakest. `SECOND` is an
 Earth-derived constant sitting in the core crate, and the tick's *length* is fixed by

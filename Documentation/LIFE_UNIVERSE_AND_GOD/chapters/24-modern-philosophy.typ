@@ -110,7 +110,7 @@ no operators.
   survives by declining to be a claim about number at all — but it is stated as one.
 
   *UC-Θ asserts a first term.* The unbuilt profile posits that time begins to be at
-  organization. That is the thesis of the First Antinomy, and Kant's whole point is
+  organisation. That is the thesis of the First Antinomy, and Kant's whole point is
   that it cannot be asserted — not that it is false in a way the antithesis is true,
   but that asserting either is a transcendental error.
 

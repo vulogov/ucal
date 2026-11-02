@@ -36,14 +36,15 @@ Four declared epochs, each converted to absolute ticks.
 #terminal(caption: "assets/output/S1-chronologies.txt")[
 ```
 epoch                         civil (Julian)    ticks since datum
---------------------------------------------------------------------------
-Seder Olam (Masoretic AM 1)   3761 BC-10-07     807020180242960413984034848...
-Byzantine AM 1                5509 BC-09-01     807020077918219588719351401...
-Ussher                        4004 BC-10-23     807020166021508493862768038...
-Julian Day epoch              4713 BC-01-01     807020136627266382332510054...
+--------------------------------------------------------------------
+Seder Olam (Masoretic AM 1)   3761 BC-10-07     8070201802429604139…
+Byzantine AM 1                5509 BC-09-01     8070200779182195887…
+Ussher                        4004 BC-10-23     8070201660215084938…
+Julian Day epoch              4713 BC-01-01     8070201244728812467…
 
-Spread between the widest pair:
-  1,748.1 years
+Spread between the widest pair, in ticks and in years:
+  1023247408252646834467200000000000000000000000000000000
+  1748.1 years
 ```
 ]
 
@@ -73,7 +74,7 @@ Six historical intercalation rules, tested against Earth's convergent ladder.
 #terminal(caption: "assets/output/S2-calendar-audit.txt")[
 ```
 rule                       value   convergent?    1 day slips in
---------------------------------------------------------------------------
+--------------------------------------------------------------------
 Julian                       1/4      yes — #1            128 yr
 Gregorian                 97/400            NO          3,226 yr
 Revised Julian           218/900            NO         31,034 yr
@@ -150,9 +151,16 @@ One instant, three calendars — the demonstration that "now" is not a shared ob
 
 #terminal(caption: "assets/output/S4-simultaneity.txt")[
 ```
-earth-d:      earth-d/1: 0027-213.7987 c328    derived (Rule K)
-mars-d:       mars-d/1:  0082-086.1665         derived (Rule K)
-earth-civil:  2026-07-31T19:11:12 TT           legacy — UCAL-W0005
+calendar     rendered                             kind
+───────────  ───────────────────────────────────  ────────────────
+earth-d      earth-d/1: 0027-213.7987 c328        derived (Rule K)
+             anchor_revision  1
+mars-d       mars-d/1: 0082-086.1665              derived (Rule K)
+             anchor_revision  1
+earth-civil  earth-civil: 2026-07-31T19:11:12 TT  legacy (§8.6)
+             warning  UCAL-W0005: value produced by a legacy
+                      (non-derived) calendar
+             note  declared tables; not a Rule K derivation
 ```
 ]
 
@@ -179,9 +187,12 @@ ticks since the datum:
   8070205189128471254993117657693008777530466139316558837890625
 
 on the tier ladder:
-  T5 deep   31        T2 sweep  3000
-  T4 drift  687       T1 arc    1638
-  T3 span   2481      T0 beat   3018
+  T5 deep   31
+  T4 drift  687
+  T3 span   2481
+  T2 sweep  3000
+  T1 arc    1638
+  T0 beat   3018
 
 in beats — the universe second:
   whole            9304313109135981143
@@ -211,22 +222,30 @@ seriously as a bridge constant and reports what it does and does not determine.
 #terminal(caption: "assets/output/S6-revealed-ratio.txt")[
 ```
 WHAT IT IMPLIES
-  1 Kolob revolution = 5853488070570534936000...000 ticks
+  1 Kolob revolution = 5853488070570534936000…000 ticks
                      = 674861227352 beats
                      = 0.007076 drifts
 
   It is NOT a whole number of beats. The remainder is
     35632189513851911760866641998291015625000 ticks
-  which is 5^60-relative, not a rounding artifact.
+  which is 5^60-relative, not a rounding artifact: a thousand Julian
+  years is a whole number of seconds and seconds carry only 5^30, so
+  the ratio lands off the tier grid by construction. …
 
 WHAT IT LEAVES UNDETERMINED
-  the phase — Rule J requires an anchor; the text supplies a period
-  the uncertainty — Rule C requires epoch, rate and window; none given
-  the determination method — 'revealed' is not a Determination value
+  the phase — when a revolution begins. Rule J requires an anchor,
+  and the text supplies a period without one.
+  the uncertainty — Rule C requires an epoch, a rate and a validity
+  window. The text supplies a ratio with none of the three.
+  the determination method — 'revealed' is not a value the schema's
+  Determination field admits.
 
 VERDICT
-  ACCEPTED as a declared bridge constant (Rule Y)
-  REFUSED  as a Rule J anchor
+  ACCEPTED as a declared bridge constant. Rule Y requires a bridge to
+  be declared and tagged on both sides, and this one is …
+  REFUSED as a Rule J anchor. An anchor must carry a determination
+  with a stated uncertainty window, and no reading of the text
+  supplies one without inventing it.
 ```
 ]
 
@@ -287,7 +306,7 @@ The non-exactness was not anticipated and is the sample's most interesting outpu
   }
 }))
 #v(1mm)
-#figcap[8][
+#figcap[11][
   The six samples and what each returned. Every row is a file under
   `assets/output/`, regenerated by one script.
 ]

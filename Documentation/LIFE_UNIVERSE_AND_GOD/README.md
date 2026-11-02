@@ -48,7 +48,7 @@ argument became less persuasive.
 
 ## State
 
-**Complete draft.** All eight parts, 32 chapters, four appendices, 245 pages.
+**Complete draft.** All eight parts, 32 chapters, four appendices, 253 pages.
 
 RFC UCAL-A1 set a 200-page hard ceiling; it was raised on the author's
 instruction and the book runs through it. Part VI at the book band — nine full
@@ -92,8 +92,8 @@ output changes between runs is a demonstration and not evidence.
 
 `GE-A4-reader-test.md` is the two-reader protocol. **It has not been run** — it
 needs two people who are not the author, and it is the one experiment he cannot
-run. Chapter 28 records it as not run, and the preface's dual-audience claim is
-untested until it is.
+run. Chapter 28 records it as not run, and the preface says so where it makes the
+dual-audience claim, which stays untested until the protocol is run.
 
 ## Note on the assets
 

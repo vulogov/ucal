@@ -49,7 +49,7 @@ The specification behind this software claimed, twice, in two published
 revisions, that its calendar-derivation mechanism reproduces both the Julian and
 the Gregorian leap rules from first principles. It reproduces the Julian one
 exactly. The Gregorian rule is not there — not at that depth, not at any depth,
-and a rule twelve times simpler is more accurate than it.
+and a rule with a denominator twelve times smaller is more accurate than it.
 
 The author found that out from his own program, about his own published claim,
 and printed it. Chapter 10 is that story, and there is a check in the build now
@@ -96,11 +96,12 @@ looking at calendars that do have Earth in theirs. Some of what came out:
 
 #section("And what kind of book it is")
 
-Nine philosophical and religious traditions are read here — Greek, Jewish,
-Islamic, Patristic, Orthodox, Latter-day Saint, modern European, Russian — and
-none of them is argued to be true. They are treated as *readers of the artifact*:
-each chapter says where the tradition and the software agree, and then, at
-greater length, where they collide.
+Eight philosophical and religious traditions are read here — Greek, Jewish,
+Islamic, Patristic, Orthodox, Latter-day Saint, modern European, Russian — and a
+ninth chapter reads the method that read them. None of the eight is argued to be
+true. They are treated as *readers of the artifact*: each chapter says where the
+tradition and the software agree, and then, at greater length, where they
+collide.
 
 Every one of those chapters has a section headed *the conflict*, and four of
 them cut at the project rather than at the tradition. A Baghdad argument from
@@ -134,8 +135,8 @@ line, published and installable. Time is an unsigned integer count of Planck-tim
 units since a stipulated datum. There is no floating-point value anywhere in the
 workspace, not in a signature, a field, an intermediate, or the rendering path. Every
 constant in it is reproducible by two independent derivations that agree bit for bit.
-At the commit this book is pinned to, 609 tests pass on both integer backends. You can
-check every sentence in that paragraph; the last page of this book tells you how.
+At the commit this book is pinned to, 765 tests pass on the default integer backend and
+702 on the other. You can check every sentence in that paragraph; the last page of this book tells you how.
 
 *Its practical utility is questionable.* No task you have today needs a Planck-tick
 count since a stipulated datum. It does not compete with `chrono`, `time`, or
@@ -149,7 +150,7 @@ up a single page in Part V, and it is not a rescue.
 the medium of a working program. That is not a consolation prize awarded after
 usefulness failed. It is what the thing is.
 
-#section("The rigor is the medium")
+#section("The rigour is the medium")
 
 Here is the part that matters, and it is easy to misread as modesty.
 
@@ -168,7 +169,7 @@ program rather than a program with a book attached.
 
 #section("What this is not")
 
-Some of these will be obvious. They are listed because a book that surveys nine
+Some of these will be obvious. They are listed because a book that surveys eight
 philosophical and religious traditions alongside a Rust crate will be misread in
 predictable directions, and it is cheaper to close those doors now than to keep
 apologising later.
@@ -203,11 +204,19 @@ whole of that.
 
 The *reader's path* is Parts I, IV, VI, VII, and VIII. It is a book about what it
 means to build a measuring instrument that points at something it declares itself
-unable to measure, and about nine traditions that have thought carefully about origins,
+unable to measure, and about eight traditions that have thought carefully about origins,
 number, and time — read here as readers of the artifact rather than as authorities over
 it.
 
 Part I belongs to both. Nothing later in the book may redefine what Part I establishes.
+
+That there are two paths is a claim, and it has not been tested. The test is written:
+two readers, one from each path, each asked to state the thesis after a single reading,
+with a stated consequence if neither can. It needs two people who are not the author,
+which is why it is the one experiment in this book still marked *not run*. Chapter 28
+records that, and the protocol sits beside the book's source so that running it is a
+matter of finding two readers rather than of designing a test. Until it is run, the two
+paths are the author's intention and not a measured property of the book.
 
 #callout(label: "A note on marking")[
   This book marks its own claims. Where a passage is *interpretation* — the author
@@ -229,7 +238,7 @@ The most valuable document in this project's history is a correction.
 Two revisions of the specification asserted that the continued-fraction machinery
 reproduces the Julian and Gregorian calendar rules as convergents. The Julian rule does
 appear — it is the first convergent. The Gregorian rule does not appear at any depth,
-and a rule twelve times simpler is more accurate than it. The machinery contradicted its
+and a rule with a denominator twelve times smaller is more accurate than it. The machinery contradicted its
 author, in writing, on a claim he had published twice.
 
 That correction is in this book, dated, including the revisions that were wrong. It is

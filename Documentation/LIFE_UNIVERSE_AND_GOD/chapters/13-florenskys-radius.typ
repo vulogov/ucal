@@ -47,7 +47,7 @@ neither trivial nor forced. Whatever one thinks of the rest, this part is good w
 #v(3mm)
 #align(center, image("../assets/images/florensky-cosmos.png", width: 74%))
 #v(1mm)
-#figcap[11][
+#figcap[9][
   The cosmos Florensky's reading requires. The spheres carry their zodiacal and
   planetary signs, and they twist so that the outermost rejoins the innermost.
   The traced line is Dante's route: in from the Empyrean at the upper right, down

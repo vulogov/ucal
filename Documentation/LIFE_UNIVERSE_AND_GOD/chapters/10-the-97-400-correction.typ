@@ -112,7 +112,7 @@ denominator below 400 could beat it.
     text(size: 7pt, fill: rgb("#8a3a3a"), "with a 3× larger denominator"))
 }))
 #v(1mm)
-#figcap[6][
+#figcap[7][
   Earth's convergent ladder, and the Gregorian rule off it. Every point on the line is
   the best approximation available at its denominator. `97/400` is not on the line.
 ]
@@ -214,10 +214,10 @@ label in the tooling's own output:
 
 #terminal(caption: "ucal cal list")[
 ```
-earth-civil:
-  kind       legacy — declared tables (§8.6)
-  arbitrary  4
-  leap_rule  97/400 (NOT a convergent — declared, not derived)
+earth-civil   legacy — declared tables (§8.6)  —          —
+              leap_rule  97/400 (NOT a convergent — declared,
+                         not derived)
+              arbitrary  4
 ```
 ]
 

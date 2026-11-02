@@ -68,11 +68,11 @@ as things the project is not.
   be.
 ]
 
-#section("The rigor is the medium")
+#section("The rigour is the medium")
 
 The preface's third fact — that this is research of another kind, conducted in the
 medium of a working program — has been the least examined of the three. It is worth
-saying what "the rigor is the medium" means concretely, now that there is evidence.
+saying what "the rigour is the medium" means concretely, now that there is evidence.
 
 *The tests are the argument's form.* That the constants reproduce along two independent
 integer routes is not a preliminary to chapter 12's claim. It is what makes chapter 12's
@@ -101,19 +101,19 @@ only its successes would be making the same claims with none of the standing.
   demonstration in the only currency that counts — a specification that was wrong in
   sixteen places and said so.
 
-  That is what "the rigor is the medium" means. Not that rigour makes the argument more
+  That is what "the rigour is the medium" means. Not that rigour makes the argument more
   respectable. That without the rigour there is no argument, only a proposal.
 ]
 
 #section("What was actually built")
 
-Six crates. 609 tests on two integer backends. A specification vendored, corrected in
+Six crates. 765 tests on one integer backend and 702 on the other. A specification vendored, corrected in
 place, and cited by the source about a thousand times, with a build step that fails if
 a citation resolves to nothing — including, since 1.7.0, the citations in this book and
 in every other document here, which had never been checked at all. A tier grid
 generated from the library so it cannot drift. A lint that reports every exemption it
 honours, and refuses to report anything if it read too few files to be believed. A
-corpus of twenty-two recorded defects, one per check, so that every check is known to
+corpus of twenty-four recorded defects, one per check, so that every check is known to
 object to the thing it exists for. A book, marked throughout where it stops asserting
 fact, with a script that checks the marking.
 
@@ -136,7 +136,7 @@ None of it is useful.
   [Διάστημα makes the title a category rather than a paradox: the instrument measures interval, interval is the mark of createdness, and what lies beyond has none.],
   [The limit is not imprecision. Adding digits does not approach what has no interval — Cusanus' point, with Nyssa's reason under it.],
   [The positive statement: an instrument for the one quantity coextensive with the created order, at a resolution no process exceeds. Utility was never the aim, and its absence is not a stage the project failed to reach.],
-  [The rigor is the medium in three concrete senses: the tests make the claim about a real object, the refusals *are* the position, and the corrections are what gives it standing.],
+  [The rigour is the medium in three concrete senses: the tests make the claim about a real object, the refusals *are* the position, and the corrections are what gives it standing.],
   [The paper version would be shorter and read more widely, and would have no case in it where the machinery contradicted its author.],
   [None of it is useful. The third fact depends on the second rather than rescuing it.],
 ))

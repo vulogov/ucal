@@ -23,7 +23,7 @@ directly than this project's own specification manages.
   *Law with bounds and conditions.* D&C 88:38: "unto every kingdom is given a law; and
   unto every law there are certain bounds also and conditions."
 
-  *Organization rather than creation from nothing.* The King Follett discourse of 1844
+  *Organisation rather than creation from nothing.* The King Follett discourse of 1844
   argues that the word rendered "created" means to organise — that matter is
   co-eternal with God and is arranged rather than brought from nothing.
 

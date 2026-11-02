@@ -63,18 +63,19 @@ Convert that uncertainty into ticks and it becomes:
 #terminal(caption: "ucal datum — the claim's magnitude")[
 ```
 big_bang_claim:
-  half_width_ticks   11706976141141069872000000000000000000000000000000000000000
+  half_width_ticks   1170697614114106987200000000000000000000
+                     0000000000000000000
   half_width_drifts  141.53
 ```
 ]
 
-Fifty-eight digits. About 0.145% of the whole span from the datum to now.
+Fifty-nine digits. About 0.145% of the whole span from the datum to now.
 
 Now suppose the datum were defined *as* the measured age. Every timestamp in the system
 would inherit that uncertainty, because every timestamp is an offset from the datum. The
 exact integer arithmetic — the thing this entire design exists to protect — would be
 computing precise-looking answers on top of a foundation that wobbles by a number with
-fifty-eight digits in it.
+fifty-nine digits in it.
 
 You cannot get an exact origin from an inexact measurement. So the origin is not taken from
 the measurement. It is *declared*, and the measurement is recorded separately.
@@ -127,6 +128,6 @@ the universe; all of them are decisions that turned out to be useful.
 #recap((
   [Tick zero is the datum: stipulated, conventionally identified with the FLRW $t arrow.r 0$ limit, and explicitly not a measurement.],
   [The domain is unsigned. A request for a time before the datum is an error, not a negative number — a refusal of the question rather than an answer to it.],
-  [Exactness cannot come from measurement: the ±0.020 Gyr uncertainty is a 58-digit number of ticks, and an exact count cannot inherit it.],
+  [Exactness cannot come from measurement: the ±0.020 Gyr uncertainty is a 59-digit number of ticks, and an exact count cannot inherit it.],
   [The physical claim is recorded separately as metadata, cited, and — as Part IV shows — made impossible to use in arithmetic.],
 ))

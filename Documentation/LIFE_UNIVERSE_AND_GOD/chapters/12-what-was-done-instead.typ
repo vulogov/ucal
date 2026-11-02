@@ -91,8 +91,8 @@ uncertainty in the age of the universe as a number. Each fails to compile. The t
 suite passes precisely because they do.
 
 #claim("interpretation")[
-  This is the whole thesis in nine lines of Rust, and it is worth spelling out why it
-  is different in kind from a comment saying *do not do this*.
+  This is the whole thesis in three programs that must not compile, and it is worth
+  spelling out why it is different in kind from a comment saying *do not do this*.
 
   A comment addresses a reader who is paying attention. A runtime check addresses a
   program that reaches a particular line. A type addresses *everyone who ever writes
@@ -159,7 +159,7 @@ misreported the measurement.
   line((0.7, -1.05), (7.0, -1.05), stroke: (thickness: 0.6pt, dash: "dashed"))
 }))
 #v(1mm)
-#figcap[5][
+#figcap[8][
   `BIG_BANG_CLAIM` against the timeline. The claim straddles the datum and extends
   where no tick exists; the timeline is unsigned. Nothing converts between them.
 ]
@@ -173,23 +173,27 @@ declaration were prose. It is data, and it re-executes.
 #terminal(caption: "ucal datum — the chain")[
 ```
 datum_provenance:
-  input     13.787 Gyr +/- 0.020 Gyr (age_of_universe)
-  citation  Planck 2018 results VI, A&A 641, A6 (2020)
+  input     13.787 Gyr ± 0.020 Gyr (age_of_universe)
+  citation  Planck 2018 results VI: Cosmological parameters, A&A 641,
+            A6 (2020)
   unit_defs:
-    Gyr = 10^9 x 31 557 600 s (Julian years, exact)
+    Gyr = 10^9 x 31 557 600 s (Julian years, exact by definition)
   chain:
-    AGE_s     = 13 787 000 000 x 31 557 600
-              = 435 084 631 200 000 000 s        (exact)
+    AGE_s = 13 787 000 000 x 31 557 600
+          = 435 084 631 200 000 000 s (exact)
     AGE_ticks = AGE_s x SECOND
-              = 8070204002895596516263200000...  (exact)
-    beats     = round_half_even(AGE_ticks / BEAT)
-              = 9 304 311 741 502 590 385
-    ORIGIN_OFFSET
-              = beats x BEAT
-  residual_ticks     -3188569143643628194695338...
+          = 8070204002895596516263200000…0 (exact)
+    beats = round_half_even(AGE_ticks / BEAT)
+          = 9 304 311 741 502 590 385
+    ORIGIN_OFFSET = beats x BEAT
+          = 8070204002895596515944343085…9316558837890625
+rounding:
+  to                 BEAT
+  mode               half_even
+  residual_ticks     -318856914364362819469533860683441162109375
   residual_rendered  -0.017190364 s
-  rationale  a whole-beat datum makes all sub-beat
-             digits of the bridge epoch zero (2.4)
+  rationale          a whole-beat datum makes all sub-beat digits of
+                     the bridge epoch zero (§2.4)
 ```
 ]
 
@@ -250,7 +254,7 @@ the one that has been rendered inert.
 One thing this part must not do is imply the design is finished.
 
 There is a second profile that has been specified and not built. Call it UC-Θ. In it,
-the datum is not the FLRW limit but the beginning of time *at organization* — a
+the datum is not the FLRW limit but the beginning of time *at organisation* — a
 cosmology in which matter is organised rather than created from nothing, so that a
 physical origin lies later than the reckoning's zero, and there is a "before" that is
 not a *when*.

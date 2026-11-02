@@ -5,7 +5,8 @@
 
 Three bodies, one mechanism, end to end. Earth because it can be checked against a
 wall calendar; Mars because it is a different planet with a different answer; Titan
-because it is strange enough to break a mechanism that only looked general.
+because it is strange enough to break a mechanism that only looked general. The
+table carries all fifteen calendars the pinned tree ships; the prose walks three.
 
 #section("Earth")
 
@@ -22,12 +23,20 @@ Here it is as one line of a comparison:
     align: (left, right, left, left),
     [*body*], [*days/year*], [*rule chosen*], [*at the default bound*],
     [Earth], [365.242190], [31/128 — conv. 4], [1 day slips in 400,000 yr],
-    [Mars], [668.599], [45/76 — conv. 6], [1 sol slips in 16,566 Mars yr],
+    [Mars], [668.592], [45/76 — conv. 6], [1 sol slips in 16,566 Mars yr],
     [Titan], [673.752068], [88/117 — conv. 3], [no anchor: phase unavailable],
     [Moon], [12.368981], [31/84 — conv. 5], [no anchor: phase unavailable],
     [Mercury], [0.499990], [1/2 — conv. 1], [no anchor: phase unavailable],
     [Venus], [1.924634], [135/146 — conv. 5], [no anchor: phase unavailable],
     [Jupiter], [10475.839571], [68/81 — conv. 4], [no anchor: phase unavailable],
+    [Io], [2447.983064], [58/59 — conv. 2], [no anchor: phase unavailable],
+    [Europa], [1219.041727], [1/24 — conv. 2], [no anchor: phase unavailable],
+    [Ganymede], [604.570886], [149/261 — conv. 4], [no anchor: phase unavailable],
+    [Callisto], [258.607202], [17/28 — conv. 6], [no anchor: phase unavailable],
+    [Enceladus], [7851.185419], [28/151 — conv. 5], [no anchor: phase unavailable],
+    [Uranus], [42717.494200], [42/85 — conv. 2], [no anchor: phase unavailable],
+    [Neptune], [89667.039106], [7/179 — conv. 4], [no anchor: phase unavailable],
+    [Pluto], [14179.355697], [53/149 — conv. 5], [no anchor: phase unavailable],
   )
 ]
 #v(2mm)
@@ -59,7 +68,7 @@ cycles:
     37/3
     99/8
     136/11
-    235/19        <- the Metonic cycle
+    235/19
     4131/334
     8497/687
 ```
@@ -111,7 +120,7 @@ intercalation:
 ```
 ]
 
-A Mars year is 668.599 sols, so the fraction to absorb is 0.599 — much larger than
+A Mars year is 668.592 sols, so the fraction to absorb is 0.592 — much larger than
 Earth's 0.242, and a different shape of problem. The convergent ladder is
 correspondingly different: it starts at 1/1, meaning "every Mars year is a leap year",
 which is nearly right and not right enough.
@@ -176,9 +185,12 @@ year belongs to a different body entirely.
 
 Titan also demonstrates the mechanism's limit, immediately and unambiguously:
 
-#terminal(caption: "ucal cal show titan-d")[
+#terminal(caption: "ucal cal show titan-d <instant>")[
 ```
 UCAL-E0062: calendar has no anchor; local fields cannot be produced
+(this calendar has no anchor, so local fields cannot be produced
+(Rule J.3). Its units, intercalation and cycles are complete:
+`ucal cal list` shows them)
 ```
 ]
 
@@ -194,10 +206,15 @@ The mechanism's output, seen from outside:
 ```
 ticks  8070205189128471254993117657693008777530466139316558837890625
 
-earth-d:      earth-d/1: 0027-213.7987 c328    derived (Rule K)
-mars-d:       mars-d/1:  0082-086.1665         derived (Rule K)
-earth-civil:  2026-07-31T19:11:12 TT           legacy (§8.6)
-                                               UCAL-W0005
+calendar     rendered                             kind
+───────────  ───────────────────────────────────  ────────────────
+earth-d      earth-d/1: 0027-213.7987 c328        derived (Rule K)
+             anchor_revision  1
+mars-d       mars-d/1: 0082-086.1665              derived (Rule K)
+             anchor_revision  1
+earth-civil  earth-civil: 2026-07-31T19:11:12 TT  legacy (§8.6)
+             warning  UCAL-W0005: value produced by a legacy
+                      (non-derived) calendar
 ```
 ]
 
@@ -227,7 +244,7 @@ earth-civil:  2026-07-31T19:11:12 TT           legacy (§8.6)
     "three renderings, one value — and \"now\" is not a shared object"))
 }))
 #v(1mm)
-#figcap[7][
+#figcap[10][
   Cross-body simultaneity. The same tick count rendered in three calendars, each
   carrying its kind and its anchor revision.
 ]
